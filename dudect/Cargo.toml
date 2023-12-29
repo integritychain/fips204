@@ -1,0 +1,12 @@
+[package]
+name = "fips204-dudect"
+version = "0.1.0"
+authors = ["Eric Schorn <eschorn@integritychain.com>"]
+publish = false
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fips204 = { path = ".." }
+dudect-bencher = "0.6"

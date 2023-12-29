@@ -1,0 +1,7 @@
+/Cargo.lock
+**/target
+/.idea
+**/artifacts
+**/corpus
+/fuzz/.gitignore
+/dudect/Cargo.lock
