@@ -51,7 +51,7 @@ fn test_44_no_verif() {
 
     // Bad messages
     for i in 0..8 {
-        let mut msg_bad = msg.clone();
+        let mut msg_bad = msg;
         msg_bad[i] ^= 0x08;
         let ver = pk.try_verify_vt(&msg_bad, &sig).unwrap();
         assert!(!ver)

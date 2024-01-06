@@ -303,29 +303,30 @@ mod tests {
     fn test_coef_from_three_bytes1() {
         let bytes = [0x12u8, 0x34, 0x56];
         let res = coef_from_three_bytes(bytes).unwrap();
-        assert_eq!(res, 0x563412);
+        assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes2() {
         let bytes = [0x12u8, 0x34, 0x80];
         let res = coef_from_three_bytes(bytes).unwrap();
-        assert_eq!(res, 0x003412);
+        assert_eq!(res, 0x0000_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes3() {
         let bytes = [0x01u8, 0xe0, 0x80];
         let res = coef_from_three_bytes(bytes).unwrap();
-        assert_eq!(res, 0x00e001);
+        assert_eq!(res, 0x0000_e001);
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
         let res = coef_from_three_bytes(bytes).unwrap();
-        assert_eq!(res, 0x563412);
+        assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
@@ -346,21 +347,21 @@ mod tests {
     fn test_coef_from_half_byte_validation1() {
         let inp = 22;
         let res = coef_from_half_byte::<2>(inp);
-        assert!(res.is_err())
+        assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation2() {
         let inp = 15;
         let res = coef_from_half_byte::<2>(inp);
-        assert!(res.is_err())
+        assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation3() {
         let inp = 10;
         let res = coef_from_half_byte::<4>(inp);
-        assert!(res.is_err())
+        assert!(res.is_err());
     }
 
     #[test]
@@ -378,7 +379,7 @@ mod tests {
         // wrong size of bytes
         let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
         let res = simple_bit_unpack(&random_bytes, 2u32.pow(6) - 1);
-        assert!(res.is_err())
+        assert!(res.is_err());
     }
 
     #[test]
@@ -386,7 +387,7 @@ mod tests {
         // wrong size of bytes
         let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
         let res = bit_unpack(&random_bytes, 0, 2u32.pow(6) - 1);
-        assert!(res.is_err())
+        assert!(res.is_err());
     }
 
     #[test]
@@ -394,7 +395,7 @@ mod tests {
         let mut random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
         let r = [0i32; 256];
         let res = simple_bit_pack(&r, 2u32.pow(6) - 1, &mut random_bytes);
-        assert!(res.is_ok())
+        assert!(res.is_ok());
     }
 
     #[test]
@@ -403,7 +404,7 @@ mod tests {
         // wrong size r coeff
         let r = [1024i32; 256];
         let res = simple_bit_pack(&r, 2u32.pow(6) - 1, &mut random_bytes);
-        assert!(res.is_err())
+        assert!(res.is_err());
     }
 
     // TODO: reword to start with bit_pack..

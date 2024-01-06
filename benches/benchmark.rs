@@ -3,6 +3,7 @@ use fips204::traits::{PreGen, Signer, Verifier};
 use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 
 
+#[allow(clippy::redundant_closure)]
 pub fn criterion_benchmark(c: &mut Criterion) {
     let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
 

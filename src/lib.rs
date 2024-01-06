@@ -8,6 +8,7 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
+#![allow(clippy::similar_names)]
 
 // Roadmap
 //  0. Stay on top of FIPS 204 updates

@@ -26,7 +26,8 @@ impl RngCore for MyRng {
     }
 
     fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
-        Ok(self.fill_bytes(out))
+        self.fill_bytes(out);
+        Ok(())
     }
 }
 

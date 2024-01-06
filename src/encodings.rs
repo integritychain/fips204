@@ -379,7 +379,7 @@ mod tests {
         random_pk.iter_mut().for_each(|a| *a = rand::random::<u8>());
         //let mut rho = [0u8; 32];
         //let mut t1 = [[0i32; 256]; 6];
-        let (rho, t1) = pk_decode::<6, 1952>(&random_pk.try_into().unwrap()).unwrap();
+        let (rho, t1) = pk_decode::<6, 1952>(&random_pk).unwrap();
         //let mut res = [0u8; 1952];
         let res = pk_encode::<6, 1952>(&rho, &t1).unwrap();
         assert_eq!(random_pk, res);
@@ -392,7 +392,7 @@ mod tests {
         random_pk.iter_mut().for_each(|a| *a = rand::random::<u8>());
         //let mut rho = [0u8; 32];
         //let mut t1 = [[0i32; 256]; 8];
-        let (rho, t1) = pk_decode::<8, 2592>(&random_pk.try_into().unwrap()).unwrap();
+        let (rho, t1) = pk_decode::<8, 2592>(&random_pk).unwrap();
         //let mut res = [0u8; 2592];
         let res = pk_encode::<8, 2592>(&rho, &t1).unwrap();
         assert_eq!(random_pk, res);
@@ -427,6 +427,7 @@ mod tests {
         let sk = sk_encode::<13, 2, 4, 4, 2560>(&rho, &k, &tr, &s1, &s2, &t0).unwrap();
         let res = sk_decode::<13, 2, 4, 4, 2560>(&sk);
         assert!(res.is_ok());
+        #[allow(clippy::similar_names)]
         let (rho_test, k_test, tr_test, s1_test, s2_test, t0_test) = res.unwrap();
 
         assert!(
