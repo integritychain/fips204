@@ -1,12 +1,6 @@
 name: test
 
-on:
-  pull_request:
-    paths:
-      - ".github/workflows/integration.yml"
-      - "Cargo.*"
-  push:
-    branches: master
+on: [ push ]
 
 
 env:
@@ -110,3 +104,10 @@ jobs:
         with:
           toolchain: stable
       - run: cargo doc --all-features
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
