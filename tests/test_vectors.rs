@@ -1,9 +1,9 @@
 // This file implements a variety of top-level tests, including: official vectors, random
 // round trips, and (soon) fails.
 
-use hex::decode;
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
+use hex::decode;
 use rand_core::{CryptoRng, RngCore};
 use regex::Regex;
 use std::fs;

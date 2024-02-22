@@ -17,14 +17,8 @@ use sha3::digest::XofReader;
 /// Input: `rng` a cryptographically-secure random number generator. <br>
 /// Output: Public key, `pk` ∈ B^{32+32k(bitlen(q−1)−d)},
 /// and private key, `sk` ∈ `B^{32+32+64+32·((ℓ+k)·bitlen(2η)+dk)}`
-pub(crate) fn key_gen<
-    const ETA: usize,
-    const K: usize,
-    const L: usize,
-    const PK_LEN: usize,
-    const SK_LEN: usize,
->(
-    rng: &mut impl CryptoRngCore,
+pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const SK_LEN: usize>(
+    rng: &mut impl CryptoRngCore, eta: u32,
 ) -> Result<([u8; PK_LEN], [u8; SK_LEN]), &'static str> {
     // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
     let mut xi = [0u8; 32];
@@ -43,7 +37,7 @@ pub(crate) fn key_gen<
     let cap_a_hat: [[T; L]; K] = expand_a::<K, L>(&rho);
 
     // 4: (s_1, s_2 ) ← ExpandS(ρ′)
-    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<ETA, K, L>(&rho_prime)?;
+    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<K, L>(eta, &rho_prime)?;
 
     // 5: t ← NTT−1 (cap_a_hat ◦ NTT(s_1)) + s_2        ▷ Compute t = As1 + s2
     let s_1_hat = ntt(&s_1);
@@ -70,7 +64,7 @@ pub(crate) fn key_gen<
 
     // 9: sk ← skEncode(ρ, K, tr, s_1 , s_2 , t_0 )     ▷ K and tr are for use in signing
     let sk: [u8; SK_LEN] =
-        sk_encode::<{ D as usize }, ETA, K, L, SK_LEN>(&rho, &cap_k, &tr, &s_1, &s_2, &t_0)?;
+        sk_encode::<{ D as usize }, K, L, SK_LEN>(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0)?;
 
     // 10: return (pk, sk)
     Ok((pk, sk))
@@ -86,9 +80,6 @@ pub(crate) fn key_gen<
 #[allow(clippy::many_single_char_names)]
 #[allow(clippy::too_many_lines)]
 pub(crate) fn sign<
-    const BETA: u32,
-    const ETA: usize,
-    const GAMMA1: usize,
     const GAMMA2: usize,
     const K: usize,
     const L: usize,
@@ -96,13 +87,13 @@ pub(crate) fn sign<
     const OMEGA: usize,
     const SIG_LEN: usize,
     const SK_LEN: usize,
-    const TAU: usize,
 >(
-    rand_gen: &mut impl CryptoRngCore, sk: &[u8; SK_LEN], message: &[u8],
+    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: u32, tau: u32, sk: &[u8; SK_LEN],
+    message: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
     #[allow(clippy::type_complexity)]
-    let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode::<{ D as usize }, ETA, K, L, SK_LEN>(sk)?;
+    let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode::<{ D as usize }, K, L, SK_LEN>(eta, sk)?;
 
     // 2:  s_hat_1 ← NTT(s_1)
     let s_hat_1 = ntt(&s_1);
@@ -141,7 +132,7 @@ pub(crate) fn sign<
     loop {
         //
         // 12: y ← ExpandMask(ρ′ , κ)
-        let y: [R; L] = expand_mask::<GAMMA1, L>(&rho_prime, k)?;
+        let y: [R; L] = expand_mask::<L>(gamma1, &rho_prime, k)?;
 
         // 13: w ← NTT−1 (cap_a_hat ◦ NTT(y))
         let ntt_y = ntt(&y);
@@ -169,7 +160,7 @@ pub(crate) fn sign<
         // c_tilde_2 is never used!
 
         // 17: c ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
-        let c: R = sample_in_ball::<TAU>(&c_tilde_1)?;
+        let c: R = sample_in_ball(tau, &c_tilde_1)?;
 
         // 18: c_hat ← NTT(c)
         let c_hat: T = ntt(&[c])[0];
@@ -210,7 +201,7 @@ pub(crate) fn sign<
         // 23: if ||z||∞ ≥ Gamma1 − β or ||r0||∞ ≥ Gamma2 − β then (z, h) ← ⊥    ▷ Validity checks
         let z_norm = helpers::infinity_norm(&z);
         let r0_norm = helpers::infinity_norm(&r0);
-        if (z_norm >= (GAMMA1 as i32 - BETA as i32)) | (r0_norm >= (GAMMA2 as i32 - BETA as i32)) {
+        if (z_norm >= (gamma1 as i32 - beta as i32)) | (r0_norm >= (GAMMA2 as i32 - beta as i32)) {
             k += L as u32;
             continue;
             // 24: else  ... not really needed, with 'continue' above
@@ -259,7 +250,7 @@ pub(crate) fn sign<
         }
     }
     let sig =
-        sig_encode::<GAMMA1, K, L, LAMBDA, OMEGA, SIG_LEN>(&c_tilde[0..2 * LAMBDA / 8], &zmq, &h)?;
+        sig_encode::<K, L, LAMBDA, OMEGA, SIG_LEN>(gamma1,&c_tilde[0..2 * LAMBDA / 8], &zmq, &h)?;
 
     Ok(sig) // 33: return σ
 }
@@ -272,8 +263,6 @@ pub(crate) fn sign<
 /// Input: Signature, `σ` ∈ B^{32 + ℓ·32·(1 + bitlen(γ1−1)) + ω + k}. <br>
 /// Output: Boolean
 pub(crate) fn verify<
-    const BETA: u32,
-    const GAMMA1: usize,
     const GAMMA2: usize,
     const K: usize,
     const L: usize,
@@ -281,23 +270,22 @@ pub(crate) fn verify<
     const OMEGA: usize,
     const PK_LEN: usize,
     const SIG_LEN: usize,
-    const TAU: usize,
 >(
-    pk: &[u8; PK_LEN], m: &[u8], sig: &[u8; SIG_LEN],
+    beta: u32, gamma1: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8], sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     // 1: (ρ,t_1) ← pkDecode(pk)
     let (rho, t_1): ([u8; 32], [R; K]) = pk_decode::<K, PK_LEN>(pk)?;
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
     let (c_tilde, z, h) = //: (Vec<u8>, [R; L], Option<[R; K]>) =
-        sig_decode::<GAMMA1, K, L, LAMBDA, OMEGA>(sig)?;
+        sig_decode::<K, L, LAMBDA, OMEGA>(gamma1, sig)?;
 
     // 3: if h = ⊥ then return false ▷ Hint was not properly encoded
     if h.is_none() {
         return Ok(false);
     };
     let i_norm = helpers::infinity_norm(&z);
-    ensure!(i_norm < GAMMA1 as i32, "Algorithm3: i_norm out of range");
+    ensure!(i_norm < gamma1 as i32, "Algorithm3: i_norm out of range");
     // 4: end if
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
@@ -318,7 +306,7 @@ pub(crate) fn verify<
 
     // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
     let c: R =
-        sample_in_ball::<TAU>(&c_tilde_1[0..32].try_into().map_err(|_e| "c_tilde_1 scrambled")?)?;
+        sample_in_ball(tau, &c_tilde_1[0..32].try_into().map_err(|_e| "c_tilde_1 scrambled")?)?;
 
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let ntt_z = ntt(&z);
@@ -367,7 +355,7 @@ pub(crate) fn verify<
     hasher.read(&mut c_tilde_p); // leftover to be ignored
 
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
-    let left = helpers::infinity_norm(&z) < ((GAMMA1 - BETA as usize) as i32);
+    let left = helpers::infinity_norm(&z) < ((gamma1 - beta) as i32);
     let center = c_tilde[0..LAMBDA / 4] == c_tilde_p[0..LAMBDA / 4];
     let right = h // TODO: confirm -- this checks #h per each R (rather than overall total)
         .ok_or("h scrambled 4")?

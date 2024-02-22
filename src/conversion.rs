@@ -53,16 +53,16 @@ pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<u32, &'static str> {
 ///
 /// # Errors
 /// Returns an error `⊥` on misconfigured or illegal input.
-pub(crate) fn coef_from_half_byte<const ETA: usize>(b: u8) -> Result<i32, &'static str> {
+pub(crate) fn coef_from_half_byte(eta: u32, b: u8) -> Result<i32, &'static str> {
     ensure!(b <= 15, "Algorithm 9: input b must be <= 15");
 
     // 1: if η = 2 and b < 15 then return 2 − (b mod 5)
-    if (ETA == 2) & (b < 15) {
+    if (eta == 2) & (b < 15) {
         Ok(2 - (b % 5) as i32)
         // 2: else
     } else {
         // 3: if η = 4 and b < 9 then return 4 − b
-        if (ETA == 4) & (b < 9) {
+        if (eta == 4) & (b < 9) {
             Ok(4 - b as i32)
             // 4: else return ⊥
         } else {
@@ -332,35 +332,35 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte1() {
         let inp = 3;
-        let res = coef_from_half_byte::<2>(inp).unwrap();
+        let res = coef_from_half_byte(2, inp).unwrap();
         assert_eq!(-1, res);
     }
 
     #[test]
     fn test_coef_from_half_byte2() {
         let inp = 8;
-        let res = coef_from_half_byte::<4>(inp).unwrap();
+        let res = coef_from_half_byte(4, inp).unwrap();
         assert_eq!(-4, res);
     }
 
     #[test]
     fn test_coef_from_half_byte_validation1() {
         let inp = 22;
-        let res = coef_from_half_byte::<2>(inp);
+        let res = coef_from_half_byte(2, inp);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation2() {
         let inp = 15;
-        let res = coef_from_half_byte::<2>(inp);
+        let res = coef_from_half_byte(2, inp);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation3() {
         let inp = 10;
-        let res = coef_from_half_byte::<4>(inp);
+        let res = coef_from_half_byte(4, inp);
         assert!(res.is_err());
     }
 

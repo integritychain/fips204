@@ -60,7 +60,7 @@ fn test_44_no_verif() {
     // Bad secret key  (intriguing, byte 40 is 'k' which is allowed variance)
     for i in 0..8 {
         let mut sk_bad = sk.clone().into_bytes();
-        sk_bad[70 + i*10] ^= 0x08;
+        sk_bad[70 + i * 10] ^= 0x08;
         let sk_bad = ml_dsa_44::PrivateKey::try_from_bytes(sk_bad).unwrap();
         let sig = sk_bad.try_sign_ct(&msg).unwrap();
         let ver = pk.try_verify_vt(&msg, &sig).unwrap();
@@ -71,7 +71,7 @@ fn test_44_no_verif() {
     // Bad public key
     for i in 0..8 {
         let mut pk_bad = pk.clone().into_bytes();
-        pk_bad[i*10] ^= 0x08;
+        pk_bad[i * 10] ^= 0x08;
         let pk_bad = ml_dsa_44::PublicKey::try_from_bytes(pk_bad).unwrap();
         let ver = pk_bad.try_verify_vt(&msg, &sig).unwrap();
         assert!(!ver)
@@ -80,10 +80,9 @@ fn test_44_no_verif() {
     // Bad signature
     for i in 0..8 {
         let mut sig_bad = sig.clone().into_bytes();
-        sig_bad[i*10] ^= 0x08;
+        sig_bad[i * 10] ^= 0x08;
         let sig_bad = ml_dsa_44::Signature::try_from_bytes(sig_bad).unwrap();
         let ver = pk.try_verify_vt(&msg, &sig_bad).unwrap();
         assert!(!ver)
     }
-
 }

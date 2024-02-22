@@ -31,7 +31,7 @@ pub(crate) fn h128_xof(v: &[&[u8]]) -> impl XofReader {
 ///
 /// # Errors
 /// Returns an error on illegal hamming weight
-pub(crate) fn sample_in_ball<const TAU: usize>(rho: &[u8; 32]) -> Result<R, &'static str> {
+pub(crate) fn sample_in_ball(tau: u32, rho: &[u8; 32]) -> Result<R, &'static str> {
     let mut xof = h_xof(&[rho]);
     let mut hpk8 = [0u8; 8];
     xof.read(&mut hpk8); // Save the first 8 bytes for step 9
@@ -42,7 +42,7 @@ pub(crate) fn sample_in_ball<const TAU: usize>(rho: &[u8; 32]) -> Result<R, &'st
     // 2: k ← 8
     let mut hpk = [0u8]; // k implicitly advances with each sample
                          // 3: for i from 256 − τ to 255 do
-    for i in (256 - TAU)..=255 {
+    for i in (256 - tau as usize)..=255 {
         // 4: while H(ρ)[[k]] > i do
         // 5: k ← k + 1
         // 6: end while
@@ -58,14 +58,17 @@ pub(crate) fn sample_in_ball<const TAU: usize>(rho: &[u8; 32]) -> Result<R, &'st
         // 8: ci ← cj
         c[i] = c[j as usize];
         // 9: c_j ← (−1)^{H(ρ)[i+τ−256]
-        let index = i + TAU - 256;
+        let index = i + tau as usize - 256;
         let bite = hpk8[index / 8];
         let shifted = bite >> (index % 8);
         c[j as usize] = (0 - 1i32).pow((shifted % 2 == 1) as u32);
         // 10: k ← k + 1   (implicit)
         // 11: end for
     }
-    ensure!(c.iter().filter(|e| e.abs() != 0).count() == TAU, "Algorithm 23: bad hamming weight");
+    ensure!(
+        c.iter().filter(|e| e.abs() != 0).count() == tau as usize,
+        "Algorithm 23: bad hamming weight"
+    );
     // 12: return c
     Ok(c)
 }
@@ -110,7 +113,7 @@ pub(crate) fn rej_ntt_poly(rhos: &[&[u8]]) -> T {
 ///
 /// Input: A seed `ρ ∈{0,1}^528`. <br>
 /// Output: A polynomial `a ∈ Rq`.
-pub(crate) fn rej_bounded_poly<const ETA: usize>(rhos: &[&[u8]]) -> R {
+pub(crate) fn rej_bounded_poly(eta: u32, rhos: &[&[u8]]) -> R {
     let mut z = [0u8];
     let mut a = R::zero();
     let mut xof = h_xof(rhos);
@@ -123,9 +126,9 @@ pub(crate) fn rej_bounded_poly<const ETA: usize>(rhos: &[&[u8]]) -> R {
         // 4: z ← H(ρ)[[c]]
         xof.read(&mut z);
         // 5: z0 ← CoefFromHalfByte(z mod 16, η)
-        let z0 = conversion::coef_from_half_byte::<ETA>(z[0].rem_euclid(16));
+        let z0 = conversion::coef_from_half_byte(eta, z[0].rem_euclid(16));
         // 6: z1 ← CoefFromHalfByte(⌊z/16⌋, η)
-        let z1 = conversion::coef_from_half_byte::<ETA>(z[0] / 16);
+        let z1 = conversion::coef_from_half_byte(eta, z[0] / 16);
         // 7: if z0 != ⊥ then
         if let Ok(x) = z0 {
             a[j] = x;
@@ -178,31 +181,25 @@ pub(crate) fn expand_a<const K: usize, const L: usize>(rho: &[u8; 32]) -> [[T; L
 ///
 /// # Errors
 /// Returns an error on illegal s1 s2 coefficients
-pub(crate) fn expand_s<const ETA: usize, const K: usize, const L: usize>(
-    rho: &[u8; 64],
+pub(crate) fn expand_s<const K: usize, const L: usize>(
+    eta: u32, rho: &[u8; 64],
 ) -> Result<([R; L], [R; K]), &'static str> {
     let (mut s1, mut s2) = ([R::zero(); L], [R::zero(); K]);
     // 1: for r from 0 to ℓ − 1 do
     for (r, s1r) in s1.iter_mut().enumerate().take(L) {
         // 2: s1[r] ← RejBoundedPoly(ρ||IntegerToBits(r, 16))
-        *s1r = rej_bounded_poly::<ETA>(&[rho, &[r as u8], &[0]]);
+        *s1r = rej_bounded_poly(eta, &[rho, &[r as u8], &[0]]);
         // 3: end for
     }
     // 4: for r from 0 to k − 1 do
     for (r, s2r) in s2.iter_mut().enumerate().take(K) {
         // 5: s2[r] ← RejBoundedPoly(ρ||IntegerToBits(r + ℓ, 16))
         ensure!((r + L) < 255, "Algorithm 27: r + L out of range u8");
-        *s2r = rej_bounded_poly::<ETA>(&[rho, &[(r + L) as u8], &[0]]);
+        *s2r = rej_bounded_poly(eta, &[rho, &[(r + L) as u8], &[0]]);
         // 6: end for
     }
-    ensure!(
-        s1.iter().all(|r| is_in_range(r, ETA as u32, ETA as u32)),
-        "Algorithm 27: s1 out of range"
-    );
-    ensure!(
-        s2.iter().all(|r| is_in_range(r, ETA as u32, ETA as u32)),
-        "Algorithm 27: s2 out of range"
-    );
+    ensure!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s1 out of range");
+    ensure!(s2.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s2 out of range");
     Ok((s1, s2)) // 7: return (s_1 , s_2)
 }
 
@@ -215,14 +212,14 @@ pub(crate) fn expand_s<const ETA: usize, const K: usize, const L: usize>(
 ///
 /// # Errors
 /// Returns an error on internal errors
-pub(crate) fn expand_mask<const GAMMA1: usize, const L: usize>(
+pub(crate) fn expand_mask<const L: usize>(gamma1: u32,
     rho: &[u8; 64], mu: u32,
 ) -> Result<[R; L], &'static str> {
     let mut s = [R::zero(); L];
     let mut v = [0u8; 32 * 20];
 
     // 1: c ← 1 + bitlen (γ1 − 1) ▷ γ1 is always a power of 2
-    let c = 1 + bitlen(GAMMA1 - 1); // c will either be 18 or 20
+    let c = 1 + bitlen(gamma1 as usize - 1); // c will either be 18 or 20
     ensure!((c == 18) | (c == 20), "Algorithm 28: illegal c");
     // 2: for r from 0 to ℓ − 1 do
     for r in 0..L {
@@ -233,9 +230,9 @@ pub(crate) fn expand_mask<const GAMMA1: usize, const L: usize>(
         let mut xof = h_xof(&[rho, &n.to_le_bytes()]);
         xof.read(&mut v);
         // 5: s[r] ← BitUnpack(v, γ1 − 1, γ1)
-        s[r] = conversion::bit_unpack(&v[0..32 * c], GAMMA1 as u32 - 1, GAMMA1 as u32)?;
+        s[r] = conversion::bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1)?;
         ensure!(
-            s.iter().all(|r| is_in_range(r, GAMMA1 as u32, GAMMA1 as u32)),
+            s.iter().all(|r| is_in_range(r, gamma1, gamma1)),
             "Algorithm 28: s coeff out of range"
         );
         // 6: end for

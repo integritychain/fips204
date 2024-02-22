@@ -140,7 +140,7 @@ macro_rules! functionality {
             fn try_keygen_with_rng_vt(
                 rng: &mut impl CryptoRngCore,
             ) -> Result<(PublicKey, PrivateKey), &'static str> {
-                let (pk, sk) = ml_dsa::key_gen::<ETA, K, L, PK_LEN, SK_LEN>(rng)?;
+                let (pk, sk) = ml_dsa::key_gen::<K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((PublicKey(pk), PrivateKey(sk)))
             }
         }
@@ -152,19 +152,9 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Signature, &'static str> {
-                let sig = ml_dsa::sign::<
-                    BETA,
-                    ETA,
-                    GAMMA1,
-                    GAMMA2,
-                    K,
-                    L,
-                    LAMBDA,
-                    OMEGA,
-                    SIG_LEN,
-                    SK_LEN,
-                    TAU,
-                >(rng, &self.0, message)?;
+                let sig = ml_dsa::sign::<GAMMA2, K, L, LAMBDA, OMEGA, SIG_LEN, SK_LEN>(
+                    rng, BETA, ETA, GAMMA1, TAU, &self.0, message,
+                )?;
                 Ok(Signature(sig))
             }
         }
@@ -185,19 +175,9 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Signature, &'static str> {
-                let sig = ml_dsa::sign::<
-                    BETA,
-                    ETA,
-                    GAMMA1,
-                    GAMMA2,
-                    K,
-                    L,
-                    LAMBDA,
-                    OMEGA,
-                    SIG_LEN,
-                    SK_LEN,
-                    TAU,
-                >(rng, &self.0, message)?;
+                let sig = ml_dsa::sign::<GAMMA2, K, L, LAMBDA, OMEGA, SIG_LEN, SK_LEN>(
+                    rng, BETA, ETA, GAMMA1, TAU, &self.0, message,
+                )?;
                 Ok(Signature(sig))
             }
         }
@@ -207,8 +187,8 @@ macro_rules! functionality {
             type Signature = Signature;
 
             fn try_verify_vt(&self, message: &[u8], sig: &Signature) -> Result<bool, &'static str> {
-                ml_dsa::verify::<BETA, GAMMA1, GAMMA2, K, L, LAMBDA, OMEGA, PK_LEN, SIG_LEN, TAU>(
-                    &self.0, &message, &sig.0,
+                ml_dsa::verify::<GAMMA2, K, L, LAMBDA, OMEGA, PK_LEN, SIG_LEN>(
+                    BETA, GAMMA1, TAU, &self.0, &message, &sig.0,
                 )
             }
         }
@@ -220,7 +200,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SIG_LEN];
 
             fn try_from_bytes(sig: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sig_decode::<GAMMA1, K, L, LAMBDA, OMEGA>(&sig)?; //.map_err(|_e| "Signature deserialization failed");
+                let _ = sig_decode::<K, L, LAMBDA, OMEGA>(GAMMA1, &sig)?; //.map_err(|_e| "Signature deserialization failed");
                 Ok(Signature(sig))
             }
 
@@ -244,7 +224,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SK_LEN];
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sk_decode::<{ D as usize }, ETA, K, L, SK_LEN>(&sk)?; //.map_err(|_e| "Private key deserialization failed");
+                let _ = sk_decode::<{ D as usize }, K, L, SK_LEN>(ETA, &sk)?; //.map_err(|_e| "Private key deserialization failed");
                 Ok(PrivateKey(sk))
             }
 
@@ -279,14 +259,14 @@ macro_rules! functionality {
 #[cfg(feature = "ml-dsa-44")]
 pub mod ml_dsa_44 {
     use super::{D, QU};
-    const TAU: usize = 39;
+    const TAU: u32 = 39;
     const LAMBDA: usize = 128;
-    const GAMMA1: usize = 2u32.pow(17) as usize;
+    const GAMMA1: u32 = 2u32.pow(17);
     const GAMMA2: usize = (QU as usize - 1) / 88;
     const K: usize = 4;
     const L: usize = 4;
-    const ETA: usize = 2;
-    const BETA: u32 = (TAU * ETA) as u32;
+    const ETA: u32 = 2;
+    const BETA: u32 = TAU * ETA;
     const OMEGA: usize = 80;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 2560;
@@ -320,14 +300,14 @@ pub mod ml_dsa_44 {
 #[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
     use super::{D, QU};
-    const TAU: usize = 49;
+    const TAU: u32 = 49;
     const LAMBDA: usize = 192;
-    const GAMMA1: usize = 2u32.pow(19) as usize;
+    const GAMMA1: u32 = 2u32.pow(19);
     const GAMMA2: usize = (QU as usize - 1) / 32;
     const K: usize = 6;
     const L: usize = 5;
-    const ETA: usize = 4;
-    const BETA: u32 = (TAU * ETA) as u32;
+    const ETA: u32 = 4;
+    const BETA: u32 = TAU * ETA;
     const OMEGA: usize = 55;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 4032;
@@ -362,14 +342,14 @@ pub mod ml_dsa_65 {
 #[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
     use super::{D, QU};
-    const TAU: usize = 60;
+    const TAU: u32 = 60;
     const LAMBDA: usize = 256;
-    const GAMMA1: usize = 2u32.pow(19) as usize;
+    const GAMMA1: u32 = 2u32.pow(19);
     const GAMMA2: usize = (QU as usize - 1) / 32;
     const K: usize = 8;
     const L: usize = 7;
-    const ETA: usize = 2;
-    const BETA: u32 = (TAU * ETA) as u32;
+    const ETA: u32 = 2;
+    const BETA: u32 = TAU * ETA;
     const OMEGA: usize = 75;
     const SK_LEN: usize = 4896;
     const PK_LEN: usize = 2592;
