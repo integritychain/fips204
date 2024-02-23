@@ -261,6 +261,7 @@ pub(crate) fn sign<
 /// Input: Public key, `pk` ∈ B^{32 + 32*k*(bitlen(q−1) − d) and message `M` ∈ {0,1}∗. <br>
 /// Input: Signature, `σ` ∈ B^{32 + ℓ·32·(1 + bitlen(γ1−1)) + ω + k}. <br>
 /// Output: Boolean
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn verify<
     const K: usize,
     const L: usize,
