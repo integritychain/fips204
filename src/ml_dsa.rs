@@ -63,8 +63,7 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
     h.read(&mut tr);
 
     // 9: sk ← skEncode(ρ, K, tr, s_1 , s_2 , t_0 )     ▷ K and tr are for use in signing
-    let sk: [u8; SK_LEN] =
-        sk_encode::<{ D as usize }, K, L, SK_LEN>(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0)?;
+    let sk: [u8; SK_LEN] = sk_encode::<K, L, SK_LEN>(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0)?;
 
     // 10: return (pk, sk)
     Ok((pk, sk))
@@ -87,12 +86,12 @@ pub(crate) fn sign<
     const SIG_LEN: usize,
     const SK_LEN: usize,
 >(
-    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: u32, gamma2: u32, omega: u32, tau: u32, sk: &[u8; SK_LEN],
-    message: &[u8],
+    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: u32, gamma2: u32, omega: u32,
+    tau: u32, sk: &[u8; SK_LEN], message: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
     #[allow(clippy::type_complexity)]
-    let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode::<{ D as usize }, K, L, SK_LEN>(eta, sk)?;
+    let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode::<K, L, SK_LEN>(eta, sk)?;
 
     // 2:  s_hat_1 ← NTT(s_1)
     let s_hat_1 = ntt(&s_1);
@@ -113,7 +112,7 @@ pub(crate) fn sign<
 
     // 7:  rnd ← {0,1}^256    ▷ For the optional deterministic variant, substitute rnd ← {0}256
     let mut rnd = [0u8; 32];
-    rand_gen.fill_bytes(&mut rnd);
+    rand_gen.try_fill_bytes(&mut rnd).map_err(|_| "Alg 2: rng fail")?;
 
     // 8:  ρ′ ← H(K||rnd||µ, 512)    ▷ Compute private random seed
     let mut h = h_xof(&[&cap_k, &rnd, &mu]);
@@ -121,7 +120,7 @@ pub(crate) fn sign<
     h.read(&mut rho_prime);
 
     // 9:  κ ← 0    ▷ Initialize counter κ
-    let mut k = 0;
+    let mut k = 0u16;
 
     // 10: (z, h) ← ⊥
     let (mut z, mut h) = ([R::zero(); L], [R::zero(); K]); // z & h are raw values;
@@ -142,7 +141,7 @@ pub(crate) fn sign<
         let mut w_1: [R; K] = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                w_1[i][j] = high_bits(gamma2,w[i][j]);
+                w_1[i][j] = high_bits(gamma2, w[i][j]);
             }
         }
 
@@ -201,7 +200,7 @@ pub(crate) fn sign<
         let z_norm = helpers::infinity_norm(&z);
         let r0_norm = helpers::infinity_norm(&r0);
         if (z_norm >= (gamma1 as i32 - beta as i32)) | (r0_norm >= (gamma2 as i32 - beta as i32)) {
-            k += L as u32;
+            k += u16::try_from(L).unwrap();
             continue;
             // 24: else  ... not really needed, with 'continue' above
         }
@@ -229,7 +228,7 @@ pub(crate) fn sign<
         if (helpers::infinity_norm(&c_t_0) >= gamma2 as i32)
             | (h.iter().flatten().filter(|i| (**i).abs() == 1).count() > omega as usize)
         {
-            k += L as u32;
+            k += u16::try_from(L).unwrap();
             continue;
             // 28: end if
         }
@@ -269,7 +268,8 @@ pub(crate) fn verify<
     const PK_LEN: usize,
     const SIG_LEN: usize,
 >(
-    beta: u32, gamma1: u32, gamma2: u32, omega: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8], sig: &[u8; SIG_LEN],
+    beta: u32, gamma1: u32, gamma2: u32, omega: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8],
+    sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     // 1: (ρ,t_1) ← pkDecode(pk)
     let (rho, t_1): ([u8; 32], [R; K]) = pk_decode::<K, PK_LEN>(pk)?;

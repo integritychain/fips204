@@ -24,6 +24,7 @@ pub(crate) fn is_in_range(w: &R, lo: u32, hi: u32) -> bool {
 const M: i128 = 2i128.pow(64) / (QI as i128);
 #[allow(clippy::inline_always)]
 #[inline(always)]
+#[allow(clippy::cast_possible_truncation)]  // temporary
 pub(crate) const fn reduce_q64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
     let res = (a - (q as i64) * (QI as i64)) as i32;
@@ -141,6 +142,7 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
 }
 
 
+#[allow(clippy::cast_possible_truncation)]  // temporary
 const fn gen_zeta_table() -> [i32; 256] {
     let mut result = [0i32; 256];
     let mut i = 0;

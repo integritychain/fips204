@@ -100,31 +100,30 @@ pub(crate) fn simple_bit_pack(w: &R, b: u32, bytes_out: &mut [u8]) -> Result<(),
 /// # Errors
 /// Returns an error on `a` and `b` outside of `u32::MAX/4`, and `w` out of range.
 pub(crate) fn bit_pack(w: &R, a: u32, b: u32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
-    ensure!(
-        (a < u32::MAX / 4) & (b < u32::MAX / 4) & (b >= a),
-        "Algorithm 11: a/b limits too large"
-    );
+    debug_assert!((a < u32::MAX / 4) & (b < u32::MAX / 4) & (b >= a), "Alg 11: a/b too large");
     let bitlen = bitlen((a + b) as usize); // Calculate element bit length
     ensure!(w.len() * bitlen / 8 == bytes_out.len(), "Algorithm 11: incorrect size output bytes");
     ensure!((w.len() * bitlen) % 8 == 0, "Algorithm 11: left over bits");
-    ensure!(is_in_range(w, a, b), "Algorithm 12: input w is outside allowed range");
+    ensure!(is_in_range(w, a, b), "Algorithm 11: input w is outside allowed range");
 
     let mut temp = 0u64; // Insert new values on the left/MSB and pop output values from the right/LSB
     let mut byte_index = 0; // Current output byte position
     let mut bit_index = 0; // Number of bits accumulated in temp
 
     // For every coefficient in w...
-    for coeff in w {
+    #[allow(clippy::cast_sign_loss)] // Each coeff is 'ensure!'d to be in range
+    for coeff in *w {
         // if we have a negative `a` bound, subtract from b and shift into empty/upper part of temp
         if a > 0 {
-            temp |= ((b as i64 - *coeff as i64) as u64) << bit_index;
+            temp |= ((b as i32 - coeff) as u64) << bit_index;
         // Otherwise, we just shift and drop into empty/upper part of temp
         } else {
-            temp |= (*coeff as u64) << bit_index;
+            temp |= (coeff as u64) << bit_index;
         }
         // account for the amount of bits we now have in temp
         bit_index += bitlen;
         // while we have at least 'bytes' worth of bits in temp
+        #[allow(clippy::cast_possible_truncation)] // truncation is intended
         while bit_index > 7 {
             // drop a byte into the output
             bytes_out[byte_index] = temp as u8;
@@ -168,18 +167,18 @@ pub(crate) fn simple_bit_unpack(v: &[u8], b: u32) -> Result<R, &'static str> {
 /// Returns an error on `w` out of range and incorrectly sized `v`.
 pub(crate) fn bit_unpack(v: &[u8], a: u32, b: u32) -> Result<R, &'static str> {
     ensure!((a < u32::MAX / 4) & (b < u32::MAX / 4) & (b >= a), "Algorithm 13: a, b too large");
-    let bitlen = ((a + b).ilog2() + 1) as usize;
-    ensure!(v.len() == 32 * bitlen, "Algorithm 12: incorrectly sized v");
+    let bitlen = (a + b).ilog2() + 1;
+    ensure!(v.len() == 32 * bitlen as usize, "Algorithm 12: incorrectly sized v");
 
     let mut w_out = [0i32; 256];
-    let mut temp = 0u64;
+    let mut temp = 0;
     let mut r_index = 0;
     let mut bit_index = 0;
     for byte in v {
-        temp |= (*byte as u64) << bit_index;
+        temp |= (*byte as u32) << bit_index;
         bit_index += 8;
         while bit_index >= bitlen {
-            let tmask = temp & (2u64.pow(bitlen as u32) - 1);
+            let tmask = temp & (2u32.pow(bitlen) - 1);
             w_out[r_index] = if a == 0 {
                 tmask as i32
             } else {
@@ -203,8 +202,8 @@ pub(crate) fn bit_unpack(v: &[u8], a: u32, b: u32) -> Result<R, &'static str> {
 ///
 /// # Errors
 /// Returns an error on incorrect sized inputs and too many `1` in `h`
-pub(crate) fn hint_bit_pack<const K: usize>(omega: u32,
-    h: &[R; K], y_bytes: &mut [u8],
+pub(crate) fn hint_bit_pack<const K: usize>(
+    omega: u32, h: &[R; K], y_bytes: &mut [u8],
 ) -> Result<(), &'static str> {
     let k = h.len();
     ensure!(y_bytes.len() == omega as usize + k, "Algorithm 14: incorrectly sized output field");
@@ -220,6 +219,7 @@ pub(crate) fn hint_bit_pack<const K: usize>(omega: u32,
     // 3: for i from 0 to k − 1 do
     for i in 0..k {
         // 4: for j from 0 to 255 do
+        #[allow(clippy::cast_possible_truncation)] // j will max out at 255
         for j in 0..256 {
             // 5: if h[i]_j != 0 then
             if h[i][j] != 0 {
@@ -227,12 +227,13 @@ pub(crate) fn hint_bit_pack<const K: usize>(omega: u32,
                 y_bytes[index] = j as u8;
                 // 7: Index ← Index + 1
                 index += 1;
+                ensure!(index < y_bytes.len(), "Alg2: index has gone out of range");
                 // 8: end if
             }
             // 9: end for
         }
         // 10: y[ω + i] ← Index ▷ Store the value of Index after processing h[i]
-        y_bytes[omega as usize + i] = index as u8;
+        y_bytes[omega as usize + i] = u8::try_from(index).map_err(|_| "Alg 2: index > u8::MAX")?;
         // 11: end for
     }
     // 12: return y
@@ -248,11 +249,12 @@ pub(crate) fn hint_bit_pack<const K: usize>(omega: u32,
 ///
 /// # Errors
 /// Returns an error on incorrectly sized or illegal inputs.
-pub(crate) fn hint_bit_unpack<const K: usize>(omega: u32,
-    y_bytes: &[u8],
+#[allow(clippy::cast_possible_truncation)] // omega as u8; note debug assert
+pub(crate) fn hint_bit_unpack<const K: usize>(
+    omega: u32, y_bytes: &[u8],
 ) -> Result<[R; K], &'static str> {
     debug_assert_eq!(y_bytes.len(), omega as usize + K);
-
+    debug_assert!(omega < u8::MAX as u32, "Alg 15: omega too large");
     // 1: h ∈ R^k_2 ∈ ← 0^k
     let mut h = [R::zero(); K];
     // 2: Index ← 0

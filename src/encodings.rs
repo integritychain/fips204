@@ -18,10 +18,12 @@ use crate::{
 ///
 /// # Errors
 /// Returns an error ........ TKTK
+#[allow(clippy::cast_possible_truncation)] // blqd as u32; note debug_assert
 pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     p: &[u8; 32], t1: &[R; K],
 ) -> Result<[u8; PK_LEN], &'static str> {
     let blqd = bitlen(QU as usize - 1) - D as usize;
+    debug_assert!(blqd < u32::MAX as usize, "Alg 16: bldq too large");
     let mut pk = [0u8; PK_LEN];
 
     // 1: pk ← BitsToBytes(ρ)
@@ -49,10 +51,12 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 ///
 /// # Errors
 /// Returns an error ........ TKTK
+#[allow(clippy::cast_possible_truncation)] // blqd as u32; note debug_assert
 pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     pk: &[u8; PK_LEN],
 ) -> Result<([u8; 32], [R; K]), &'static str> {
     let blqd = bitlen(QU as usize - 1) - D as usize;
+    debug_assert!(blqd < u32::MAX as usize, "Alg 17: bldq too large");
     ensure!(pk.len() == 32 + 32 * K * blqd, "Algorithm 17: incorrect pk length");
     let (mut rho, mut t1): ([u8; 32], [R; K]) = ([0u8; 32], [R::zero(); K]);
 
@@ -89,17 +93,20 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 ///
 /// # Errors
 /// Returns an error ........ TKTK
-pub fn sk_encode<const D: usize, const K: usize, const L: usize, const SK_LEN: usize>(
+pub fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: u32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s1: &[R; L], s2: &[R; K], t0: &[R; K],
 ) -> Result<[u8; SK_LEN], &'static str> {
     ensure!(s1.iter().all(|x| is_in_range(x, eta, eta)), "Algorithm 18: s1 out of range");
     ensure!(s2.iter().all(|x| is_in_range(x, eta, eta)), "Algorithm 18: s2 out of range");
     ensure!(
-        t0.iter().all(|x| is_in_range(x, 2u32.pow(D as u32 - 1) + 1, 2u32.pow(D as u32 - 1))),
+        t0.iter().all(|x| is_in_range(x, 2u32.pow(D - 1) + 1, 2u32.pow(D - 1))),
         "Algorithm 18: t0 out of range"
     );
     let mut sk = [0u8; SK_LEN];
-    debug_assert_eq!(sk.len(), 32 + 32 + 64 + 32 * ((K + L) * bitlen(2 * eta as usize) + D * K)); // Useful nonsense? ;)
+    debug_assert_eq!(
+        sk.len(),
+        32 + 32 + 64 + 32 * ((K + L) * bitlen(2 * eta as usize) + D as usize * K)
+    ); // Useful nonsense? ;)
 
     // 1: sk ← BitsToBytes(ρ) || BitsToBytes(K) || BitsToBytes(tr)
     sk[0..32].copy_from_slice(rho);
@@ -122,13 +129,13 @@ pub fn sk_encode<const D: usize, const K: usize, const L: usize, const SK_LEN: u
     }
     // 8: for i from 0 to k − 1 do
     let start = start + K * step;
-    let step = 32 * D;
+    let step = 32 * D as usize;
     for i in 0..K {
         // 9: sk ← sk || BitPack (t0[i], [−2^{d-1} + 1, 2^{d-1}] )
         bit_pack(
             &t0[i],
-            2u32.pow(D as u32 - 1) - 1,
-            2u32.pow(D as u32 - 1),
+            2u32.pow(D - 1) - 1,
+            2u32.pow(D - 1),
             &mut sk[start + i * step..start + (i + 1) * step],
         )?;
         // 10: end for
@@ -149,11 +156,14 @@ pub fn sk_encode<const D: usize, const K: usize, const L: usize, const SK_LEN: u
 /// # Errors
 /// Returns an error ........ TKTK
 #[allow(clippy::similar_names, clippy::type_complexity)]
-pub(crate) fn sk_decode<const D: usize, const K: usize, const L: usize, const SK_LEN: usize>(
+pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: u32, sk: &[u8; SK_LEN],
 ) -> Result<([u8; 32], [u8; 32], [u8; 64], [R; L], [R; K], [R; K]), &'static str> {
     let bl = bitlen(2 * eta as usize);
-    ensure!(sk.len() == 32 + 32 + 64 + 32 * ((L + K) * bl + D * K), "Algorithm 19: asdf asdf");
+    ensure!(
+        sk.len() == 32 + 32 + 64 + 32 * ((L + K) * bl + D as usize * K),
+        "Algorithm 19: asdf asdf"
+    );
     let (mut rho, mut k, mut tr) = ([0u8; 32], [0u8; 32], [0u8; 64]);
     let (mut s1, mut s2, mut t0) = ([R::zero(); L], [R::zero(); K], [R::zero(); K]);
 
@@ -183,13 +193,13 @@ pub(crate) fn sk_decode<const D: usize, const K: usize, const L: usize, const SK
     }
     // 11: for i from 0 to k − 1 do
     let start = start + K * step;
-    let step = 32 * D;
+    let step = 32 * D as usize;
     for i in 0..K {
         // 12: t0[i] ← BitUnpack(wi, −2^{d−1} - 1, 2^{d−1})   ▷ This is always in the correct range
         t0[i] = bit_unpack(
             &sk[start + i * step..start + (i + 1) * step],
-            2u32.pow(D as u32 - 1) - 1,
-            2u32.pow(D as u32 - 1),
+            2u32.pow(D - 1) - 1,
+            2u32.pow(D - 1),
         )?;
         // 13: end for
     }
@@ -199,8 +209,7 @@ pub(crate) fn sk_decode<const D: usize, const K: usize, const L: usize, const SK
     // Note spec is not consistent on the range constraints for s1 and s2; this is tighter
     let s1_ok = s1.iter().all(|r| is_in_range(r, eta, eta));
     let s2_ok = s2.iter().all(|r| is_in_range(r, eta, eta));
-    let t0_ok =
-        t0.iter().all(|r| is_in_range(r, 2u32.pow(D as u32 - 1) + 1, 2u32.pow(D as u32 - 1) + 1));
+    let t0_ok = t0.iter().all(|r| is_in_range(r, 2u32.pow(D - 1) + 1, 2u32.pow(D - 1) + 1));
     if s1_ok & s2_ok & t0_ok {
         Ok((rho, k, tr, s1, s2, t0))
     } else {
@@ -228,7 +237,10 @@ pub(crate) fn sig_encode<
     let mut sigma = [0u8; SIG_LEN];
     ensure!(c_tilde.len() == 2 * LAMBDA / 8, "Algoirthm 20: asdf asdf");
     let bl = bitlen(gamma1 as usize - 1);
-    ensure!(sigma.len() == LAMBDA / 4 + L * 32 * (1 + bl) + omega as usize + K, "Algorithm 20: qwer qwer");
+    ensure!(
+        sigma.len() == LAMBDA / 4 + L * 32 * (1 + bl) + omega as usize + K,
+        "Algorithm 20: qwer qwer"
+    );
 
     // 1: σ ← BitsToBytes(c_tilde)
     sigma[..2 * LAMBDA / 8].copy_from_slice(c_tilde);
@@ -237,12 +249,7 @@ pub(crate) fn sig_encode<
     let step = 32 * (1 + bl);
     for i in 0..L {
         // 3: σ ← σ || BitPack (z[i], γ_1 − 1, γ_1)
-        bit_pack(
-            &z[i],
-            gamma1 - 1,
-            gamma1,
-            &mut sigma[start + i * step..start + (i + 1) * step],
-        )?;
+        bit_pack(&z[i], gamma1 - 1, gamma1, &mut sigma[start + i * step..start + (i + 1) * step])?;
         // 4: end for
     }
     // 5: σ ← σ || HintBitPack (h)
@@ -261,12 +268,8 @@ pub(crate) fn sig_encode<
 /// # Errors
 /// Returns an error ........ TKTK
 #[allow(clippy::type_complexity)]
-pub(crate) fn sig_decode<
-    const K: usize,
-    const L: usize,
-    const LAMBDA: usize,
->(gamma1: u32, omega: u32,
-    sigma: &[u8],
+pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA: usize>(
+    gamma1: u32, omega: u32, sigma: &[u8],
 ) -> Result<([u8; 64], [R; L], Option<[R; K]>), &'static str> {
     let bl = bitlen(gamma1 as usize - 1);
     // let mut c_tilde = vec![0u8; LAMBDA / 4];
@@ -281,11 +284,7 @@ pub(crate) fn sig_decode<
     let step = 32 * (bl + 1);
     for i in 0..L {
         // 4: z[i] ← BitUnpack(xi, γ1 − 1, γ1) ▷ This is always in the correct range, as γ1 is a power of 2
-        z[i] = bit_unpack(
-            &sigma[start + i * step..start + (i + 1) * step],
-            gamma1 - 1,
-            gamma1,
-        )?;
+        z[i] = bit_unpack(&sigma[start + i * step..start + (i + 1) * step], gamma1 - 1, gamma1)?;
         // 5: end for
     }
     // 6: h ← HintBitUnpack(y)
@@ -303,8 +302,8 @@ pub(crate) fn sig_decode<
 ///
 /// # Errors
 /// Returns an error ........ TKTK
-pub(crate) fn w1_encode<const K: usize>(gamma2: u32,
-    w1: &[R; K], w1_tilde: &mut [u8],
+pub(crate) fn w1_encode<const K: usize>(
+    gamma2: u32, w1: &[R; K], w1_tilde: &mut [u8],
 ) -> Result<(), &'static str> {
     let qm12gm1 = (QU - 1) / (2 * gamma2) - 1;
     let bl = bitlen(qm12gm1 as usize);
@@ -392,8 +391,8 @@ mod tests {
             get_vec(2u32.pow(11)),
         ];
         //let mut sk = [0u8; 2560];
-        let sk = sk_encode::<13, 4, 4, 2560>(2, &rho, &k, &tr, &s1, &s2, &t0).unwrap();
-        let res = sk_decode::<13, 4, 4, 2560>(2, &sk);
+        let sk = sk_encode::<4, 4, 2560>(2, &rho, &k, &tr, &s1, &s2, &t0).unwrap();
+        let res = sk_decode::<4, 4, 2560>(2, &sk);
         assert!(res.is_ok());
         #[allow(clippy::similar_names)]
         let (rho_test, k_test, tr_test, s1_test, s2_test, t0_test) = res.unwrap();
@@ -415,13 +414,11 @@ mod tests {
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         //let mut sigma = [0u8; 2420];
-        let sigma =
-            sig_encode::<4, 4, 128, 2420>(2u32.pow(17), 80, &c_tilde, &z, &h).unwrap();
+        let sigma = sig_encode::<4, 4, 128, 2420>(2u32.pow(17), 80, &c_tilde, &z, &h).unwrap();
         // let mut c_test = [0u8; 2 * 128 / 8];
         // let mut z_test = [[0i32; 256]; 4];
         // let mut h_test = [[0i32; 256]; 4];
-        let (c_test, z_test, h_test) =
-            sig_decode::<4, 4, 128>(2u32.pow(17), 80, &sigma).unwrap();
+        let (c_test, z_test, h_test) = sig_decode::<4, 4, 128>(2u32.pow(17), 80, &sigma).unwrap();
         //        assert!(res.is_ok());
         assert_eq!(c_tilde[0..8], c_test[0..8]);
         assert_eq!(z, z_test);

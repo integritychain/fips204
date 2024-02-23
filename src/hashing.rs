@@ -47,6 +47,7 @@ pub(crate) fn sample_in_ball(tau: u32, rho: &[u8; 32]) -> Result<R, &'static str
         // 5: k ← k + 1
         // 6: end while
         // The above/below loop reads xof bytes until less than or equal to i
+        #[allow(clippy::cast_possible_truncation)] // i as u8 cannot overflow
         loop {
             xof.read(&mut hpk); // Every 'read' effectively contains k = k + 1
             if hpk[0] <= i as u8 {
@@ -160,11 +161,11 @@ pub(crate) fn rej_bounded_poly(eta: u32, rhos: &[&[u8]]) -> R {
 pub(crate) fn expand_a<const K: usize, const L: usize>(rho: &[u8; 32]) -> [[T; L]; K] {
     let mut cap_a_hat = [[T::zero(); L]; K];
     // 1: for r from 0 to k − 1 do
-    for (r, a_row) in cap_a_hat.iter_mut().enumerate().take(K) {
+    for (a_row, r) in cap_a_hat.iter_mut().zip(0..u8::try_from(K).unwrap()) {
         // 2: for s from 0 to ℓ − 1 do
-        for (s, a_element) in a_row.iter_mut().enumerate().take(L) {
+        for (a_element, s) in a_row.iter_mut().zip(0..u8::try_from(L).unwrap()) {
             // 3: A_hat[r, s] ← RejNTTPoly(ρ||IntegerToBits(s, 8)||IntegerToBits(r, 8))
-            *a_element = rej_ntt_poly(&[&rho[..], &[s as u8], &[r as u8]]);
+            *a_element = rej_ntt_poly(&[&rho[..], &[s], &[r]]);
             // 4: end for
         }
         // 5: end for
@@ -186,16 +187,16 @@ pub(crate) fn expand_s<const K: usize, const L: usize>(
 ) -> Result<([R; L], [R; K]), &'static str> {
     let (mut s1, mut s2) = ([R::zero(); L], [R::zero(); K]);
     // 1: for r from 0 to ℓ − 1 do
-    for (r, s1r) in s1.iter_mut().enumerate().take(L) {
+    for (s1r, r) in s1.iter_mut().zip(0..u8::try_from(L).unwrap()) {
         // 2: s1[r] ← RejBoundedPoly(ρ||IntegerToBits(r, 16))
-        *s1r = rej_bounded_poly(eta, &[rho, &[r as u8], &[0]]);
+        *s1r = rej_bounded_poly(eta, &[rho, &[r], &[0]]);
         // 3: end for
     }
     // 4: for r from 0 to k − 1 do
-    for (r, s2r) in s2.iter_mut().enumerate().take(K) {
+    for (s2r, r) in s2.iter_mut().zip(0..u8::try_from(K).unwrap()) {
         // 5: s2[r] ← RejBoundedPoly(ρ||IntegerToBits(r + ℓ, 16))
-        ensure!((r + L) < 255, "Algorithm 27: r + L out of range u8");
-        *s2r = rej_bounded_poly(eta, &[rho, &[(r + L) as u8], &[0]]);
+        ensure!((r as usize + L) < 255, "Algorithm 27: r + L out of range u8");
+        *s2r = rej_bounded_poly(eta, &[rho, &[r + u8::try_from(L).unwrap()], &[0]]);
         // 6: end for
     }
     ensure!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s1 out of range");
@@ -212,8 +213,8 @@ pub(crate) fn expand_s<const K: usize, const L: usize>(
 ///
 /// # Errors
 /// Returns an error on internal errors
-pub(crate) fn expand_mask<const L: usize>(gamma1: u32,
-    rho: &[u8; 64], mu: u32,
+pub(crate) fn expand_mask<const L: usize>(
+    gamma1: u32, rho: &[u8; 64], mu: u16,
 ) -> Result<[R; L], &'static str> {
     let mut s = [R::zero(); L];
     let mut v = [0u8; 32 * 20];
@@ -222,15 +223,15 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: u32,
     let c = 1 + bitlen(gamma1 as usize - 1); // c will either be 18 or 20
     ensure!((c == 18) | (c == 20), "Algorithm 28: illegal c");
     // 2: for r from 0 to ℓ − 1 do
-    for r in 0..L {
+    for r in 0..u16::try_from(L).unwrap() {
         // 3: n ← IntegerToBits(µ + r, 16)
-        ensure!((mu + (r as u32) < 512), "Algorithm 28: mu + r out of range");
-        let n = mu as u16 + r as u16;
+        ensure!((mu + r < 512), "Algorithm 28: mu + r out of range");
+        let n = mu + r;
         // 4: v ← (H(ρ||n)[[32rc]], H(ρ||n)[[32rc+1]], ... , H(ρ||n)[[32rc+32c − 1]])
         let mut xof = h_xof(&[rho, &n.to_le_bytes()]);
         xof.read(&mut v);
         // 5: s[r] ← BitUnpack(v, γ1 − 1, γ1)
-        s[r] = conversion::bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1)?;
+        s[r as usize] = conversion::bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1)?;
         ensure!(
             s.iter().all(|r| is_in_range(r, gamma1, gamma1)),
             "Algorithm 28: s coeff out of range"

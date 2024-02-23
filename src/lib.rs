@@ -6,13 +6,10 @@
 // To remove...need to rework element+math
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_sign_loss)]
-#![allow(clippy::similar_names)]
+//#![allow(clippy::cast_possible_truncation)]
 
 // Roadmap
 //  1. types -> types.rs
-//  2. github actions (init cargo deny)
 //  3. Refine LAMBDA
 //  4. Resolve/remove precompute signing
 //  5. Clean up remaining rem_euclid instances
@@ -227,7 +224,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SK_LEN];
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sk_decode::<{ D as usize }, K, L, SK_LEN>(ETA, &sk)?; //.map_err(|_e| "Private key deserialization failed");
+                let _ = sk_decode::<K, L, SK_LEN>(ETA, &sk)?; //.map_err(|_e| "Private key deserialization failed");
                 Ok(PrivateKey(sk))
             }
 
@@ -261,7 +258,7 @@ macro_rules! functionality {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-44")]
 pub mod ml_dsa_44 {
-    use super::{D, QU};
+    use super::QU;
     const TAU: u32 = 39;
     const LAMBDA: usize = 128;
     const GAMMA1: u32 = 2u32.pow(17);
@@ -302,7 +299,7 @@ pub mod ml_dsa_44 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
-    use super::{D, QU};
+    use super::QU;
     const TAU: u32 = 49;
     const LAMBDA: usize = 192;
     const GAMMA1: u32 = 2u32.pow(19);
@@ -344,7 +341,7 @@ pub mod ml_dsa_65 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
-    use super::{D, QU};
+    use super::QU;
     const TAU: u32 = 60;
     const LAMBDA: usize = 256;
     const GAMMA1: u32 = 2u32.pow(19);
