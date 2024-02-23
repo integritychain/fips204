@@ -203,13 +203,13 @@ pub(crate) fn bit_unpack(v: &[u8], a: u32, b: u32) -> Result<R, &'static str> {
 ///
 /// # Errors
 /// Returns an error on incorrect sized inputs and too many `1` in `h`
-pub(crate) fn hint_bit_pack<const K: usize, const OMEGA: usize>(
+pub(crate) fn hint_bit_pack<const K: usize>(omega: u32,
     h: &[R; K], y_bytes: &mut [u8],
 ) -> Result<(), &'static str> {
     let k = h.len();
-    ensure!(y_bytes.len() == OMEGA + k, "Algorithm 14: incorrectly sized output field");
+    ensure!(y_bytes.len() == omega as usize + k, "Algorithm 14: incorrectly sized output field");
     ensure!(
-        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= OMEGA as i32),
+        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega as i32),
         "Algorithm 14: too many 1's in h"
     );
 
@@ -232,7 +232,7 @@ pub(crate) fn hint_bit_pack<const K: usize, const OMEGA: usize>(
             // 9: end for
         }
         // 10: y[ω + i] ← Index ▷ Store the value of Index after processing h[i]
-        y_bytes[OMEGA + i] = index as u8;
+        y_bytes[omega as usize + i] = index as u8;
         // 11: end for
     }
     // 12: return y
@@ -248,10 +248,10 @@ pub(crate) fn hint_bit_pack<const K: usize, const OMEGA: usize>(
 ///
 /// # Errors
 /// Returns an error on incorrectly sized or illegal inputs.
-pub(crate) fn hint_bit_unpack<const K: usize, const OMEGA: usize>(
+pub(crate) fn hint_bit_unpack<const K: usize>(omega: u32,
     y_bytes: &[u8],
 ) -> Result<[R; K], &'static str> {
-    debug_assert_eq!(y_bytes.len(), OMEGA + K);
+    debug_assert_eq!(y_bytes.len(), omega as usize + K);
 
     // 1: h ∈ R^k_2 ∈ ← 0^k
     let mut h = [R::zero(); K];
@@ -260,12 +260,12 @@ pub(crate) fn hint_bit_unpack<const K: usize, const OMEGA: usize>(
     // 3: for i from 0 to k − 1 do
     for i in 0..K {
         // 4: if y[ω + i] < Index or y[ω + i] > ω then return ⊥
-        if (y_bytes[OMEGA + i] < index) | (y_bytes[OMEGA + i] > OMEGA as u8) {
+        if (y_bytes[omega as usize + i] < index) | (y_bytes[omega as usize + i] > omega as u8) {
             return Err("Algorithm 15: returns ⊥");
             // 5: end if
         }
         // 6: while Index < y[ω + i] do
-        while index < y_bytes[OMEGA + i] {
+        while index < y_bytes[omega as usize + i] {
             // 7: h[i]y[Index] ← 1
             h[i][y_bytes[index as usize] as usize] = 1;
             // 8: Index ← Index + 1
@@ -276,7 +276,7 @@ pub(crate) fn hint_bit_unpack<const K: usize, const OMEGA: usize>(
     }
 
     // 11: while Index < ω do
-    while index < OMEGA as u8 {
+    while index < omega as u8 {
         // 12: if y[Index] != 0 then return ⊥
         if y_bytes[index as usize] != 0 {
             return Err("Algorithm 15: returns ⊥");
@@ -288,7 +288,7 @@ pub(crate) fn hint_bit_unpack<const K: usize, const OMEGA: usize>(
     }
     // 16: return h
     ensure!(
-        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= OMEGA as i32),
+        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega as i32),
         "Algorithm 14: too many 1's in h"
     );
     Ok(h)

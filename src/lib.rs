@@ -11,11 +11,14 @@
 #![allow(clippy::similar_names)]
 
 // Roadmap
-//  0. Stay on top of FIPS 204 updates
-//  1. Break-out precompute signing
-//  2. Clean up remaining rem_euclid instances
-//  3. More robust unit testing
-//  4. infinity_norm() -> check_infinity_norm() w/ early exit
+//  1. types -> types.rs
+//  2. github actions (init cargo deny)
+//  3. Refine LAMBDA
+//  4. Resolve/remove precompute signing
+//  5. Clean up remaining rem_euclid instances
+//  6. More robust unit testing
+//  7. infinity_norm() -> check_infinity_norm() w/ early exit
+//  8. Remove blanket clippy allows
 
 mod conversion;
 mod encodings;
@@ -152,8 +155,8 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Signature, &'static str> {
-                let sig = ml_dsa::sign::<GAMMA2, K, L, LAMBDA, OMEGA, SIG_LEN, SK_LEN>(
-                    rng, BETA, ETA, GAMMA1, TAU, &self.0, message,
+                let sig = ml_dsa::sign::<K, L, LAMBDA, SIG_LEN, SK_LEN>(
+                    rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
                 Ok(Signature(sig))
             }
@@ -175,8 +178,8 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Signature, &'static str> {
-                let sig = ml_dsa::sign::<GAMMA2, K, L, LAMBDA, OMEGA, SIG_LEN, SK_LEN>(
-                    rng, BETA, ETA, GAMMA1, TAU, &self.0, message,
+                let sig = ml_dsa::sign::<K, L, LAMBDA, SIG_LEN, SK_LEN>(
+                    rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
                 Ok(Signature(sig))
             }
@@ -187,8 +190,8 @@ macro_rules! functionality {
             type Signature = Signature;
 
             fn try_verify_vt(&self, message: &[u8], sig: &Signature) -> Result<bool, &'static str> {
-                ml_dsa::verify::<GAMMA2, K, L, LAMBDA, OMEGA, PK_LEN, SIG_LEN>(
-                    BETA, GAMMA1, TAU, &self.0, &message, &sig.0,
+                ml_dsa::verify::<K, L, LAMBDA, PK_LEN, SIG_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, &message, &sig.0,
                 )
             }
         }
@@ -200,7 +203,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SIG_LEN];
 
             fn try_from_bytes(sig: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sig_decode::<K, L, LAMBDA, OMEGA>(GAMMA1, &sig)?; //.map_err(|_e| "Signature deserialization failed");
+                let _ = sig_decode::<K, L, LAMBDA>(GAMMA1, OMEGA, &sig)?; //.map_err(|_e| "Signature deserialization failed");
                 Ok(Signature(sig))
             }
 
@@ -262,12 +265,12 @@ pub mod ml_dsa_44 {
     const TAU: u32 = 39;
     const LAMBDA: usize = 128;
     const GAMMA1: u32 = 2u32.pow(17);
-    const GAMMA2: usize = (QU as usize - 1) / 88;
+    const GAMMA2: u32 = (QU - 1) / 88;
     const K: usize = 4;
     const L: usize = 4;
     const ETA: u32 = 2;
     const BETA: u32 = TAU * ETA;
-    const OMEGA: usize = 80;
+    const OMEGA: u32 = 80;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 2560;
     /// Public key length in bytes.
@@ -303,12 +306,12 @@ pub mod ml_dsa_65 {
     const TAU: u32 = 49;
     const LAMBDA: usize = 192;
     const GAMMA1: u32 = 2u32.pow(19);
-    const GAMMA2: usize = (QU as usize - 1) / 32;
+    const GAMMA2: u32 = (QU - 1) / 32;
     const K: usize = 6;
     const L: usize = 5;
     const ETA: u32 = 4;
     const BETA: u32 = TAU * ETA;
-    const OMEGA: usize = 55;
+    const OMEGA: u32 = 55;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 4032;
     /// Public key length in bytes.
@@ -345,12 +348,12 @@ pub mod ml_dsa_87 {
     const TAU: u32 = 60;
     const LAMBDA: usize = 256;
     const GAMMA1: u32 = 2u32.pow(19);
-    const GAMMA2: usize = (QU as usize - 1) / 32;
+    const GAMMA2: u32 = (QU - 1) / 32;
     const K: usize = 8;
     const L: usize = 7;
     const ETA: u32 = 2;
     const BETA: u32 = TAU * ETA;
-    const OMEGA: usize = 75;
+    const OMEGA: u32 = 75;
     const SK_LEN: usize = 4896;
     const PK_LEN: usize = 2592;
     const SIG_LEN: usize = 4627;

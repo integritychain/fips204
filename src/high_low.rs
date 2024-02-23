@@ -27,11 +27,11 @@ pub(crate) fn power2round(r: Zq) -> (Zq, Zq) {
 ///
 /// Input: `r ∈ Zq` <br>
 /// Output: Integers `(r1, r0)`.
-pub(crate) fn decompose<const GAMMA2: usize>(r: Zq, r1: &mut Zq, r0: &mut Zq) {
+pub(crate) fn decompose(gamma2: u32, r: Zq, r1: &mut Zq, r0: &mut Zq) {
     // 1: r+ ← r mod q
     let rp = r.rem_euclid(QI); // TODO: Sensitive -- reduce_q32(r);
                                // 2: r0 ← r+ mod±(2γ_2)
-    *r0 = mod_pm(rp, 2 * GAMMA2 as u32);
+    *r0 = mod_pm(rp, 2 * gamma2);
     // 3: if r+ − r0 = q − 1 then
     if (rp - *r0) == (QU as i32 - 1) {
         // 4: r1 ← 0
@@ -40,7 +40,7 @@ pub(crate) fn decompose<const GAMMA2: usize>(r: Zq, r1: &mut Zq, r0: &mut Zq) {
         *r0 -= 1;
     } else {
         // 6: else r_1 ← (r+ − r0)/(2γ2)
-        *r1 = (rp - *r0) / (2 * GAMMA2 as i32);
+        *r1 = (rp - *r0) / (2 * gamma2 as i32);
         // 7: end if
     }
 }
@@ -51,10 +51,10 @@ pub(crate) fn decompose<const GAMMA2: usize>(r: Zq, r1: &mut Zq, r0: &mut Zq) {
 ///
 /// Input: `r ∈ Zq` <br>
 /// Output: Integer `r1`.
-pub(crate) fn high_bits<const GAMMA2: usize>(r: Zq) -> Zq {
+pub(crate) fn high_bits(gamma2: u32, r: Zq) -> Zq {
     // 1: (r1, r0) ← Decompose(r)
     let (mut r1, mut r0) = (0, 0);
-    decompose::<GAMMA2>(r, &mut r1, &mut r0);
+    decompose(gamma2, r, &mut r1, &mut r0);
     // 2: return r1
     r1
 }
@@ -65,10 +65,10 @@ pub(crate) fn high_bits<const GAMMA2: usize>(r: Zq) -> Zq {
 ///
 /// Input: r ∈ Zq <br>
 /// Output: Integer r0.
-pub(crate) fn low_bits<const GAMMA2: usize>(r: Zq) -> Zq {
+pub(crate) fn low_bits(gamma2: u32, r: Zq) -> Zq {
     // 1: (r1, r0) ← Decompose(r)
     let (mut r1, mut r0) = (0, 0);
-    decompose::<GAMMA2>(r, &mut r1, &mut r0);
+    decompose(gamma2, r, &mut r1, &mut r0);
     // 2: return r0
     r0
 }
@@ -79,11 +79,11 @@ pub(crate) fn low_bits<const GAMMA2: usize>(r: Zq) -> Zq {
 ///
 /// Input: `z`, `r` ∈ `Zq` <br>
 /// Output: Boolean
-pub(crate) fn make_hint<const GAMMA2: usize>(z: Zq, r: Zq) -> bool {
+pub(crate) fn make_hint(gamma2: u32, z: Zq, r: Zq) -> bool {
     // 1: r1 ← HighBits(r)
-    let r1 = high_bits::<GAMMA2>(r);
+    let r1 = high_bits(gamma2, r);
     // 2: v1 ← HighBits(r + z)
-    let v1 = high_bits::<GAMMA2>(reduce_q32(r + z));
+    let v1 = high_bits(gamma2, reduce_q32(r + z));
     // 3: return [[r1 != v1]]
     r1 != v1
 }
@@ -94,12 +94,12 @@ pub(crate) fn make_hint<const GAMMA2: usize>(z: Zq, r: Zq) -> bool {
 ///
 /// Input:boolean `h`, `r` ∈ `Zq` <br>
 /// Output: `r1` ∈ `Z` with `0 ≤ r1 ≤ (q − 1)/(2*γ_2)`
-pub(crate) fn use_hint<const GAMMA2: usize>(h: Zq, r: Zq) -> Zq {
+pub(crate) fn use_hint(gamma2: u32, h: Zq, r: Zq) -> Zq {
     // 1: m ← (q− 1)/(2*γ_2)
-    let m = (QU - 1) / (2 * GAMMA2 as u32);
+    let m = (QU - 1) / (2 * gamma2);
     // 2: (r1, r0) ← Decompose(r)
     let (mut r1, mut r0) = (0, 0);
-    decompose::<GAMMA2>(r, &mut r1, &mut r0);
+    decompose(gamma2, r, &mut r1, &mut r0);
     // 3: if h = 1 and r0 > 0 return (r1 + 1) mod m
     if (h == 1) & (r0 > 0) {
         return (r1 + 1).rem_euclid(m as i32);

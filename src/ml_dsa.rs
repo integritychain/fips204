@@ -79,16 +79,15 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 #[allow(clippy::similar_names)]
 #[allow(clippy::many_single_char_names)]
 #[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn sign<
-    const GAMMA2: usize,
     const K: usize,
     const L: usize,
     const LAMBDA: usize,
-    const OMEGA: usize,
     const SIG_LEN: usize,
     const SK_LEN: usize,
 >(
-    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: u32, tau: u32, sk: &[u8; SK_LEN],
+    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: u32, gamma2: u32, omega: u32, tau: u32, sk: &[u8; SK_LEN],
     message: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
@@ -108,7 +107,7 @@ pub(crate) fn sign<
     let cap_a_hat: [[T; L]; K] = expand_a(&rho);
 
     // 6:  µ ← H(tr||M, 512)    ▷ Compute message representative µ
-    let mut h = h_xof(&[&tr, &message]);
+    let mut h = h_xof(&[&tr, message]);
     let mut mu = [0u8; 64];
     h.read(&mut mu);
 
@@ -143,14 +142,14 @@ pub(crate) fn sign<
         let mut w_1: [R; K] = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                w_1[i][j] = high_bits::<GAMMA2>(w[i][j]);
+                w_1[i][j] = high_bits(gamma2,w[i][j]);
             }
         }
 
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
-        let w1e_len = 32 * K * bitlen(((QU - 1) / (2 * GAMMA2 as u32) - 1) as usize);
+        let w1e_len = 32 * K * bitlen(((QU - 1) / (2 * gamma2) - 1) as usize);
         let mut w1_tilde = [0u8; 1024];
-        w1_encode::<K, GAMMA2>(&w_1, &mut w1_tilde[0..w1e_len])?;
+        w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len])?;
         let mut h99 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
         h99.read(&mut c_tilde); // Ok to read a bit too much
 
@@ -194,14 +193,14 @@ pub(crate) fn sign<
         let mut r0: [R; K] = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                r0[i][j] = low_bits::<GAMMA2>(reduce_q32(w[i][j] - c_s_2[i][j]));
+                r0[i][j] = low_bits(gamma2, reduce_q32(w[i][j] - c_s_2[i][j]));
             }
         }
 
         // 23: if ||z||∞ ≥ Gamma1 − β or ||r0||∞ ≥ Gamma2 − β then (z, h) ← ⊥    ▷ Validity checks
         let z_norm = helpers::infinity_norm(&z);
         let r0_norm = helpers::infinity_norm(&r0);
-        if (z_norm >= (gamma1 as i32 - beta as i32)) | (r0_norm >= (GAMMA2 as i32 - beta as i32)) {
+        if (z_norm >= (gamma1 as i32 - beta as i32)) | (r0_norm >= (gamma2 as i32 - beta as i32)) {
             k += L as u32;
             continue;
             // 24: else  ... not really needed, with 'continue' above
@@ -222,13 +221,13 @@ pub(crate) fn sign<
             for j in 0..256 {
                 mct0[i][j] = reduce_q32(QI - c_t_0[i][j]);
                 wcc[i][j] = reduce_q32(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
-                h[i][j] = make_hint::<GAMMA2>(mct0[i][j], wcc[i][j]) as i32;
+                h[i][j] = make_hint(gamma2, mct0[i][j], wcc[i][j]) as i32;
             }
         }
 
         // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
-        if (helpers::infinity_norm(&c_t_0) >= GAMMA2 as i32)
-            | (h.iter().flatten().filter(|i| (**i).abs() == 1).count() > OMEGA)
+        if (helpers::infinity_norm(&c_t_0) >= gamma2 as i32)
+            | (h.iter().flatten().filter(|i| (**i).abs() == 1).count() > omega as usize)
         {
             k += L as u32;
             continue;
@@ -250,7 +249,7 @@ pub(crate) fn sign<
         }
     }
     let sig =
-        sig_encode::<K, L, LAMBDA, OMEGA, SIG_LEN>(gamma1,&c_tilde[0..2 * LAMBDA / 8], &zmq, &h)?;
+        sig_encode::<K, L, LAMBDA, SIG_LEN>(gamma1, omega, &c_tilde[0..2 * LAMBDA / 8], &zmq, &h)?;
 
     Ok(sig) // 33: return σ
 }
@@ -263,22 +262,20 @@ pub(crate) fn sign<
 /// Input: Signature, `σ` ∈ B^{32 + ℓ·32·(1 + bitlen(γ1−1)) + ω + k}. <br>
 /// Output: Boolean
 pub(crate) fn verify<
-    const GAMMA2: usize,
     const K: usize,
     const L: usize,
     const LAMBDA: usize,
-    const OMEGA: usize,
     const PK_LEN: usize,
     const SIG_LEN: usize,
 >(
-    beta: u32, gamma1: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8], sig: &[u8; SIG_LEN],
+    beta: u32, gamma1: u32, gamma2: u32, omega: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8], sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     // 1: (ρ,t_1) ← pkDecode(pk)
     let (rho, t_1): ([u8; 32], [R; K]) = pk_decode::<K, PK_LEN>(pk)?;
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
     let (c_tilde, z, h) = //: (Vec<u8>, [R; L], Option<[R; K]>) =
-        sig_decode::<K, L, LAMBDA, OMEGA>(gamma1, sig)?;
+        sig_decode::<K, L, LAMBDA>(gamma1, omega, sig)?;
 
     // 3: if h = ⊥ then return false ▷ Hint was not properly encoded
     if h.is_none() {
@@ -340,16 +337,16 @@ pub(crate) fn verify<
     let mut wp_1: [R; K] = [R::zero(); K];
     for i in 0..K {
         for j in 0..256 {
-            wp_1[i][j] = use_hint::<GAMMA2>(h.ok_or("h scrambled 3")?[i][j], wp_approx[i][j]);
+            wp_1[i][j] = use_hint(gamma2, h.ok_or("h scrambled 3")?[i][j], wp_approx[i][j]);
         }
     }
 
     // 12: c_tilde_′ ← H(µ||w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
-    let qm12gm1 = (QU - 1) / (2 * GAMMA2 as u32) - 1;
+    let qm12gm1 = (QU - 1) / (2 * gamma2) - 1;
     let bl = bitlen(qm12gm1 as usize);
     let t_max = 32 * K * bl;
     let mut tmp = [0u8; 1024]; // TODO: optimize to [0u8; 32 * K * bl]
-    w1_encode::<K, GAMMA2>(&wp_1, &mut tmp[..t_max])?;
+    w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max])?;
     let mut hasher = h_xof(&[&mu, &tmp[..t_max]]);
     let mut c_tilde_p = [0u8; 64];
     hasher.read(&mut c_tilde_p); // leftover to be ignored
@@ -360,6 +357,6 @@ pub(crate) fn verify<
     let right = h // TODO: confirm -- this checks #h per each R (rather than overall total)
         .ok_or("h scrambled 4")?
         .iter()
-        .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= OMEGA as i32);
+        .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega as i32);
     Ok(left & center & right)
 }

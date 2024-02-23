@@ -221,15 +221,14 @@ pub(crate) fn sig_encode<
     const K: usize,
     const L: usize,
     const LAMBDA: usize,
-    const OMEGA: usize,
     const SIG_LEN: usize,
 >(
-    gamma1: u32, c_tilde: &[u8], z: &[R; L], h: &[R; K],
+    gamma1: u32, omega: u32, c_tilde: &[u8], z: &[R; L], h: &[R; K],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     let mut sigma = [0u8; SIG_LEN];
     ensure!(c_tilde.len() == 2 * LAMBDA / 8, "Algoirthm 20: asdf asdf");
     let bl = bitlen(gamma1 as usize - 1);
-    ensure!(sigma.len() == LAMBDA / 4 + L * 32 * (1 + bl) + OMEGA + K, "Algorithm 20: qwer qwer");
+    ensure!(sigma.len() == LAMBDA / 4 + L * 32 * (1 + bl) + omega as usize + K, "Algorithm 20: qwer qwer");
 
     // 1: σ ← BitsToBytes(c_tilde)
     sigma[..2 * LAMBDA / 8].copy_from_slice(c_tilde);
@@ -247,7 +246,7 @@ pub(crate) fn sig_encode<
         // 4: end for
     }
     // 5: σ ← σ || HintBitPack (h)
-    hint_bit_pack::<K, OMEGA>(h, &mut sigma[start + L * step..])?;
+    hint_bit_pack::<K>(omega, h, &mut sigma[start + L * step..])?;
     Ok(sigma)
 }
 
@@ -266,8 +265,7 @@ pub(crate) fn sig_decode<
     const K: usize,
     const L: usize,
     const LAMBDA: usize,
-    const OMEGA: usize,
->(gamma1: u32,
+>(gamma1: u32, omega: u32,
     sigma: &[u8],
 ) -> Result<([u8; 64], [R; L], Option<[R; K]>), &'static str> {
     let bl = bitlen(gamma1 as usize - 1);
@@ -291,7 +289,7 @@ pub(crate) fn sig_decode<
         // 5: end for
     }
     // 6: h ← HintBitUnpack(y)
-    let h = hint_bit_unpack::<K, OMEGA>(&sigma[start + L * step..])?;
+    let h = hint_bit_unpack::<K>(omega, &sigma[start + L * step..])?;
     // 7: return (c_tilde, z, h)
     Ok((c_tilde, z, Some(h)))
 }
@@ -305,10 +303,10 @@ pub(crate) fn sig_decode<
 ///
 /// # Errors
 /// Returns an error ........ TKTK
-pub(crate) fn w1_encode<const K: usize, const GAMMA2: usize>(
+pub(crate) fn w1_encode<const K: usize>(gamma2: u32,
     w1: &[R; K], w1_tilde: &mut [u8],
 ) -> Result<(), &'static str> {
-    let qm12gm1 = (QU - 1) / (2 * GAMMA2 as u32) - 1;
+    let qm12gm1 = (QU - 1) / (2 * gamma2) - 1;
     let bl = bitlen(qm12gm1 as usize);
     ensure!(w1.iter().all(|r| is_in_range(r, 0, qm12gm1)), "Agorithm 22: adsf asdf ");
 
@@ -418,12 +416,12 @@ mod tests {
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         //let mut sigma = [0u8; 2420];
         let sigma =
-            sig_encode::<4, 4, 128, 80, 2420>(2u32.pow(17), &c_tilde, &z, &h).unwrap();
+            sig_encode::<4, 4, 128, 2420>(2u32.pow(17), 80, &c_tilde, &z, &h).unwrap();
         // let mut c_test = [0u8; 2 * 128 / 8];
         // let mut z_test = [[0i32; 256]; 4];
         // let mut h_test = [[0i32; 256]; 4];
         let (c_test, z_test, h_test) =
-            sig_decode::<4, 4, 128, 80>(2u32.pow(17), &sigma).unwrap();
+            sig_decode::<4, 4, 128>(2u32.pow(17), 80, &sigma).unwrap();
         //        assert!(res.is_ok());
         assert_eq!(c_tilde[0..8], c_test[0..8]);
         assert_eq!(z, z_test);

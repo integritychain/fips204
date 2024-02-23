@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
 repository = "https://github.com/integritychain/fips204"
-rust-version = "1.72"
+rust-version = "1.74"
 
 
 [dependencies]
@@ -28,7 +28,7 @@ rand = "0.8.5"
 regex = "1.10.3"
 hex = "0.4.3"
 rand_chacha = "0.3.1"
-criterion = "0.4.0" # for MSRV 1.72, otherwise newest is "0.5.1"
+criterion = "0.5.1"
 
 
 [[bench]]
