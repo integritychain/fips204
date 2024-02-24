@@ -372,6 +372,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_sk_encode_decode_roundtrip1() {
         // TODO: figure out how to best test this correctly
         //  - should the skDecode function return a result (probably)
@@ -394,7 +395,6 @@ mod tests {
         let sk = sk_encode::<4, 4, 2560>(2, &rho, &k, &tr, &s1, &s2, &t0).unwrap();
         let res = sk_decode::<4, 4, 2560>(2, &sk);
         assert!(res.is_ok());
-        #[allow(clippy::similar_names)]
         let (rho_test, k_test, tr_test, s1_test, s2_test, t0_test) = res.unwrap();
 
         assert!(

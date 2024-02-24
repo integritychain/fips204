@@ -43,7 +43,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.74 # MSRV
+          - 1.72  # MSRV 1.70 GA flaky
           - stable
         target:
           - thumbv7em-none-eabi
@@ -69,14 +69,14 @@ jobs:
         include:
           # 32-bit Linux
           - target: i686-unknown-linux-gnu
-            rust: 1.74 # MSRV
+            rust: 1.72 # MSRV 1.70 GA flaky
             deps: sudo apt update && sudo apt install gcc-multilib
           - target: i686-unknown-linux-gnu
             rust: stable
             deps: sudo apt update && sudo apt install gcc-multilib
           # 64-bit Linux
           - target: x86_64-unknown-linux-gnu
-            rust: 1.74 # MSRV
+            rust: 1.72 # MSRV 1.70 GA flaky
           - target: x86_64-unknown-linux-gnu
             rust: stable
     steps:
@@ -96,17 +96,17 @@ jobs:
         include:
           # ARM32
           - target: armv7-unknown-linux-gnueabihf
-            rust: 1.74 # MSRV (cross)
+            rust: 1.72  # MSRV 1.70 GA flaky
           - target: armv7-unknown-linux-gnueabihf
             rust: stable
           # ARM64
           - target: aarch64-unknown-linux-gnu
-            rust: 1.74 # MSRV (cross)
+            rust: 1.72  # MSRV 1.70 GA flaky
           - target: aarch64-unknown-linux-gnu
             rust: stable
           # PPC32
           - target: powerpc-unknown-linux-gnu
-            rust: 1.74 # MSRV (cross)
+            rust: 1.72  # MSRV 1.70 GA flaky
           - target: powerpc-unknown-linux-gnu
             rust: stable
     runs-on: ubuntu-latest

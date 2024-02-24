@@ -55,7 +55,7 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 * This crate is fully functional and corresponds to the first initial public draft of FIPS 204.    
 * Constant-time assurances target the source-code level only, and are a work in progress.
 * Note that FIPS 204 places specific requirements on randomness per section 3.5.1, hence the exposed `RNG`.
-* Requires Rust **1.74** or higher. The minimum supported Rust version may be changed in the future, but 
+* Requires Rust **1.70** or higher. The minimum supported Rust version may be changed in the future, but 
 it will be done with a minor version bump.
 * All on-by-default features of this library are covered by SemVer.
 * This software is experimental and still under active development -- USE AT YOUR OWN RISK!
@@ -79,7 +79,7 @@ defined in the Apache-2.0 license, shall be dual licensed as above, without any 
 [build-image]: https://github.com/integritychain/fips204/workflows/test/badge.svg
 [build-link]: https://github.com/integritychain/fips204/actions?query=workflow%3Atest
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.74+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.70+-blue.svg
 
 [//]: # (general links)
 

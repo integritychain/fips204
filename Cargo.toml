@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
 repository = "https://github.com/integritychain/fips204"
-rust-version = "1.74"
+rust-version = "1.70"
 
 
 [dependencies]
