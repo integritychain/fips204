@@ -9,11 +9,6 @@ repository = "https://github.com/integritychain/fips204"
 rust-version = "1.70"
 
 
-[dependencies]
-sha3 = { version = "0.10.8", default-features = false }
-rand_core = { version = "0.6.4", default-features = false }
-zeroize = { version = "1.7.0", features = ["zeroize_derive"] }
-
 
 [features]
 default = ["default-rng", "ml-dsa-44", "ml-dsa-65", "ml-dsa-87"]
@@ -23,12 +18,18 @@ ml-dsa-65 = []
 ml-dsa-87 = []
 
 
+[dependencies]
+sha3 = { version = "0.10.8", default-features = false }
+rand_core = { version = "0.6.4", default-features = false }
+zeroize = { version = "1.6.0", features = ["zeroize_derive"] }
+
+
 [dev-dependencies]
 rand = "0.8.5"
-regex = "1.10.3"
+regex = "1.10.2"
 hex = "0.4.3"
 rand_chacha = "0.3.1"
-criterion = "0.5.1"
+criterion = "0.4.0" # 0.4.0 needed to keep MSRV back at 1.70, newer: "0.5.1"
 
 
 [[bench]]
