@@ -260,11 +260,11 @@ macro_rules! functionality {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-44")]
 pub mod ml_dsa_44 {
-    use super::QU;
+    use super::QI;
     const TAU: u32 = 39;
     const LAMBDA: usize = 128;
-    const GAMMA1: u32 = 2u32.pow(17);
-    const GAMMA2: u32 = (QU - 1) / 88;
+    const GAMMA1: i32 = 2i32.pow(17);
+    const GAMMA2: i32 = (QI - 1) / 88;
     const K: usize = 4;
     const L: usize = 4;
     const ETA: u32 = 2;
@@ -301,11 +301,11 @@ pub mod ml_dsa_44 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
-    use super::QU;
+    use super::QI;
     const TAU: u32 = 49;
     const LAMBDA: usize = 192;
-    const GAMMA1: u32 = 2u32.pow(19);
-    const GAMMA2: u32 = (QU - 1) / 32;
+    const GAMMA1: i32 = 2i32.pow(19);
+    const GAMMA2: i32 = (QI - 1) / 32;
     const K: usize = 6;
     const L: usize = 5;
     const ETA: u32 = 4;
@@ -343,11 +343,11 @@ pub mod ml_dsa_65 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
-    use super::QU;
+    use super::QI;
     const TAU: u32 = 60;
     const LAMBDA: usize = 256;
-    const GAMMA1: u32 = 2u32.pow(19);
-    const GAMMA2: u32 = (QU - 1) / 32;
+    const GAMMA1: i32 = 2i32.pow(19);
+    const GAMMA2: i32 = (QI - 1) / 32;
     const K: usize = 8;
     const L: usize = 7;
     const ETA: u32 = 2;

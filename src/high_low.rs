@@ -1,6 +1,6 @@
 use crate::helpers::{full_reduce, mod_pm, partial_reduce};
 use crate::types::Zq;
-use crate::{D, QU};
+use crate::{D, QI, QU};
 
 
 // This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
@@ -27,11 +27,11 @@ pub(crate) fn power2round(r: Zq) -> (Zq, Zq) {
 ///
 /// Input: `r ∈ Zq` <br>
 /// Output: Integers `(r1, r0)`.
-pub(crate) fn decompose(gamma2: u32, r: Zq) -> (Zq, Zq) {
+pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     // 1: r+ ← r mod q
     let rp = full_reduce(r);
     // 2: r0 ← r+ mod±(2γ_2)
-    let mut r0 = mod_pm(rp, 2 * gamma2);
+    let mut r0 = mod_pm(rp, 2 * gamma2 as u32);
     let mut r1 = 0;
     // 3: if r+ − r0 = q − 1 then
     if (rp - r0) == (QU as i32 - 1) {
@@ -64,7 +64,7 @@ pub(crate) fn decompose(gamma2: u32, r: Zq) -> (Zq, Zq) {
 ///
 /// Input: `r ∈ Zq` <br>
 /// Output: Integer `r1`.
-pub(crate) fn high_bits(gamma2: u32, r: Zq) -> Zq {
+pub(crate) fn high_bits(gamma2: i32, r: Zq) -> Zq {
     // 1: (r1, r0) ← Decompose(r)
     let (r1, _r0) = decompose(gamma2, r);
     // 2: return r1
@@ -77,7 +77,7 @@ pub(crate) fn high_bits(gamma2: u32, r: Zq) -> Zq {
 ///
 /// Input: r ∈ Zq <br>
 /// Output: Integer r0.
-pub(crate) fn low_bits(gamma2: u32, r: Zq) -> Zq {
+pub(crate) fn low_bits(gamma2: i32, r: Zq) -> Zq {
     // 1: (r1, r0) ← Decompose(r)
     let (_r1, r0) = decompose(gamma2, r);
     // 2: return r0
@@ -90,7 +90,7 @@ pub(crate) fn low_bits(gamma2: u32, r: Zq) -> Zq {
 ///
 /// Input: `z`, `r` ∈ `Zq` <br>
 /// Output: Boolean
-pub(crate) fn make_hint(gamma2: u32, z: Zq, r: Zq) -> bool {
+pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
     // 1: r1 ← HighBits(r)
     let r1 = high_bits(gamma2, r);
     // 2: v1 ← HighBits(r + z)
@@ -105,18 +105,18 @@ pub(crate) fn make_hint(gamma2: u32, z: Zq, r: Zq) -> bool {
 ///
 /// Input:boolean `h`, `r` ∈ `Zq` <br>
 /// Output: `r1` ∈ `Z` with `0 ≤ r1 ≤ (q − 1)/(2*γ_2)`
-pub(crate) fn use_hint(gamma2: u32, h: Zq, r: Zq) -> Zq {
+pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     // 1: m ← (q− 1)/(2*γ_2)
-    let m = (QU - 1) / (2 * gamma2);
+    let m = (QI - 1) / (2 * gamma2);
     // 2: (r1, r0) ← Decompose(r)
     let (r1, r0) = decompose(gamma2, r);
     // 3: if h = 1 and r0 > 0 return (r1 + 1) mod m
     if (h == 1) & (r0 > 0) {
-        return (r1 + 1).rem_euclid(m as i32);
+        return (r1 + 1).rem_euclid(m);
     }
     // 4: if h = 1 and r0 ≤ 0 return (r1 − 1) mod m
     if (h == 1) & (r0 <= 0) {
-        return (r1 - 1).rem_euclid(m as i32);
+        return (r1 - 1).rem_euclid(m);
     }
     // 5: return r1
     r1

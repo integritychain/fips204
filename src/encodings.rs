@@ -2,12 +2,9 @@
 
 use crate::helpers::{bitlen, ensure, is_in_range};
 use crate::types::{Zero, R};
-use crate::{
-    conversion::{
-        bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
-    },
-    D, QU,
-};
+use crate::{conversion::{
+    bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
+}, D, QI, QU};
 
 
 /// Algorithm 16: `pkEncode(ρ, t1)` on page 25.
@@ -33,7 +30,7 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
         // 3: pk ← pk || SimpleBitPack (t1[i], 2^{bitlen(q−1)−d}-1)
         simple_bit_pack(
             &t1[i],
-            2u32.pow(blqd as u32) - 1,
+            2i32.pow(blqd as u32) - 1,
             &mut pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd],
         )?;
         // 4: end for
@@ -69,13 +66,13 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
         // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1)) ▷ This is always in the correct range
         t1[i] = simple_bit_unpack(
             &pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd],
-            2u32.pow(blqd as u32) - 1,
+            2i32.pow(blqd as u32) - 1,
         )?;
         // 5: end for
     }
     // 6: return (ρ, t1 )
     ensure!(
-        t1.iter().all(|x| is_in_range(x, 0, 2u32.pow(blqd as u32))),
+        t1.iter().all(|x| is_in_range(x, 0, 2i32.pow(blqd as u32))),
         "Algorithm 17: t1 out of range"
     );
     Ok((rho, t1))
@@ -96,10 +93,10 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 pub fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: u32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s1: &[R; L], s2: &[R; K], t0: &[R; K],
 ) -> Result<[u8; SK_LEN], &'static str> {
-    ensure!(s1.iter().all(|x| is_in_range(x, eta, eta)), "Algorithm 18: s1 out of range");
-    ensure!(s2.iter().all(|x| is_in_range(x, eta, eta)), "Algorithm 18: s2 out of range");
+    ensure!(s1.iter().all(|x| is_in_range(x, eta as i32, eta as i32)), "Algorithm 18: s1 out of range");
+    ensure!(s2.iter().all(|x| is_in_range(x, eta as i32, eta as i32)), "Algorithm 18: s2 out of range");
     ensure!(
-        t0.iter().all(|x| is_in_range(x, 2u32.pow(D - 1) + 1, 2u32.pow(D - 1))),
+        t0.iter().all(|x| is_in_range(x, 2i32.pow(D - 1) + 1, 2i32.pow(D - 1))),
         "Algorithm 18: t0 out of range"
     );
     let mut sk = [0u8; SK_LEN];
@@ -117,14 +114,14 @@ pub fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     let step = 32 * bitlen(2 * eta as usize);
     for i in 0..L {
         // 3: sk ← sk || BitPack (s1[i], η, η)
-        bit_pack(&s1[i], eta, eta, &mut sk[start + i * step..start + (i + 1) * step])?;
+        bit_pack(&s1[i], eta as i32, eta as i32, &mut sk[start + i * step..start + (i + 1) * step])?;
         // 4: end for
     }
     // 5: for i from 0 to k − 1 do
     let start = start + L * step;
     for i in 0..K {
         // 6: sk ← sk || BitPack (s2[i], η, η)
-        bit_pack(&s2[i], eta, eta, &mut sk[start + i * step..start + (i + 1) * step])?;
+        bit_pack(&s2[i], eta as i32, eta as i32, &mut sk[start + i * step..start + (i + 1) * step])?;
         // 7: end for
     }
     // 8: for i from 0 to k − 1 do
@@ -134,8 +131,8 @@ pub fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
         // 9: sk ← sk || BitPack (t0[i], [−2^{d-1} + 1, 2^{d-1}] )
         bit_pack(
             &t0[i],
-            2u32.pow(D - 1) - 1,
-            2u32.pow(D - 1),
+            2i32.pow(D - 1) - 1,
+            2i32.pow(D - 1),
             &mut sk[start + i * step..start + (i + 1) * step],
         )?;
         // 10: end for
@@ -181,14 +178,14 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     let step = 32 * bl;
     for i in 0..L {
         // 6: s1[i] ← BitUnpack(yi, η, η)   ▷ This may lie outside [−η, η], if input is malformed
-        s1[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
+        s1[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta as i32, eta as i32)?;
         // 7: end for
     }
     // 8: for i from 0 to k − 1 do
     let start = start + L * step;
     for i in 0..K {
         // 9: s2[i] ← BitUnpack(zi, η, η) ▷ This may lie outside [−η, η], if input is malformed
-        s2[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
+        s2[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta as i32, eta as i32)?;
         // 10: end for
     }
     // 11: for i from 0 to k − 1 do
@@ -198,8 +195,8 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
         // 12: t0[i] ← BitUnpack(wi, −2^{d−1} - 1, 2^{d−1})   ▷ This is always in the correct range
         t0[i] = bit_unpack(
             &sk[start + i * step..start + (i + 1) * step],
-            2u32.pow(D - 1) - 1,
-            2u32.pow(D - 1),
+            2i32.pow(D - 1) - 1,
+            2i32.pow(D - 1),
         )?;
         // 13: end for
     }
@@ -207,9 +204,9 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     ensure!(start + K * step == sk.len(), "Algorithm 19: asdf asdf ");
 
     // Note spec is not consistent on the range constraints for s1 and s2; this is tighter
-    let s1_ok = s1.iter().all(|r| is_in_range(r, eta, eta));
-    let s2_ok = s2.iter().all(|r| is_in_range(r, eta, eta));
-    let t0_ok = t0.iter().all(|r| is_in_range(r, 2u32.pow(D - 1) + 1, 2u32.pow(D - 1) + 1));
+    let s1_ok = s1.iter().all(|r| is_in_range(r, eta as i32, eta as i32));
+    let s2_ok = s2.iter().all(|r| is_in_range(r, eta as i32, eta as i32));
+    let t0_ok = t0.iter().all(|r| is_in_range(r, 2i32.pow(D - 1) + 1, 2i32.pow(D - 1) + 1));
     if s1_ok & s2_ok & t0_ok {
         Ok((rho, k, tr, s1, s2, t0))
     } else {
@@ -232,7 +229,7 @@ pub(crate) fn sig_encode<
     const LAMBDA: usize,
     const SIG_LEN: usize,
 >(
-    gamma1: u32, omega: u32, c_tilde: &[u8], z: &[R; L], h: &[R; K],
+    gamma1: i32, omega: u32, c_tilde: &[u8], z: &[R; L], h: &[R; K],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     let mut sigma = [0u8; SIG_LEN];
     ensure!(c_tilde.len() == 2 * LAMBDA / 8, "Algorithm 20: {line!()}");
@@ -269,7 +266,7 @@ pub(crate) fn sig_encode<
 /// Returns an error ........ TKTK
 #[allow(clippy::type_complexity)]
 pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA: usize>(
-    gamma1: u32, omega: u32, sigma: &[u8],
+    gamma1: i32, omega: u32, sigma: &[u8],
 ) -> Result<([u8; 64], [R; L], Option<[R; K]>), &'static str> {
     let bl = bitlen(gamma1 as usize - 1);
     // let mut c_tilde = vec![0u8; LAMBDA / 4];
@@ -303,9 +300,9 @@ pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA: usize>(
 /// # Errors
 /// Returns an error ........ TKTK
 pub(crate) fn w1_encode<const K: usize>(
-    gamma2: u32, w1: &[R; K], w1_tilde: &mut [u8],
+    gamma2: i32, w1: &[R; K], w1_tilde: &mut [u8],
 ) -> Result<(), &'static str> {
-    let qm12gm1 = (QU - 1) / (2 * gamma2) - 1;
+    let qm12gm1 = (QI - 1) / (2 * gamma2) - 1;
     let bl = bitlen(qm12gm1 as usize);
     ensure!(w1.iter().all(|r| is_in_range(r, 0, qm12gm1)), "Agorithm 22: adsf asdf ");
 
@@ -414,11 +411,11 @@ mod tests {
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         //let mut sigma = [0u8; 2420];
-        let sigma = sig_encode::<4, 4, 128, 2420>(2u32.pow(17), 80, &c_tilde, &z, &h).unwrap();
+        let sigma = sig_encode::<4, 4, 128, 2420>(2i32.pow(17), 80, &c_tilde, &z, &h).unwrap();
         // let mut c_test = [0u8; 2 * 128 / 8];
         // let mut z_test = [[0i32; 256]; 4];
         // let mut h_test = [[0i32; 256]; 4];
-        let (c_test, z_test, h_test) = sig_decode::<4, 4, 128>(2u32.pow(17), 80, &sigma).unwrap();
+        let (c_test, z_test, h_test) = sig_decode::<4, 4, 128>(2i32.pow(17), 80, &sigma).unwrap();
         //        assert!(res.is_ok());
         assert_eq!(c_tilde[0..8], c_test[0..8]);
         assert_eq!(z, z_test);

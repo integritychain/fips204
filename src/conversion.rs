@@ -82,7 +82,7 @@ pub(crate) fn coef_from_half_byte(eta: u32, b: u8) -> Result<i32, &'static str> 
 ///
 /// # Errors
 /// Returns an error on any out-of-range coefficients of `w`
-pub(crate) fn simple_bit_pack(w: &R, b: u32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
+pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
     ensure!(is_in_range(w, 0, b), "Algorithm 10: input w is outside allowed range");
     let bitlen = bitlen(b as usize);
     ensure!(bytes_out.len() == 32 * bitlen, "Algorithm 10: incorrect size of output bytes");
@@ -99,8 +99,8 @@ pub(crate) fn simple_bit_pack(w: &R, b: u32, bytes_out: &mut [u8]) -> Result<(),
 ///
 /// # Errors
 /// Returns an error on `a` and `b` outside of `u32::MAX/4`, and `w` out of range.
-pub(crate) fn bit_pack(w: &R, a: u32, b: u32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
-    debug_assert!((a < u32::MAX / 4) & (b < u32::MAX / 4) & (b >= a), "Alg 11: a/b too large");
+pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
+    debug_assert!((a < i32::MAX / 4) & (b < i32::MAX / 4) & (b >= a), "Alg 11: a/b too large");
     let bitlen = bitlen((a + b) as usize); // Calculate element bit length
     ensure!(w.len() * bitlen / 8 == bytes_out.len(), "Algorithm 11: incorrect size output bytes");
     ensure!((w.len() * bitlen) % 8 == 0, "Algorithm 11: left over bits");
@@ -147,7 +147,7 @@ pub(crate) fn bit_pack(w: &R, a: u32, b: u32, bytes_out: &mut [u8]) -> Result<()
 ///
 /// # Errors
 /// Returns an error on `w` out of range and incorrectly sized `v`.
-pub(crate) fn simple_bit_unpack(v: &[u8], b: u32) -> Result<R, &'static str> {
+pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
     let bitlen = (b.ilog2() + 1) as usize;
     ensure!(v.len() == 32 * bitlen, "Algorithm 12: incorrectly sized v");
     let w_out = bit_unpack(v, 0, b)?;
@@ -165,8 +165,8 @@ pub(crate) fn simple_bit_unpack(v: &[u8], b: u32) -> Result<R, &'static str> {
 ///
 /// # Errors
 /// Returns an error on `w` out of range and incorrectly sized `v`.
-pub(crate) fn bit_unpack(v: &[u8], a: u32, b: u32) -> Result<R, &'static str> {
-    ensure!((a < u32::MAX / 4) & (b < u32::MAX / 4) & (b >= a), "Algorithm 13: a, b too large");
+pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
+    ensure!((a < i32::MAX / 4) & (b < i32::MAX / 4) & (b >= a), "Algorithm 13: a, b too large");
     let bitlen = (a + b).ilog2() + 1;
     ensure!(v.len() == 32 * bitlen as usize, "Algorithm 12: incorrectly sized v");
 
@@ -372,9 +372,9 @@ mod tests {
     fn test_simple_bit_pack_roundtrip() {
         // Round trip for 32 * 6(bitlen) bytes
         let random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
-        let r = simple_bit_unpack(&random_bytes, 2u32.pow(6) - 1).unwrap();
+        let r = simple_bit_unpack(&random_bytes, 2i32.pow(6) - 1).unwrap();
         let mut res = [0u8; 32 * 6];
-        simple_bit_pack(&r, 2u32.pow(6) - 1, &mut res).unwrap();
+        simple_bit_pack(&r, 2i32.pow(6) - 1, &mut res).unwrap();
         assert_eq!(random_bytes, res);
     }
 
@@ -382,7 +382,7 @@ mod tests {
     fn test_simple_bit_unpack_validation1() {
         // wrong size of bytes
         let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
-        let res = simple_bit_unpack(&random_bytes, 2u32.pow(6) - 1);
+        let res = simple_bit_unpack(&random_bytes, 2i32.pow(6) - 1);
         assert!(res.is_err());
     }
 
@@ -390,7 +390,7 @@ mod tests {
     fn test_bit_unpack_validation1() {
         // wrong size of bytes
         let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
-        let res = bit_unpack(&random_bytes, 0, 2u32.pow(6) - 1);
+        let res = bit_unpack(&random_bytes, 0, 2i32.pow(6) - 1);
         assert!(res.is_err());
     }
 
@@ -398,7 +398,7 @@ mod tests {
     fn test_simple_bit_pack_validation1() {
         let mut random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
         let r = [0i32; 256];
-        let res = simple_bit_pack(&r, 2u32.pow(6) - 1, &mut random_bytes);
+        let res = simple_bit_pack(&r, 2i32.pow(6) - 1, &mut random_bytes);
         assert!(res.is_ok());
     }
 
@@ -407,7 +407,7 @@ mod tests {
         let mut random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
         // wrong size r coeff
         let r = [1024i32; 256];
-        let res = simple_bit_pack(&r, 2u32.pow(6) - 1, &mut random_bytes);
+        let res = simple_bit_pack(&r, 2i32.pow(6) - 1, &mut random_bytes);
         assert!(res.is_err());
     }
 

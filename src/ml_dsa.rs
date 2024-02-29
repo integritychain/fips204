@@ -86,7 +86,7 @@ pub(crate) fn sign<
     const SIG_LEN: usize,
     const SK_LEN: usize,
 >(
-    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: u32, gamma2: u32, omega: u32,
+    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: i32, gamma2: i32, omega: u32,
     tau: u32, sk: &[u8; SK_LEN], message: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
@@ -146,7 +146,7 @@ pub(crate) fn sign<
         }
 
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
-        let w1e_len = 32 * K * bitlen(((QU - 1) / (2 * gamma2) - 1) as usize);
+        let w1e_len = 32 * K * bitlen(((QI - 1) / (2 * gamma2) - 1) as usize);
         let mut w1_tilde = [0u8; 1024];
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len])?;
         let mut h99 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
@@ -268,7 +268,7 @@ pub(crate) fn verify<
     const PK_LEN: usize,
     const SIG_LEN: usize,
 >(
-    beta: u32, gamma1: u32, gamma2: u32, omega: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8],
+    beta: u32, gamma1: i32, gamma2: i32, omega: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8],
     sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     // 1: (ρ,t_1) ← pkDecode(pk)
@@ -343,7 +343,7 @@ pub(crate) fn verify<
     }
 
     // 12: c_tilde_′ ← H(µ||w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
-    let qm12gm1 = (QU - 1) / (2 * gamma2) - 1;
+    let qm12gm1 = (QI - 1) / (2 * gamma2) - 1;
     let bl = bitlen(qm12gm1 as usize);
     let t_max = 32 * K * bl;
     let mut tmp = [0u8; 1024]; // TODO: optimize to [0u8; 32 * K * bl]
@@ -353,7 +353,7 @@ pub(crate) fn verify<
     hasher.read(&mut c_tilde_p); // leftover to be ignored
 
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
-    let left = helpers::infinity_norm(&z) < ((gamma1 - beta) as i32);
+    let left = helpers::infinity_norm(&z) < ((gamma1 - beta as i32) as i32);
     let center = c_tilde[0..LAMBDA / 4] == c_tilde_p[0..LAMBDA / 4];
     let right = h // TODO: confirm -- this checks #h per each R (rather than overall total)
         .ok_or("h scrambled 4")?

@@ -200,8 +200,8 @@ pub(crate) fn expand_s<const K: usize, const L: usize>(
         *s2r = rej_bounded_poly(eta, &[rho, &[r + u8::try_from(L).unwrap()], &[0]]);
         // 6: end for
     }
-    ensure!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s1 out of range");
-    ensure!(s2.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s2 out of range");
+    ensure!(s1.iter().all(|r| is_in_range(r, eta as i32, eta as i32)), "Algorithm 27: s1 out of range");
+    ensure!(s2.iter().all(|r| is_in_range(r, eta as i32, eta as i32)), "Algorithm 27: s2 out of range");
     Ok((s1, s2)) // 7: return (s_1 , s_2)
 }
 
@@ -215,7 +215,7 @@ pub(crate) fn expand_s<const K: usize, const L: usize>(
 /// # Errors
 /// Returns an error on internal errors
 pub(crate) fn expand_mask<const L: usize>(
-    gamma1: u32, rho: &[u8; 64], mu: u16,
+    gamma1: i32, rho: &[u8; 64], mu: u16,
 ) -> Result<[R; L], &'static str> {
     let mut s = [R::zero(); L];
     let mut v = [0u8; 32 * 20];

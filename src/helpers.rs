@@ -16,9 +16,9 @@ pub(crate) use ensure; // make available throughout crate
 
 /// Ensure polynomial w is within -lo to +hi (inclusive)
 #[allow(clippy::cast_possible_wrap)]  // lo/hi is program structure
-pub(crate) fn is_in_range(w: &R, lo: u32, hi: u32) -> bool {
-    debug_assert!((lo < u32::MAX/4) & (hi < u32::MAX/4));
-    w.iter().all(|&e| (e >= -(lo as i32)) & (e <= (hi as i32)))
+pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
+    debug_assert!((lo < i32::MAX/4) & (hi < i32::MAX/4));
+    w.iter().all(|&e| (e >= -lo) & (e <= hi))
 }
 
 
@@ -52,14 +52,15 @@ pub(crate) const fn reduce_q64(a: i64) -> i32 {
 
 /// Partially reduce a signed 32-bit value mod Q ---> `-Q <~ result <~ Q`
 // Considering the positive case for `a`, bits 23 and above can be loosely
-// viewed as the 'number of Q' contained within `a` (with some error). So,
-// increment these bits and then subtract off the corresponding number of Q.
-// The result is within (better than) -Q < res < Q. This approach also
-// works for negative values. For the extreme positive `a` result, consider
-// all bits set except for position 22 so the increment cannot generate a
-// carry, or a = 2**31 - 2**22 - 1, which then suggests a maximum (0xFF) Q.
-// Then, a - (a >> 23)*Q is 6283008 or 2**23 - 2**21 - 2**8. The negative
-// result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck
+// viewed as the 'number of Q' contained within `a` (with some rounding-down
+// error). So, increment these bits and then subtract off the corresponding
+// number of Q. The result is within (better than) -Q < res < Q. This
+// approach also works for negative values. For the extreme positive `a`
+// result, consider all bits set except for position 22 so the increment
+// cannot generate a carry (and thus we have maximum rounding-down error
+// accumulated), or a = 2**31 - 2**22 - 1, which then suggests (0xFF) Q to
+// be subtracted. Then, a - (a >> 23)*Q is 6283008 or 2**23 - 2**21 - 2**8.
+// The negative result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck
 #[inline(always)]
 #[allow(clippy::inline_always)]
 pub(crate) const fn partial_reduce(a: i32) -> i32 {
