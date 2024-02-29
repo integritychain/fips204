@@ -111,7 +111,7 @@ pub(crate) fn bit_pack(w: &R, a: u32, b: u32, bytes_out: &mut [u8]) -> Result<()
     let mut bit_index = 0; // Number of bits accumulated in temp
 
     // For every coefficient in w...
-    #[allow(clippy::cast_sign_loss)] // Each coeff is 'ensure!'d to be in range
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)] // Each coeff is 'ensure!'d to be in range
     for coeff in *w {
         // if we have a negative `a` bound, subtract from b and shift into empty/upper part of temp
         if a > 0 {
@@ -177,6 +177,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: u32, b: u32) -> Result<R, &'static str> {
     for byte in v {
         temp |= (*byte as u32) << bit_index;
         bit_index += 8;
+        #[allow(clippy::cast_possible_wrap)]
         while bit_index >= bitlen {
             let tmask = temp & (2u32.pow(bitlen) - 1);
             w_out[r_index] = if a == 0 {
@@ -207,8 +208,9 @@ pub(crate) fn hint_bit_pack<const K: usize>(
 ) -> Result<(), &'static str> {
     let k = h.len();
     ensure!(y_bytes.len() == omega as usize + k, "Algorithm 14: incorrectly sized output field");
+    ensure!(h.iter().all(|&r| r.iter().all(|&e| (e==0) | (e==1))), "Alg 14: h contains other than 0,1");
     ensure!(
-        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega as i32),
+        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() as i64 <= omega as i64),
         "Algorithm 14: too many 1's in h"
     );
 
@@ -290,7 +292,7 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
     }
     // 16: return h
     ensure!(
-        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega as i32),
+        h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() as i64 <= omega as i64),
         "Algorithm 14: too many 1's in h"
     );
     Ok(h)

@@ -88,6 +88,7 @@ pub(crate) fn rej_ntt_poly(rhos: &[&[u8]]) -> T {
     let mut j = 0;
     // 2: c ← 0  (xof has implicit and advancing j)
     // 3: while j < 256 do
+    #[allow(clippy::cast_possible_wrap)]  // max value from coef_from_three_bytes is Q
     while j < 256 {
         // 4: a_hat[j] ← CoefFromThreeBytes(H128(ρ)[[c]], H128(ρ)[[c + 1]], H128(ρ)[[c + 2]])
         let mut h128pc = [0u8; 3];

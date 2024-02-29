@@ -15,7 +15,9 @@ pub(crate) use ensure; // make available throughout crate
 
 
 /// Ensure polynomial w is within -lo to +hi (inclusive)
+#[allow(clippy::cast_possible_wrap)]  // lo/hi is program structure
 pub(crate) fn is_in_range(w: &R, lo: u32, hi: u32) -> bool {
+    debug_assert!((lo < u32::MAX/4) & (hi < u32::MAX/4));
     w.iter().all(|&e| (e >= -(lo as i32)) & (e <= (hi as i32)))
 }
 
@@ -48,14 +50,30 @@ pub(crate) const fn reduce_q64(a: i64) -> i32 {
 //     }
 // }
 
-/// Reduce 32-bit value mod Q --->   -q < result < q  TODO revisit
+/// Partially reduce a signed 32-bit value mod Q ---> `-Q <~ result <~ Q`
+// Considering the positive case for `a`, bits 23 and above can be loosely
+// viewed as the 'number of Q' contained within `a` (with some error). So,
+// increment these bits and then subtract off the corresponding number of Q.
+// The result is within (better than) -Q < res < Q. This approach also
+// works for negative values. For the extreme positive `a` result, consider
+// all bits set except for position 22 so the increment cannot generate a
+// carry, or a = 2**31 - 2**22 - 1, which then suggests a maximum (0xFF) Q.
+// Then, a - (a >> 23)*Q is 6283008 or 2**23 - 2**21 - 2**8. The negative
+// result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck
 #[inline(always)]
 #[allow(clippy::inline_always)]
-pub(crate) const fn reduce_q32(a: i32) -> i32 {
-    let x = (a + (1 << 22)) >> 23; // +2^22 ensures quotient is never 'too low'
-    a - x * QI
+pub(crate) const fn partial_reduce(a: i32) -> i32 {
+    let x = (a + (1 << 22)) >> 23;
+    let res = a - x * QI;
+    debug_assert!(res.abs() < 2i32.pow(23) - 2i32.pow(21) - 2i32.pow(8));
+    res
 }
 
+#[allow(dead_code)]
+pub(crate) const fn full_reduce(a: i32) -> i32 {
+    let x = partial_reduce(a);  // puts us within -Q to +Q
+    x + ((x >> 31) & QI)  // add Q if negative
+}
 
 /// Bit length required to express `a` in bits
 pub const fn bitlen(a: usize) -> usize { a.ilog2() as usize + 1 }
@@ -66,6 +84,9 @@ pub const fn bitlen(a: usize) -> usize { a.ilog2() as usize + 1 }
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
 pub fn mod_pm(m: i32, a: u32) -> i32 {
+
+
+
     let t = m.rem_euclid(a as i32);
     let a = a as i32;
     if t <= (a / 2) {
@@ -90,7 +111,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
                 *e = reduce_q64(a_hat[i][j][m] as i64 * u_hat[j][m] as i64);
             });
             for k in 0..256 {
-                w_hat[i][k] = reduce_q32(w_hat[i][k] + tmp[k]);
+                w_hat[i][k] = partial_reduce(w_hat[i][k] + tmp[k]);
             }
         }
     }
@@ -103,7 +124,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
     let mut result = [R::zero(); K];
     for i in 0..vec_a.len() {
         for j in 0..vec_a[i].len() {
-            result[i][j] = reduce_q32(vec_a[i][j] + vec_b[i][j]);
+            result[i][j] = partial_reduce(vec_a[i][j] + vec_b[i][j]);
         }
     }
     result

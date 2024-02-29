@@ -5,8 +5,7 @@
 #![doc = include_str!("../README.md")]
 // To remove...need to rework element+math
 #![allow(clippy::cast_lossless)]
-#![allow(clippy::cast_possible_wrap)]
-//#![allow(clippy::cast_possible_truncation)]
+//#![allow(clippy::cast_possible_wrap)]
 
 // Roadmap
 //  1. types -> types.rs
@@ -16,6 +15,9 @@
 //  6. More robust unit testing
 //  7. infinity_norm() -> check_infinity_norm() w/ early exit
 //  8. Remove blanket clippy allows
+
+// Note: `debug_assert!()` is used for non-data checks (e.g., program structure) that speed
+// development of changes; `ensure!()` is used for data related checks at runtime
 
 mod conversion;
 mod encodings;

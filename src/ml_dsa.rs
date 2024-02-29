@@ -2,7 +2,7 @@ use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
-use crate::helpers::{bitlen, ensure, mod_pm, reduce_q32, reduce_q64};
+use crate::helpers::{bitlen, ensure, mod_pm, partial_reduce, reduce_q64};
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{Zero, R, T};
@@ -184,7 +184,7 @@ pub(crate) fn sign<
         // 21: z ← y + ⟨⟨c_s_1⟩⟩    ▷ Signer’s response
         for i in 0..L {
             for j in 0..256 {
-                z[i][j] = reduce_q32(y[i][j] + c_s_1[i][j]);
+                z[i][j] = partial_reduce(y[i][j] + c_s_1[i][j]);
             }
         }
 
@@ -192,7 +192,7 @@ pub(crate) fn sign<
         let mut r0: [R; K] = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                r0[i][j] = low_bits(gamma2, reduce_q32(w[i][j] - c_s_2[i][j]));
+                r0[i][j] = low_bits(gamma2, partial_reduce(w[i][j] - c_s_2[i][j]));
             }
         }
 
@@ -218,8 +218,8 @@ pub(crate) fn sign<
         let mut wcc = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                mct0[i][j] = reduce_q32(QI - c_t_0[i][j]);
-                wcc[i][j] = reduce_q32(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
+                mct0[i][j] = partial_reduce(QI - c_t_0[i][j]);
+                wcc[i][j] = partial_reduce(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
                 h[i][j] = make_hint(gamma2, mct0[i][j], wcc[i][j]) as i32;
             }
         }

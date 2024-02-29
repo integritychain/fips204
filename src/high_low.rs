@@ -1,6 +1,6 @@
-use crate::helpers::{mod_pm, reduce_q32, reduce_q64};
+use crate::helpers::{full_reduce, mod_pm, partial_reduce};
 use crate::types::Zq;
-use crate::{D, QI, QU};
+use crate::{D, QU};
 
 
 // This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
@@ -13,11 +13,11 @@ use crate::{D, QI, QU};
 /// Output: Integers `(r1, r0)`.
 pub(crate) fn power2round(r: Zq) -> (Zq, Zq) {
     // 1: r+ ← r mod q
-    let rp = reduce_q64(r.into());
     // 2: r0 ← r+ mod±2^d
-    let r0 = mod_pm(rp, 2_u32.pow(D));
     // 3: return ((r+ − r0)/2^d, r0)
-    let r1 = (rp - r0) >> D;
+    let r = full_reduce(r);
+    let r1 = (r + (1 << (D - 1)) - 1) >> D;
+    let r0 = r - (r1 << D);
     (r1, r0)
 }
 
@@ -27,22 +27,35 @@ pub(crate) fn power2round(r: Zq) -> (Zq, Zq) {
 ///
 /// Input: `r ∈ Zq` <br>
 /// Output: Integers `(r1, r0)`.
-pub(crate) fn decompose(gamma2: u32, r: Zq, r1: &mut Zq, r0: &mut Zq) {
+pub(crate) fn decompose(gamma2: u32, r: Zq) -> (Zq, Zq) {
     // 1: r+ ← r mod q
-    let rp = r.rem_euclid(QI); // TODO: Sensitive -- reduce_q32(r);
-                               // 2: r0 ← r+ mod±(2γ_2)
-    *r0 = mod_pm(rp, 2 * gamma2);
+    let rp = full_reduce(r);
+    // 2: r0 ← r+ mod±(2γ_2)
+    let mut r0 = mod_pm(rp, 2 * gamma2);
+    let mut r1 = 0;
     // 3: if r+ − r0 = q − 1 then
-    if (rp - *r0) == (QU as i32 - 1) {
+    if (rp - r0) == (QU as i32 - 1) {
         // 4: r1 ← 0
-        *r1 = 0;
+        // *r1 = 0;
         // 5: r0 ← r0 − 1
-        *r0 -= 1;
+        r0 -= 1;
     } else {
         // 6: else r_1 ← (r+ − r0)/(2γ2)
-        *r1 = (rp - *r0) / (2 * gamma2 as i32);
+        r1 = (rp - r0) / (2 * gamma2 as i32);
         // 7: end if
     }
+    (r1, r0)
+  //  debug_assert_eq!(rp, *r1 * 2 * gamma2 as i32 + *r0);
+    // let r = full_reduce(r);
+    // assert!(r < QI);
+    // assert!(r >= 0);
+    // //let r = r.rem_euclid(QI);
+    // *r1 = (r + 127) >> 7;
+    // *r1 = (*r1 * 1025 + (1 << 21)) >> 22;
+    // *r1 &= 15;
+    //
+    // *r0  = r - *r1 * 2 * gamma2 as i32;
+    // *r0 = *r0 - ((((QI - 1) / 2 - *r0) >> 31) & QI);
 }
 
 
@@ -53,8 +66,7 @@ pub(crate) fn decompose(gamma2: u32, r: Zq, r1: &mut Zq, r0: &mut Zq) {
 /// Output: Integer `r1`.
 pub(crate) fn high_bits(gamma2: u32, r: Zq) -> Zq {
     // 1: (r1, r0) ← Decompose(r)
-    let (mut r1, mut r0) = (0, 0);
-    decompose(gamma2, r, &mut r1, &mut r0);
+    let (r1, _r0) = decompose(gamma2, r);
     // 2: return r1
     r1
 }
@@ -67,8 +79,7 @@ pub(crate) fn high_bits(gamma2: u32, r: Zq) -> Zq {
 /// Output: Integer r0.
 pub(crate) fn low_bits(gamma2: u32, r: Zq) -> Zq {
     // 1: (r1, r0) ← Decompose(r)
-    let (mut r1, mut r0) = (0, 0);
-    decompose(gamma2, r, &mut r1, &mut r0);
+    let (_r1, r0) = decompose(gamma2, r);
     // 2: return r0
     r0
 }
@@ -83,7 +94,7 @@ pub(crate) fn make_hint(gamma2: u32, z: Zq, r: Zq) -> bool {
     // 1: r1 ← HighBits(r)
     let r1 = high_bits(gamma2, r);
     // 2: v1 ← HighBits(r + z)
-    let v1 = high_bits(gamma2, reduce_q32(r + z));
+    let v1 = high_bits(gamma2, partial_reduce(r + z));
     // 3: return [[r1 != v1]]
     r1 != v1
 }
@@ -98,8 +109,7 @@ pub(crate) fn use_hint(gamma2: u32, h: Zq, r: Zq) -> Zq {
     // 1: m ← (q− 1)/(2*γ_2)
     let m = (QU - 1) / (2 * gamma2);
     // 2: (r1, r0) ← Decompose(r)
-    let (mut r1, mut r0) = (0, 0);
-    decompose(gamma2, r, &mut r1, &mut r0);
+    let (r1, r0) = decompose(gamma2, r);
     // 3: if h = 1 and r0 > 0 return (r1 + 1) mod m
     if (h == 1) & (r0 > 0) {
         return (r1 + 1).rem_euclid(m as i32);

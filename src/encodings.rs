@@ -235,7 +235,7 @@ pub(crate) fn sig_encode<
     gamma1: u32, omega: u32, c_tilde: &[u8], z: &[R; L], h: &[R; K],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     let mut sigma = [0u8; SIG_LEN];
-    ensure!(c_tilde.len() == 2 * LAMBDA / 8, "Algoirthm 20: asdf asdf");
+    ensure!(c_tilde.len() == 2 * LAMBDA / 8, "Algorithm 20: {line!()}");
     let bl = bitlen(gamma1 as usize - 1);
     ensure!(
         sigma.len() == LAMBDA / 4 + L * 32 * (1 + bl) + omega as usize + K,
@@ -248,7 +248,7 @@ pub(crate) fn sig_encode<
     let start = 2 * LAMBDA / 8;
     let step = 32 * (1 + bl);
     for i in 0..L {
-        // 3: σ ← σ || BitPack (z[i], γ_1 − 1, γ_1)
+        // 3: σ ← σ || BitPack (z[i], γ_1 − 1, γ_1)  (note: this checks the range of z)
         bit_pack(&z[i], gamma1 - 1, gamma1, &mut sigma[start + i * step..start + (i + 1) * step])?;
         // 4: end for
     }

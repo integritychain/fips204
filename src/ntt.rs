@@ -1,5 +1,5 @@
 use crate::helpers;
-use crate::helpers::{reduce_q32, reduce_q64};
+use crate::helpers::{partial_reduce, reduce_q64};
 use crate::types::{R, T};
 
 
@@ -33,9 +33,9 @@ pub(crate) fn ntt<const X: usize>(w: &[R; X]) -> [T; X] {
                     // 12: t ← zeta · w_hat[ j + len]
                     let t = reduce_q64(zeta * w_hat[j + len] as i64);
                     // 13: w_hat[j + len] ← w_hat[j] − t
-                    w_hat[j + len] = reduce_q32(w_hat[j] - t);
+                    w_hat[j + len] = partial_reduce(w_hat[j] - t);
                     // 14: w_hat[j] ← w_hat[j] + t
-                    w_hat[j] = reduce_q32(w_hat[j] + t);
+                    w_hat[j] = partial_reduce(w_hat[j] + t);
                     // 15: end for
                 }
                 // 16: start ← start + 2 · len
