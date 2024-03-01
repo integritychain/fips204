@@ -1,6 +1,6 @@
 use crate::helpers::{full_reduce, mod_pm, partial_reduce};
 use crate::types::Zq;
-use crate::{D, QI, QU};
+use crate::{D, QI};
 
 
 // This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
@@ -34,7 +34,7 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     let mut r0 = mod_pm(rp, 2 * gamma2 as u32);
     let mut r1 = 0;
     // 3: if r+ − r0 = q − 1 then
-    if (rp - r0) == (QU as i32 - 1) {
+    if (rp - r0) == (QI - 1) {
         // 4: r1 ← 0
         // *r1 = 0;
         // 5: r0 ← r0 − 1
@@ -45,7 +45,7 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
         // 7: end if
     }
     (r1, r0)
-  //  debug_assert_eq!(rp, *r1 * 2 * gamma2 as i32 + *r0);
+    //  debug_assert_eq!(rp, *r1 * 2 * gamma2 as i32 + *r0);
     // let r = full_reduce(r);
     // assert!(r < QI);
     // assert!(r >= 0);

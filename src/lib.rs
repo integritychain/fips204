@@ -5,19 +5,60 @@
 #![doc = include_str!("../README.md")]
 // To remove...need to rework element+math
 #![allow(clippy::cast_lossless)]
-//#![allow(clippy::cast_possible_wrap)]
 
 // Roadmap
+//  1. Clean up; resolve math
 //  1. types -> types.rs
-//  3. Refine LAMBDA
 //  4. Resolve/remove precompute signing
-//  5. Clean up remaining rem_euclid instances
 //  6. More robust unit testing
 //  7. infinity_norm() -> check_infinity_norm() w/ early exit
 //  8. Remove blanket clippy allows
 
-// Note: `debug_assert!()` is used for non-data checks (e.g., program structure) that speed
-// development of changes; `ensure!()` is used for data related checks at runtime
+
+// Functionality map per FIPS 204 draft
+//
+// Algorithm 1 ML-DSA.KeyGen() on page 15                 --> ml_dsa.rs
+// Algorithm 2 ML-DSA.Sign(sk,M) on page 17               --> ml_dsa.rs
+// Algorithm 3 ML-DSA.Verify(pk,M,σ) on page 19           --> ml_dsa.rs
+// Algorithm 4 IntegerToBits(x,α) one page 20             --> (optimized away) conversion.rs
+// Algorithm 5 BitsToInteger(y) on page 20                --> (optimized away) conversion.rs
+// Algorithm 6 BitsToBytes(y) on page 21                  --> (optimized away) conversion.rs
+// Algorithm 7 BytesToBits(z) on page 21                  --> (optimized away) conversion.rs
+// Algorithm 8 CoefFromThreeBytes(b0,b1,b2) on page 21    --> conversion.rs
+// Algorithm 9 CoefFromHalfByte(b) on page 22             --> conversion.rs
+// Algorithm 10 SimpleBitPack(w,b) on page 22             --> conversion.rs
+// Algorithm 11 BitPack(w,a,b) on page 22                 --> conversion.rs
+// Algorithm 12 SimpleBitUnpack(v,b) on page 23           --> conversion.rs
+// Algorithm 13 BitUnpack(v,a,b) on page 23               --> conversion.rs
+// Algorithm 14 HintBitPack(h) on page 24                 --> conversion.rs
+// Algorithm 15 HintBitUnpack(y) on page 24               --> conversion.rs
+// Algorithm 16 pkEncode(ρ,t1) on page 25                 --> encodings.rs
+// Algorithm 17 pkDecode(pk) on page 25                   --> encodings.rs
+// Algorithm 18 skEncode(ρ,K,tr,s1,s2,t0) on page 26      --> encodings.rs
+// Algorithm 19 skDecode(sk) on page 27                   --> encodings.rs
+// Algorithm 20 sigEncode(c˜,z,h) on page 28              --> encodings.rs
+// Algorithm 21 sigDecode(σ) on page 28                   --> encodings.rs
+// Algorithm 22 w1Encode(w1) on page 28                   --> encodings.rs
+// Algorithm 23 SampleInBall(ρ) on page 30                --> hashing.rs
+// Algorithm 24 RejNTTPoly(ρ) on page 30                  --> hashing.rs
+// Algorithm 25 RejBoundedPoly(ρ) on page 31              --> hashing.rs
+// Algorithm 26 ExpandA(ρ) on page 31                     --> hashing.rs
+// Algorithm 27 ExpandS(ρ) on page 32                     --> hashing.rs
+// Algorithm 28 ExpandMask(ρ,µ) on page 32                --> hashing.rs
+// Algorithm 29 Power2Round(r) on page 34                 --> high_low.rs
+// Algorithm 30 Decompose(r) on page 34                   --> high_low.rs
+// Algorithm 31 HighBits(r) on page 34                    --> high_low.rs
+// Algorithm 32 LowBits(r) on page 35                     --> high_low.rs
+// Algorithm 33 MakeHint(z,r) on page 35                  --> high_low.rs
+// Algorithm 34 UseHint(h,r) on page 35                   --> high_low.rs
+// Algorithm 35 NTT(w) on page 35                         --> ntt.rs
+// Algorithm 36 NTT−1(wˆ) on page 27                      --> ntt.rs
+// Types are in types.rs, traits are in traits.rs...
+// Quite a few security parameters are used as i32 to simplify interop
+// `debug_assert!()` is used for non-data checks (e.g., program structure, parameters)
+// `ensure!()` is used for data-related checks at runtime (e.g., input validation)
+
+extern crate alloc;
 
 mod conversion;
 mod encodings;
@@ -46,6 +87,7 @@ macro_rules! functionality {
         use rand_core::CryptoRngCore;
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
+        const LAMBDA_DIV4: usize = LAMBDA / 4;
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
@@ -154,7 +196,7 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Signature, &'static str> {
-                let sig = ml_dsa::sign::<K, L, LAMBDA, SIG_LEN, SK_LEN>(
+                let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
                 Ok(Signature(sig))
@@ -177,7 +219,7 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Signature, &'static str> {
-                let sig = ml_dsa::sign::<K, L, LAMBDA, SIG_LEN, SK_LEN>(
+                let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
                 Ok(Signature(sig))
@@ -189,7 +231,7 @@ macro_rules! functionality {
             type Signature = Signature;
 
             fn try_verify_vt(&self, message: &[u8], sig: &Signature) -> Result<bool, &'static str> {
-                ml_dsa::verify::<K, L, LAMBDA, PK_LEN, SIG_LEN>(
+                ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, &message, &sig.0,
                 )
             }
@@ -202,7 +244,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SIG_LEN];
 
             fn try_from_bytes(sig: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sig_decode::<K, L, LAMBDA>(GAMMA1, OMEGA, &sig)?; //.map_err(|_e| "Signature deserialization failed");
+                let _ = sig_decode::<K, L, LAMBDA_DIV4>(GAMMA1, OMEGA, &sig)?; //.map_err(|_e| "Signature deserialization failed");
                 Ok(Signature(sig))
             }
 
@@ -261,15 +303,15 @@ macro_rules! functionality {
 #[cfg(feature = "ml-dsa-44")]
 pub mod ml_dsa_44 {
     use super::QI;
-    const TAU: u32 = 39;
+    const TAU: i32 = 39;
     const LAMBDA: usize = 128;
     const GAMMA1: i32 = 2i32.pow(17);
     const GAMMA2: i32 = (QI - 1) / 88;
     const K: usize = 4;
     const L: usize = 4;
-    const ETA: u32 = 2;
-    const BETA: u32 = TAU * ETA;
-    const OMEGA: u32 = 80;
+    const ETA: i32 = 2;
+    const BETA: i32 = TAU * ETA;
+    const OMEGA: i32 = 80;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 2560;
     /// Public key length in bytes.
@@ -302,15 +344,15 @@ pub mod ml_dsa_44 {
 #[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
     use super::QI;
-    const TAU: u32 = 49;
+    const TAU: i32 = 49;
     const LAMBDA: usize = 192;
     const GAMMA1: i32 = 2i32.pow(19);
     const GAMMA2: i32 = (QI - 1) / 32;
     const K: usize = 6;
     const L: usize = 5;
-    const ETA: u32 = 4;
-    const BETA: u32 = TAU * ETA;
-    const OMEGA: u32 = 55;
+    const ETA: i32 = 4;
+    const BETA: i32 = TAU * ETA;
+    const OMEGA: i32 = 55;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 4032;
     /// Public key length in bytes.
@@ -344,15 +386,15 @@ pub mod ml_dsa_65 {
 #[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
     use super::QI;
-    const TAU: u32 = 60;
+    const TAU: i32 = 60;
     const LAMBDA: usize = 256;
     const GAMMA1: i32 = 2i32.pow(19);
     const GAMMA2: i32 = (QI - 1) / 32;
     const K: usize = 8;
     const L: usize = 7;
-    const ETA: u32 = 2;
-    const BETA: u32 = TAU * ETA;
-    const OMEGA: u32 = 75;
+    const ETA: i32 = 2;
+    const BETA: i32 = TAU * ETA;
+    const OMEGA: i32 = 75;
     const SK_LEN: usize = 4896;
     const PK_LEN: usize = 2592;
     const SIG_LEN: usize = 4627;

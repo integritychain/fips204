@@ -1,5 +1,5 @@
 use crate::conversion;
-use crate::helpers::{bitlen, ensure, is_in_range};
+use crate::helpers::{bit_length, ensure, is_in_range};
 use crate::types::{Zero, R, T};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
@@ -31,7 +31,7 @@ pub(crate) fn h128_xof(v: &[&[u8]]) -> impl XofReader {
 ///
 /// # Errors
 /// Returns an error on illegal hamming weight
-pub(crate) fn sample_in_ball(tau: u32, rho: &[u8; 32]) -> Result<R, &'static str> {
+pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> Result<R, &'static str> {
     let mut xof = h_xof(&[rho]);
     let mut hpk8 = [0u8; 8];
     xof.read(&mut hpk8); // Save the first 8 bytes for step 9
@@ -88,7 +88,7 @@ pub(crate) fn rej_ntt_poly(rhos: &[&[u8]]) -> T {
     let mut j = 0;
     // 2: c ← 0  (xof has implicit and advancing j)
     // 3: while j < 256 do
-    #[allow(clippy::cast_possible_wrap)]  // max value from coef_from_three_bytes is Q
+    #[allow(clippy::cast_possible_wrap)] // max value from coef_from_three_bytes is Q
     while j < 256 {
         // 4: a_hat[j] ← CoefFromThreeBytes(H128(ρ)[[c]], H128(ρ)[[c + 1]], H128(ρ)[[c + 2]])
         let mut h128pc = [0u8; 3];
@@ -115,7 +115,7 @@ pub(crate) fn rej_ntt_poly(rhos: &[&[u8]]) -> T {
 ///
 /// Input: A seed `ρ ∈{0,1}^528`. <br>
 /// Output: A polynomial `a ∈ Rq`.
-pub(crate) fn rej_bounded_poly(eta: u32, rhos: &[&[u8]]) -> R {
+pub(crate) fn rej_bounded_poly(eta: i32, rhos: &[&[u8]]) -> R {
     let mut z = [0u8];
     let mut a = R::zero();
     let mut xof = h_xof(rhos);
@@ -128,9 +128,9 @@ pub(crate) fn rej_bounded_poly(eta: u32, rhos: &[&[u8]]) -> R {
         // 4: z ← H(ρ)[[c]]
         xof.read(&mut z);
         // 5: z0 ← CoefFromHalfByte(z mod 16, η)
-        let z0 = conversion::coef_from_half_byte(eta, z[0].rem_euclid(16));
+        let z0 = conversion::coef_from_half_byte_vt(eta, z[0].rem_euclid(16));
         // 6: z1 ← CoefFromHalfByte(⌊z/16⌋, η)
-        let z1 = conversion::coef_from_half_byte(eta, z[0] / 16);
+        let z1 = conversion::coef_from_half_byte_vt(eta, z[0] / 16);
         // 7: if z0 != ⊥ then
         if let Ok(x) = z0 {
             a[j] = x;
@@ -184,7 +184,7 @@ pub(crate) fn expand_a<const K: usize, const L: usize>(rho: &[u8; 32]) -> [[T; L
 /// # Errors
 /// Returns an error on illegal s1 s2 coefficients
 pub(crate) fn expand_s<const K: usize, const L: usize>(
-    eta: u32, rho: &[u8; 64],
+    eta: i32, rho: &[u8; 64],
 ) -> Result<([R; L], [R; K]), &'static str> {
     let (mut s1, mut s2) = ([R::zero(); L], [R::zero(); K]);
     // 1: for r from 0 to ℓ − 1 do
@@ -200,8 +200,8 @@ pub(crate) fn expand_s<const K: usize, const L: usize>(
         *s2r = rej_bounded_poly(eta, &[rho, &[r + u8::try_from(L).unwrap()], &[0]]);
         // 6: end for
     }
-    ensure!(s1.iter().all(|r| is_in_range(r, eta as i32, eta as i32)), "Algorithm 27: s1 out of range");
-    ensure!(s2.iter().all(|r| is_in_range(r, eta as i32, eta as i32)), "Algorithm 27: s2 out of range");
+    ensure!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s1 out of range");
+    ensure!(s2.iter().all(|r| is_in_range(r, eta, eta)), "Algorithm 27: s2 out of range");
     Ok((s1, s2)) // 7: return (s_1 , s_2)
 }
 
@@ -221,7 +221,7 @@ pub(crate) fn expand_mask<const L: usize>(
     let mut v = [0u8; 32 * 20];
 
     // 1: c ← 1 + bitlen (γ1 − 1) ▷ γ1 is always a power of 2
-    let c = 1 + bitlen(gamma1 as usize - 1); // c will either be 18 or 20
+    let c = 1 + bit_length(gamma1 - 1); // c will either be 18 or 20
     ensure!((c == 18) | (c == 20), "Algorithm 28: illegal c");
     // 2: for r from 0 to ℓ − 1 do
     for r in 0..u16::try_from(L).unwrap() {

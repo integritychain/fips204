@@ -2,7 +2,7 @@ use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
-use crate::helpers::{bitlen, ensure, mod_pm, partial_reduce, reduce_q64};
+use crate::helpers::{bit_length, ensure, mod_pm, partial_reduce, reduce_q64};
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{Zero, R, T};
@@ -18,7 +18,7 @@ use sha3::digest::XofReader;
 /// Output: Public key, `pk` ∈ B^{32+32k(bitlen(q−1)−d)},
 /// and private key, `sk` ∈ `B^{32+32+64+32·((ℓ+k)·bitlen(2η)+dk)}`
 pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const SK_LEN: usize>(
-    rng: &mut impl CryptoRngCore, eta: u32,
+    rng: &mut impl CryptoRngCore, eta: i32,
 ) -> Result<([u8; PK_LEN], [u8; SK_LEN]), &'static str> {
     // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
     let mut xi = [0u8; 32];
@@ -82,12 +82,12 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 pub(crate) fn sign<
     const K: usize,
     const L: usize,
-    const LAMBDA: usize,
+    const LAMBDA_DIV4: usize,
     const SIG_LEN: usize,
     const SK_LEN: usize,
 >(
-    rand_gen: &mut impl CryptoRngCore, beta: u32, eta: u32, gamma1: i32, gamma2: i32, omega: u32,
-    tau: u32, sk: &[u8; SK_LEN], message: &[u8],
+    rand_gen: &mut impl CryptoRngCore, beta: i32, eta: i32, gamma1: i32, gamma2: i32, omega: i32,
+    tau: i32, sk: &[u8; SK_LEN], message: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
     #[allow(clippy::type_complexity)]
@@ -146,7 +146,7 @@ pub(crate) fn sign<
         }
 
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
-        let w1e_len = 32 * K * bitlen(((QI - 1) / (2 * gamma2) - 1) as usize);
+        let w1e_len = 32 * K * bit_length((QI - 1) / (2 * gamma2) - 1);
         let mut w1_tilde = [0u8; 1024];
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len])?;
         let mut h99 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
@@ -199,7 +199,7 @@ pub(crate) fn sign<
         // 23: if ||z||∞ ≥ Gamma1 − β or ||r0||∞ ≥ Gamma2 − β then (z, h) ← ⊥    ▷ Validity checks
         let z_norm = helpers::infinity_norm(&z);
         let r0_norm = helpers::infinity_norm(&r0);
-        if (z_norm >= (gamma1 as i32 - beta as i32)) | (r0_norm >= (gamma2 as i32 - beta as i32)) {
+        if (z_norm >= (gamma1 - beta)) | (r0_norm >= (gamma2 - beta)) {
             k += u16::try_from(L).unwrap();
             continue;
             // 24: else  ... not really needed, with 'continue' above
@@ -225,7 +225,7 @@ pub(crate) fn sign<
         }
 
         // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
-        if (helpers::infinity_norm(&c_t_0) >= gamma2 as i32)
+        if (helpers::infinity_norm(&c_t_0) >= gamma2)
             | (h.iter().flatten().filter(|i| (**i).abs() == 1).count() > omega as usize)
         {
             k += u16::try_from(L).unwrap();
@@ -248,7 +248,7 @@ pub(crate) fn sign<
         }
     }
     let sig =
-        sig_encode::<K, L, LAMBDA, SIG_LEN>(gamma1, omega, &c_tilde[0..2 * LAMBDA / 8], &zmq, &h)?;
+        sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde[0..LAMBDA_DIV4], &zmq, &h)?;
 
     Ok(sig) // 33: return σ
 }
@@ -264,11 +264,11 @@ pub(crate) fn sign<
 pub(crate) fn verify<
     const K: usize,
     const L: usize,
-    const LAMBDA: usize,
+    const LAMBDA_DIV4: usize,
     const PK_LEN: usize,
     const SIG_LEN: usize,
 >(
-    beta: u32, gamma1: i32, gamma2: i32, omega: u32, tau: u32, pk: &[u8; PK_LEN], m: &[u8],
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, pk: &[u8; PK_LEN], m: &[u8],
     sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     // 1: (ρ,t_1) ← pkDecode(pk)
@@ -276,14 +276,14 @@ pub(crate) fn verify<
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
     let (c_tilde, z, h) = //: (Vec<u8>, [R; L], Option<[R; K]>) =
-        sig_decode::<K, L, LAMBDA>(gamma1, omega, sig)?;
+        sig_decode::<K, L, LAMBDA_DIV4>(gamma1, omega, sig)?;
 
     // 3: if h = ⊥ then return false ▷ Hint was not properly encoded
     if h.is_none() {
         return Ok(false);
     };
     let i_norm = helpers::infinity_norm(&z);
-    ensure!(i_norm < gamma1 as i32, "Algorithm3: i_norm out of range");
+    ensure!(i_norm < gamma1, "Algorithm3: i_norm out of range");
     // 4: end if
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
@@ -344,7 +344,7 @@ pub(crate) fn verify<
 
     // 12: c_tilde_′ ← H(µ||w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
     let qm12gm1 = (QI - 1) / (2 * gamma2) - 1;
-    let bl = bitlen(qm12gm1 as usize);
+    let bl = bit_length(qm12gm1);
     let t_max = 32 * K * bl;
     let mut tmp = [0u8; 1024]; // TODO: optimize to [0u8; 32 * K * bl]
     w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max])?;
@@ -353,11 +353,11 @@ pub(crate) fn verify<
     hasher.read(&mut c_tilde_p); // leftover to be ignored
 
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
-    let left = helpers::infinity_norm(&z) < ((gamma1 - beta as i32) as i32);
-    let center = c_tilde[0..LAMBDA / 4] == c_tilde_p[0..LAMBDA / 4];
+    let left = helpers::infinity_norm(&z) < (gamma1 - beta);
+    let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4];
     let right = h // TODO: confirm -- this checks #h per each R (rather than overall total)
         .ok_or("h scrambled 4")?
         .iter()
-        .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega as i32);
+        .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
     Ok(left & center & right)
 }

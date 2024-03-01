@@ -15,9 +15,8 @@ pub(crate) use ensure; // make available throughout crate
 
 
 /// Ensure polynomial w is within -lo to +hi (inclusive)
-#[allow(clippy::cast_possible_wrap)]  // lo/hi is program structure
+#[allow(clippy::cast_possible_wrap)] // lo/hi is program structure
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
-    debug_assert!((lo < i32::MAX/4) & (hi < i32::MAX/4));
     w.iter().all(|&e| (e >= -lo) & (e <= hi))
 }
 
@@ -26,7 +25,7 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 const M: i128 = 2i128.pow(64) / (QI as i128);
 #[allow(clippy::inline_always)]
 #[inline(always)]
-#[allow(clippy::cast_possible_truncation)]  // temporary
+#[allow(clippy::cast_possible_truncation)] // temporary
 pub(crate) const fn reduce_q64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
     let res = (a - (q as i64) * (QI as i64)) as i32;
@@ -72,12 +71,12 @@ pub(crate) const fn partial_reduce(a: i32) -> i32 {
 
 #[allow(dead_code)]
 pub(crate) const fn full_reduce(a: i32) -> i32 {
-    let x = partial_reduce(a);  // puts us within -Q to +Q
-    x + ((x >> 31) & QI)  // add Q if negative
+    let x = partial_reduce(a); // puts us within -Q to +Q
+    x + ((x >> 31) & QI) // add Q if negative
 }
 
 /// Bit length required to express `a` in bits
-pub const fn bitlen(a: usize) -> usize { a.ilog2() as usize + 1 }
+pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 
 
 /// Mod +/- see definition on page 6.
@@ -85,9 +84,6 @@ pub const fn bitlen(a: usize) -> usize { a.ilog2() as usize + 1 }
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
 pub fn mod_pm(m: i32, a: u32) -> i32 {
-
-
-
     let t = m.rem_euclid(a as i32);
     let a = a as i32;
     if t <= (a / 2) {
@@ -164,7 +160,7 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
 }
 
 
-#[allow(clippy::cast_possible_truncation)]  // temporary
+#[allow(clippy::cast_possible_truncation)] // temporary
 const fn gen_zeta_table() -> [i32; 256] {
     let mut result = [0i32; 256];
     let mut i = 0;
