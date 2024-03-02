@@ -87,7 +87,7 @@ jobs:
           targets: ${{ matrix.target }}
       - run: ${{ matrix.deps }}
       - run: cargo check --target ${{ matrix.target }} --all-features
-      - run: cargo test --release --target ${{ matrix.target }}
+      - run: cargo test --target ${{ matrix.target }}
 
 
   cross:
@@ -118,7 +118,7 @@ jobs:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
       - uses: RustCrypto/actions/cross-install@master
-      - run: cross test --release --target ${{ matrix.target }} --all-features
+      - run: cross test --target ${{ matrix.target }} --all-features
 
 
   doc:
