@@ -448,7 +448,7 @@ mod tests {
 
     fn get_vec(max: u32) -> [i32; 256] {
         let mut rnd_r = [0i32; 256];
-        rnd_r.iter_mut().for_each(|e| *e = rand::random::<i32>().rem_euclid(max as i32));
+        rnd_r.iter_mut().for_each(|e| *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap()));
         rnd_r
     }
 

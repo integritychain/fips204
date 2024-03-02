@@ -394,8 +394,8 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
+    #[allow(clippy::should_panic_without_expect)]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
         let res = coef_from_three_bytes(bytes).unwrap();
@@ -449,6 +449,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[allow(clippy::should_panic_without_expect)]
     fn test_simple_bit_unpack_validation1() {
         // wrong size of bytes
         let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
@@ -458,6 +459,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[allow(clippy::should_panic_without_expect)]
     fn test_bit_unpack_validation1() {
         // wrong size of bytes
         let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
@@ -475,6 +477,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[allow(clippy::should_panic_without_expect)]
     fn test_simple_bit_pack_validation2() {
         let mut random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
         // wrong size r coeff
