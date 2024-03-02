@@ -27,14 +27,14 @@ const M: i128 = 2i128.pow(64) / (QI as i128);
 #[allow(clippy::inline_always)]
 #[inline(always)]
 #[allow(clippy::cast_possible_truncation)] // temporary
-pub(crate) const fn reduce_q64(a: i64) -> i32 {
+pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
-    let res = (a - (q as i64) * (QI as i64)) as i32;
-    if res >= QI {
-        res - QI
-    } else {
-        res
-    }
+    (a - (q as i64) * (QI as i64)) as i32
+    // if res >= QI {
+    //     res - QI
+    // } else {
+    //     res
+    // }
 }
 
 /// Barrett reduction  TODO revisit <http://www.acsel-lab.com/arithmetic/arith18/papers/ARITH18_Hasenplaugh.pdf>
@@ -106,7 +106,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
         for j in 0..L {
             let mut tmp = [0i32; 256];
             tmp.iter_mut().enumerate().for_each(|(m, e)| {
-                *e = reduce_q64(a_hat[i][j][m] as i64 * u_hat[j][m] as i64);
+                *e = partial_reduce64(a_hat[i][j][m] as i64 * u_hat[j][m] as i64);
             });
             for k in 0..256 {
                 w_hat[i][k] = partial_reduce(w_hat[i][k] + tmp[k]);
@@ -122,7 +122,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
     let mut result = [R::zero(); K];
     for i in 0..vec_a.len() {
         for j in 0..vec_a[i].len() {
-            result[i][j] = partial_reduce(vec_a[i][j] + vec_b[i][j]);
+            result[i][j] = vec_a[i][j] + vec_b[i][j]; //partial_reduce(vec_a[i][j] + vec_b[i][j]);
         }
     }
     result
@@ -157,7 +157,7 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
             s = (s * s).rem_euclid(QI as i64);
         };
     }
-    reduce_q64(result)
+    partial_reduce64(result)
 }
 
 

@@ -1,7 +1,7 @@
 //! This file implements functionality from FIPS 204 section 8.5 `NTT` and `invNTT`
 
 use crate::helpers;
-use crate::helpers::{partial_reduce, reduce_q64};
+use crate::helpers::{partial_reduce64};
 use crate::types::{R, T};
 
 
@@ -44,13 +44,13 @@ pub(crate) fn ntt<const X: usize>(w: &[R; X]) -> [T; X] {
                 for j in start..(start + len) {
                     //
                     // 12: t ← zeta · w_hat[ j + len]
-                    let t = reduce_q64(zeta * w_element[j + len] as i64);
+                    let t = partial_reduce64(zeta * w_element[j + len] as i64);
 
                     // 13: w_hat[j + len] ← w_hat[j] − t
-                    w_element[j + len] = partial_reduce(w_element[j] - t);
+                    w_element[j + len] = w_element[j] - t; // TODO revist: partial_reduce(w_element[j] - t);
 
                     // 14: w_hat[j] ← w_hat[j] + t
-                    w_element[j] = partial_reduce(w_element[j] + t);
+                    w_element[j] += t; // TODO revisit: partial_reduce(w_element[j] + t);
 
                     // 15: end for
                 }
@@ -124,7 +124,7 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
                     w_element[j + len] = t - w_element[j + len];
 
                     // 15: w_{j+len} ← zeta · w_{j+len}
-                    w_element[j + len] = reduce_q64(zeta as i64 * w_element[j + len] as i64);
+                    w_element[j + len] = partial_reduce64(zeta as i64 * w_element[j + len] as i64);
 
                     // 16: end for
                 }
@@ -147,7 +147,7 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
         // 22: for j from 0 to 255 do
         // 23: wj ← f · wj
         for i in &mut *w_element {
-            *i = reduce_q64(f * *i as i64);
+            *i = partial_reduce64(f * *i as i64);
         }
 
         // 24: end for

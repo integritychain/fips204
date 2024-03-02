@@ -1,7 +1,7 @@
 //! This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
 
 use crate::helpers::{full_reduce, mod_pm, partial_reduce};
-use crate::types::{R, Zero, Zq};
+use crate::types::{Zero, Zq, R};
 use crate::{D, QI};
 
 

@@ -5,7 +5,7 @@ use crate::encodings::{
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
 use crate::helpers::{
-    bit_length, ensure, infinity_norm, mat_vec_mul, mod_pm, partial_reduce, reduce_q64, vec_add,
+    bit_length, ensure, infinity_norm, mat_vec_mul, mod_pm, partial_reduce, partial_reduce64, vec_add,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -135,7 +135,7 @@ pub(crate) fn sign<
         let y: [R; L] = expand_mask(gamma1, &rho_prime, k)?;
 
         // 13: w ← NTT−1 (cap_a_hat ◦ NTT(y))
-        let y_hat:[T; L] = ntt(&y);
+        let y_hat: [T; L] = ntt(&y);
         let a_y_hat: [T; K] = mat_vec_mul(&cap_a_hat, &y_hat);
         let w: [R; K] = inv_ntt(&a_y_hat);
 
@@ -149,10 +149,10 @@ pub(crate) fn sign<
 
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
         let w1e_len = 32 * K * bit_length((QI - 1) / (2 * gamma2) - 1);
-        let mut w1_tilde = [0u8; 1024];
+        let mut w1_tilde = [0u8; 1024]; // TODO: Revisit potential waste of 256 bytes
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len])?;
-        let mut h99 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
-        h99.read(&mut c_tilde); // Ok to read a bit too much
+        let mut h15 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
+        h15.read(&mut c_tilde);
 
         // 16: (c_tilde_1 , c_tilde_2) ∈ {0,1}^256 × {0,1}^{2Lambda-256} ← c_tilde    ▷ First 256 bits of commitment hash
         let mut c_tilde_1 = [0u8; 32];
@@ -169,7 +169,7 @@ pub(crate) fn sign<
         let mut x: [T; L] = [T::zero(); L];
         for (xi, sh1i) in x.iter_mut().zip(s_hat_1.iter()) {
             for (xij, (chj, sh1ij)) in xi.iter_mut().zip(c_hat.iter().zip(sh1i.iter())) {
-                *xij = reduce_q64(*chj as i64 * *sh1ij as i64);
+                *xij = partial_reduce64(*chj as i64 * *sh1ij as i64);
             }
         }
         let c_s_1 = inv_ntt(&x);
@@ -178,7 +178,7 @@ pub(crate) fn sign<
         let mut x: [T; K] = [T::zero(); K];
         for (xi, sh2i) in x.iter_mut().zip(s_hat_2.iter()) {
             for (xij, (chj, sh2ij)) in xi.iter_mut().zip(c_hat.iter().zip(sh2i.iter())) {
-                *xij = reduce_q64(*chj as i64 * *sh2ij as i64);
+                *xij = partial_reduce64(*chj as i64 * *sh2ij as i64);
             }
         }
         let c_s_2 = inv_ntt(&x);
@@ -204,13 +204,14 @@ pub(crate) fn sign<
         if (z_norm >= (gamma1 - beta)) | (r0_norm >= (gamma2 - beta)) {
             k += u16::try_from(L).unwrap();
             continue;
-            // 24: else  ... not really needed, with 'continue' above
+            // 24: else  ... not needed with 'continue'
         }
+
         // 25: ⟨⟨c_t_0 ⟩⟩ ← NTT−1 (c_hat ◦ t_hat_0)
         let mut x: [T; K] = [T::zero(); K];
         for (xi, th0i) in x.iter_mut().zip(t_hat_0.iter()) {
             for (xij, (chj, th0ij)) in xi.iter_mut().zip(c_hat.iter().zip(th0i.iter())) {
-                *xij = reduce_q64(*chj as i64 * *th0ij as i64);
+                *xij = partial_reduce64(*chj as i64 * *th0ij as i64);
             }
         }
         let c_t_0 = inv_ntt(&x);
@@ -236,13 +237,14 @@ pub(crate) fn sign<
             // 28: end if
         }
         // 29: end if
-        //
+
         // 30: κ ← κ + ℓ ▷ Increment counter
         // if we made it here, we passed the 'continue' conditions, so have a solution
         break;
+
         // 31: end while
     }
-    //
+
     // 32: σ ← sigEncode(c_tilde, z mod± q, h)
     let mut zmq: [R; L] = [R::zero(); L];
     for i in 0..L {
@@ -250,23 +252,17 @@ pub(crate) fn sign<
             zmq[i][j] = mod_pm(z[i][j], QU);
         }
     }
-    let sig = sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(
-        gamma1,
-        omega,
-        &(c_tilde[0..LAMBDA_DIV4].try_into().unwrap()),
-        &zmq,
-        &h,
-    )?;
+    let sig = sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde, &zmq, &h)?;
 
     Ok(sig) // 33: return σ
 }
 
 
-/// Algorithm 3: `ML-DSA.Verify(pk, M, σ)` on page 19.
+/// Algorithm 3: `ML-DSA.Verify(pk,M,σ)` on page 19.
 /// Verifies a signature `σ` for a message `M`.
 ///
-/// Input: Public key, `pk` ∈ B^{32 + 32*k*(bitlen(q−1) − d) and message `M` ∈ {0,1}∗. <br>
-/// Input: Signature, `σ` ∈ B^{32 + ℓ·32·(1 + bitlen(γ1−1)) + ω + k}. <br>
+/// Input: Public key, `pk` ∈ B^{32+32*k*(bitlen(q−1)−d) and message `M` ∈ {0,1}∗. <br>
+/// Input: Signature, `σ` ∈ B^{32+ℓ·32·(1+bitlen(γ1−1))+ω+k}. <br>
 /// Output: Boolean
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn verify<
@@ -279,20 +275,21 @@ pub(crate) fn verify<
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, pk: &[u8; PK_LEN], m: &[u8],
     sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
+    //
     // 1: (ρ,t_1) ← pkDecode(pk)
-    let (rho, t_1): ([u8; 32], [R; K]) = pk_decode::<K, PK_LEN>(pk)?;
+    let (rho, t_1): ([u8; 32], [R; K]) = pk_decode(pk)?;
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
-    let (c_tilde, z, h) = //: (Vec<u8>, [R; L], Option<[R; K]>) =
-        sig_decode::<K, L, LAMBDA_DIV4>(gamma1, omega, sig)?;
+    let (c_tilde, z, h): ([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>) =
+        sig_decode(gamma1, omega, sig)?;
 
     // 3: if h = ⊥ then return false ▷ Hint was not properly encoded
     if h.is_none() {
         return Ok(false);
+        // 4: end if
     };
     let i_norm = infinity_norm(&z);
-    ensure!(i_norm < gamma1, "Algorithm3: i_norm out of range");
-    // 4: end if
+    ensure!(i_norm < gamma1, "Alg3: i_norm out of range");
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
     let cap_a_hat: [[T; L]; K] = expand_a(&rho);
@@ -307,38 +304,38 @@ pub(crate) fn verify<
     let mut mu = [0u8; 64];
     hasher.read(&mut mu);
 
-    // 8: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2λ-256} ← c_tilde   NOTE: c_tilde_2 is discarded
-    let c_tilde_1 = c_tilde; //.clone(); // c_tilde_2 is just discarded...
+    // 8: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2λ-256} ← c_tilde
+    let mut c_tilde_1 = [0u8; 32];
+    c_tilde_1.copy_from_slice(&c_tilde[0..32]); // c_tilde_2 is just discarded...
 
     // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
-    let c: R =
-        sample_in_ball(tau, &c_tilde_1[0..32].try_into().map_err(|_e| "c_tilde_1 scrambled")?)?;
+    let c: R = sample_in_ball(tau, &c_tilde_1)?;
 
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
-    let ntt_z = ntt(&z);
-    let ntt_a_z: [T; K] = mat_vec_mul(&cap_a_hat, &ntt_z);
+    let z_hat: [T; L] = ntt(&z);
+    let amz_hat: [T; K] = mat_vec_mul(&cap_a_hat, &z_hat);
 
-    let ntt_t1 = ntt(&t_1);
-    let mut ntt_t1_d2: [T; K] = [T::zero(); K];
+    let t1_hat: [T; K] = ntt(&t_1);
+    let mut t1_d2_hat: [T; K] = [T::zero(); K];
     for i in 0..K {
         for j in 0..256 {
-            ntt_t1_d2[i][j] = reduce_q64(ntt_t1[i][j] as i64 * 2i32.pow(D) as i64);
+            t1_d2_hat[i][j] = partial_reduce64(t1_hat[i][j] as i64 * 2i32.pow(D) as i64);
         }
     }
 
-    let ntt_c = ntt(&[c])[0];
+    let c_hat: T = ntt(&[c])[0];
 
-    let mut ntt_ct: [T; K] = [T::zero(); K];
-    for (ntci, ntdi) in ntt_ct.iter_mut().zip(ntt_t1_d2.iter()) {
-        for (ntcij, (ncj, ntdij)) in ntci.iter_mut().zip(ntt_c.iter().zip(ntdi.iter())) {
-            *ntcij = reduce_q64(*ncj as i64 * *ntdij as i64);
+    let mut cmt_hat: [T; K] = [T::zero(); K];
+    for (ntci, ntdi) in cmt_hat.iter_mut().zip(t1_d2_hat.iter()) {
+        for (ntcij, (ncj, ntdij)) in ntci.iter_mut().zip(c_hat.iter().zip(ntdi.iter())) {
+            *ntcij = partial_reduce64(*ncj as i64 * *ntdij as i64);
         }
     }
 
     let mut wp_approx: [R; K] = [R::zero(); K];
     for i in 0..K {
         let mut tmp = T::zero();
-        (0..256).for_each(|j| tmp[j] = ntt_a_z[i][j] - ntt_ct[i][j]);
+        (0..256).for_each(|j| tmp[j] = amz_hat[i][j] - cmt_hat[i][j]);
         wp_approx[i] = inv_ntt(&[tmp])[0];
     }
 
@@ -354,7 +351,7 @@ pub(crate) fn verify<
     let qm12gm1 = (QI - 1) / (2 * gamma2) - 1;
     let bl = bit_length(qm12gm1);
     let t_max = 32 * K * bl;
-    let mut tmp = [0u8; 1024]; // TODO: optimize to [0u8; 32 * K * bl]
+    let mut tmp = [0u8; 1024];  // TODO: Revisit potential waste of 256 bytes
     w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max])?;
     let mut hasher = h_xof(&[&mu, &tmp[..t_max]]);
     let mut c_tilde_p = [0u8; 64];
@@ -363,7 +360,7 @@ pub(crate) fn verify<
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
     let left = infinity_norm(&z) < (gamma1 - beta);
     let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4];
-    let right = h // TODO: confirm -- this checks #h per each R (rather than overall total)
+    let right = h
         .ok_or("h scrambled 4")?
         .iter()
         .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
