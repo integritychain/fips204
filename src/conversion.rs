@@ -18,7 +18,7 @@ use crate::QI;
 // algorithms have been reimplemented at a higher level.
 
 
-/// Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
+/// # Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
 /// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}`.
 ///
 /// **Input**: A byte array of length three, representing bytes `b0`, `b1`, `b2`. <br>
@@ -48,7 +48,7 @@ pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<i32, &'static str> {
 }
 
 
-/// Algorithm 9: `CoefFromHalfByte(b)` on page 22.
+/// # Algorithm 9: `CoefFromHalfByte(b)` on page 22.
 /// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}`.
 /// Not intended to be constant time.
 ///
@@ -87,7 +87,7 @@ pub(crate) fn coef_from_half_byte_vt(eta: i32, b: u8) -> Result<i32, &'static st
 }
 
 
-/// Algorithm 10: `SimpleBitPack(w,b)` on page 22.
+/// # Algorithm 10: `SimpleBitPack(w,b)` on page 22.
 /// Encodes a polynomial `w` into a byte string.
 ///
 /// **Input**: `b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[0, b]`. <br>
@@ -108,7 +108,7 @@ pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) -> Result<(),
 }
 
 
-/// Algorithm 11: `BitPack(w,a,b)` on page 22
+/// # Algorithm 11: `BitPack(w,a,b)` on page 22
 /// Encodes a polynomial `w` into a byte string.
 ///
 /// **Input**: `a, b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[−a, b]`. <br>
@@ -161,7 +161,7 @@ pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<()
 }
 
 
-/// Algorithm 12: `SimpleBitUnpack(v,b)` on page 23.
+/// # Algorithm 12: `SimpleBitUnpack(v,b)` on page 23.
 /// Reverses the procedure `SimpleBitPack`.
 ///
 /// **Input**: `b ∈ N` and a byte string `v` of length 32·bitlen(b). <br>
@@ -183,7 +183,7 @@ pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
 }
 
 
-/// Algorithm 13: `BitUnpack(v,a,b)` on page 23.
+/// # Algorithm 13: `BitUnpack(v,a,b)` on page 23.
 /// Reverses the procedure `BitPack`.
 ///
 /// **Input**: `a, b ∈ N` and a byte string `v` of length `32·bitlen(a + b)`. <br>
@@ -225,7 +225,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
 }
 
 
-/// Algorithm 14: `HintBitPack(h)` on page 24.
+/// # Algorithm 14: `HintBitPack(h)` on page 24.
 /// Encodes a polynomial vector `h` with binary coefficients into a byte string.
 ///
 /// **Input**: A polynomial vector `h ∈ R^k_2` such that at most `ω` of the coefficients in `h` are equal to `1`. <br>
@@ -291,7 +291,7 @@ pub(crate) fn hint_bit_pack<const K: usize>(
 }
 
 
-/// Algorithm 15: `HintBitUnpack(y)` on page 24.
+/// # Algorithm 15: `HintBitUnpack(y)` on page 24.
 /// Reverses the procedure `HintBitPack`.
 ///
 /// **Input**: A byte string `y` of length `ω + k`. <br>

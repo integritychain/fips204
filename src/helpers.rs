@@ -84,8 +84,8 @@ pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
 pub fn mod_pm(m: i32, a: u32) -> i32 {
-    let t = m.rem_euclid(a as i32);
-    let a = a as i32;
+    let a = i32::try_from(a).unwrap();
+    let t = m.rem_euclid(a);
     if t <= (a / 2) {
         t
     } else {

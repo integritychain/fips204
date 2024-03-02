@@ -226,7 +226,7 @@ pub(crate) fn sign<
 
         // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
         if (helpers::infinity_norm(&c_t_0) >= gamma2)
-            | (h.iter().flatten().filter(|i| (**i).abs() == 1).count() > omega as usize)
+            | (h.iter().flatten().filter(|i| (**i).abs() == 1).count() > usize::try_from(omega).unwrap())
         {
             k += u16::try_from(L).unwrap();
             continue;
@@ -247,8 +247,13 @@ pub(crate) fn sign<
             zmq[i][j] = mod_pm(z[i][j], QU);
         }
     }
-    let sig =
-        sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde[0..LAMBDA_DIV4], &zmq, &h)?;
+    let sig = sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(
+        gamma1,
+        omega,
+        &(c_tilde[0..LAMBDA_DIV4].try_into().unwrap()),
+        &zmq,
+        &h,
+    )?;
 
     Ok(sig) // 33: return σ
 }

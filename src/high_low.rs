@@ -31,7 +31,7 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     // 1: r+ ← r mod q
     let rp = full_reduce(r);
     // 2: r0 ← r+ mod±(2γ_2)
-    let mut r0 = mod_pm(rp, 2 * gamma2 as u32);
+    let mut r0 = mod_pm(rp, 2 * u32::try_from(gamma2).unwrap());
     let mut r1 = 0;
     // 3: if r+ − r0 = q − 1 then
     if (rp - r0) == (QI - 1) {
@@ -41,7 +41,7 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
         r0 -= 1;
     } else {
         // 6: else r_1 ← (r+ − r0)/(2γ2)
-        r1 = (rp - r0) / (2 * gamma2 as i32);
+        r1 = (rp - r0) / (2 * gamma2);
         // 7: end if
     }
     (r1, r0)
