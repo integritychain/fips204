@@ -1,6 +1,8 @@
 use crate::types::{Zero, R};
 use crate::{QI, QU, ZETA};
 
+
+/// # Macro ensure!()
 /// If the condition is not met, return an error message. Borrowed from the `anyhow` crate.
 /// Pervasive use of this macro hits performance around 3%
 macro_rules! ensure {
@@ -15,7 +17,6 @@ pub(crate) use ensure; // make available throughout crate
 
 
 /// Ensure polynomial w is within -lo to +hi (inclusive)
-#[allow(clippy::cast_possible_wrap)] // lo/hi is program structure
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
     w.iter().all(|&e| (e >= -lo) & (e <= hi))
 }

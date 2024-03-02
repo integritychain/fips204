@@ -1,10 +1,10 @@
+//! This file implements functionality from FIPS 204 section 8.3 Hashing and Pseudorandom Sampling
+
 use crate::conversion;
 use crate::helpers::{bit_length, ensure, is_in_range};
 use crate::types::{Zero, R, T};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
-
-// This file implements functionality from FIPS 204 section 8.3 Hashing and Pseudorandom Sampling
 
 
 /// # Function H(v,d) of (8.1) on page 29.
@@ -275,8 +275,8 @@ pub(crate) fn expand_s<const K: usize, const L: usize>(
 /// # Algorithm 28: `ExpandMask(ρ,µ)` from page 32.
 /// Samples a vector `s ∈ R^ℓ_q` such that each polynomial `s_j` has coefficients between −γ1 + 1 and γ1.
 ///
-/// Input: A bit string `ρ ∈ {0,1}^512` and a non-negative integer `µ`. <br>
-/// Output: Vector `s ∈ R^ℓ_q`.
+/// **Input**: A bit string `ρ ∈ {0,1}^512` and a non-negative integer `µ`. <br>
+/// **Output**: Vector `s ∈ R^ℓ_q`.
 ///
 /// # Errors
 /// Returns an error on internal errors
@@ -305,10 +305,7 @@ pub(crate) fn expand_mask<const L: usize>(
 
         // 5: s[r] ← BitUnpack(v, γ1 − 1, γ1)
         s[r as usize] = conversion::bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1)?;
-        ensure!(
-            s.iter().all(|r| is_in_range(r, gamma1, gamma1)),
-            "Alg28: s coeff out of range"
-        );
+        ensure!(s.iter().all(|r| is_in_range(r, gamma1, gamma1)), "Alg28: s coeff out of range");
 
         // 6: end for
     }

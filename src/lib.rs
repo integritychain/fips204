@@ -10,7 +10,7 @@
 //  1. Clean up; resolve math
 //  1. types -> types.rs
 //  4. Resolve/remove precompute signing
-//  6. More robust unit testing
+//  6. More robust unit testing; consider whether to test debug statements: release-vs-test
 //  7. infinity_norm() -> check_infinity_norm() w/ early exit
 //  8. Remove blanket clippy allows
 
