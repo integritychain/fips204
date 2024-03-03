@@ -1,18 +1,15 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 #![deny(clippy::pedantic)]
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
-// To remove...need to rework element+math
-#![allow(clippy::cast_lossless)]
 
 // Roadmap
 //  1. Clean up; resolve math
-//  1. types -> types.rs
-//  4. Resolve/remove precompute signing
-//  6. More robust unit testing; consider whether to test debug statements: release-vs-test
-//  7. infinity_norm() -> check_infinity_norm() w/ early exit
-//  8. Remove blanket clippy allows
+//  2. Signature should just be a byte array
+//  3. Resolve/remove precompute signing
+//  4. infinity_norm() -> check_infinity_norm() w/ early exit
+//  5. More robust unit testing; consider whether to test debug statements: release-vs-test
 
 
 // Functionality map per FIPS 204 draft
@@ -58,8 +55,6 @@
 // `debug_assert!()` is used for non-data checks (e.g., program structure, parameters)
 // `ensure!()` is used for data-related checks at runtime (e.g., input validation)
 
-extern crate alloc;
-
 mod conversion;
 mod encodings;
 mod hashing;
@@ -78,7 +73,7 @@ const ZETA: i32 = 1753; // See line 906 et al
 const D: u32 = 13;
 
 
-// This common functionality is injected into each parameter set module
+// This common functionality is injected into each security parameter set module
 macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sig_decode, sk_decode};
@@ -89,25 +84,23 @@ macro_rules! functionality {
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
 
+
         // ----- 'EXTERNAL' DATA TYPES -----
 
         /// Correctly sized private key specific to the target security parameter set. <br>
         /// Implements the [`crate::traits::Signer`], [`crate::traits::SerDes`], and
         /// [`crate::traits::PreGen`] traits.
-        #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-        pub struct PrivateKey([u8; SK_LEN]);
+        pub type PrivateKey = crate::types::PrivateKey<SK_LEN>;
 
 
         /// Correctly sized public key specific to the target security parameter set. <br>
         /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
-        #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-        pub struct PublicKey([u8; PK_LEN]);
+        pub type PublicKey = crate::types::PublicKey<PK_LEN>;
 
 
         /// Correctly sized signature specific to the target security parameter set. <br>
         /// Implements the [`crate::traits::SerDes`] trait.
-        #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-        pub struct Signature([u8; SIG_LEN]);
+        pub type Signature = crate::types::Signature<SIG_LEN>;
 
 
         /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>
@@ -185,7 +178,7 @@ macro_rules! functionality {
                 rng: &mut impl CryptoRngCore,
             ) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-                Ok((PublicKey(pk), PrivateKey(sk)))
+                Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             }
         }
 
@@ -199,7 +192,7 @@ macro_rules! functionality {
                 let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
-                Ok(Signature(sig))
+                Ok(Signature { 0: sig })
             }
         }
 
@@ -222,7 +215,7 @@ macro_rules! functionality {
                 let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
-                Ok(Signature(sig))
+                Ok(Signature { 0: sig })
             }
         }
 
@@ -245,7 +238,7 @@ macro_rules! functionality {
 
             fn try_from_bytes(sig: Self::ByteArray) -> Result<Self, &'static str> {
                 let _ = sig_decode::<K, L, LAMBDA_DIV4>(GAMMA1, OMEGA, &sig)?; //.map_err(|_e| "Signature deserialization failed");
-                Ok(Signature(sig))
+                Ok(Signature { 0: sig })
             }
 
             fn into_bytes(self) -> Self::ByteArray { self.0 }
@@ -257,7 +250,7 @@ macro_rules! functionality {
 
             fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
                 let _ = pk_decode::<K, PK_LEN>(&pk)?; //.map_err(|_e| "Public key deserialization failed");
-                Ok(PublicKey(pk))
+                Ok(PublicKey { 0: pk })
             }
 
             fn into_bytes(self) -> Self::ByteArray { self.0 }
@@ -269,7 +262,7 @@ macro_rules! functionality {
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
                 let _ = sk_decode::<K, L, SK_LEN>(ETA, &sk)?; //.map_err(|_e| "Private key deserialization failed");
-                Ok(PrivateKey(sk))
+                Ok(PrivateKey { 0: sk })
             }
 
             fn into_bytes(self) -> Self::ByteArray { self.0 }
@@ -321,6 +314,7 @@ pub mod ml_dsa_44 {
 
     functionality!();
 }
+
 
 /// Functionality for the **ML-DSA-65** security parameter set. This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-65

@@ -405,7 +405,7 @@ pub(crate) fn w1_encode<const K: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec::Vec;
+    use rand_core::RngCore;
 
     #[test]
     fn test_pk_encode_decode_roundtrip1() {
@@ -493,7 +493,8 @@ mod tests {
     #[test]
     fn test_sig_roundtrip() {
         // GAMMA1=2^17 K=4 L=4 LAMBDA=128 OMEGA=80
-        let c_tilde: Vec<u8> = (0..2 * 128 / 8).map(|_| rand::random::<u8>()).collect();
+        let mut c_tilde = [0u8; 2 * 128 / 8];
+        rand::thread_rng().fill_bytes(&mut c_tilde);
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         //let mut sigma = [0u8; 2420];

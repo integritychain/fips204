@@ -208,7 +208,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
     let mut bit_index = 0;
 
     for byte in v {
-        temp |= (*byte as i32) << bit_index;
+        temp |= i32::from(*byte) << bit_index;
         bit_index += 8;
         #[allow(clippy::cast_possible_wrap)]
         while bit_index >= bitlen {
@@ -370,7 +370,7 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec::Vec;
+    use rand_core::RngCore;
 
     #[test]
     fn test_coef_from_three_bytes1() {
@@ -440,7 +440,8 @@ mod tests {
     #[test]
     fn test_simple_bit_pack_roundtrip() {
         // Round trip for 32 * 6(bitlen) bytes
-        let random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
+        let mut random_bytes = [0u8; 32 * 6];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
         let r = simple_bit_unpack(&random_bytes, 2i32.pow(6) - 1).unwrap();
         let mut res = [0u8; 32 * 6];
         simple_bit_pack(&r, 2i32.pow(6) - 1, &mut res).unwrap();
@@ -452,7 +453,8 @@ mod tests {
     #[allow(clippy::should_panic_without_expect)]
     fn test_simple_bit_unpack_validation1() {
         // wrong size of bytes
-        let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
+        let mut random_bytes = [0u8; 32 * 7];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
         let res = simple_bit_unpack(&random_bytes, 2i32.pow(6) - 1);
         assert!(res.is_err());
     }
@@ -462,14 +464,16 @@ mod tests {
     #[allow(clippy::should_panic_without_expect)]
     fn test_bit_unpack_validation1() {
         // wrong size of bytes
-        let random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
+        let mut random_bytes = [0u8; 32 * 7];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
         let res = bit_unpack(&random_bytes, 0, 2i32.pow(6) - 1);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_simple_bit_pack_validation1() {
-        let mut random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
+        let mut random_bytes = [0u8; 32 * 6];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
         let r = [0i32; 256];
         let res = simple_bit_pack(&r, 2i32.pow(6) - 1, &mut random_bytes);
         assert!(res.is_ok());
@@ -479,7 +483,8 @@ mod tests {
     #[should_panic]
     #[allow(clippy::should_panic_without_expect)]
     fn test_simple_bit_pack_validation2() {
-        let mut random_bytes: Vec<u8> = (0..32 * 7).map(|_| rand::random::<u8>()).collect();
+        let mut random_bytes = [0u8; 32 * 7];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
         // wrong size r coeff
         let r = [1024i32; 256];
         let res = simple_bit_pack(&r, 2i32.pow(6) - 1, &mut random_bytes);

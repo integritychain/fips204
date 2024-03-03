@@ -22,11 +22,10 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 }
 
 
-/// Barrett reduction  TODO revisit
+/// Partial Barrett-style reduction
 const M: i128 = 2i128.pow(64) / (QI as i128);
-#[allow(clippy::inline_always)]
+#[allow(clippy::inline_always, clippy::cast_possible_truncation)]
 #[inline(always)]
-#[allow(clippy::cast_possible_truncation)] // temporary
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
     (a - (q as i64) * (QI as i64)) as i32
@@ -106,7 +105,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
         for j in 0..L {
             let mut tmp = [0i32; 256];
             tmp.iter_mut().enumerate().for_each(|(m, e)| {
-                *e = partial_reduce64(a_hat[i][j][m] as i64 * u_hat[j][m] as i64);
+                *e = partial_reduce64(i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]));
             });
             for k in 0..256 {
                 w_hat[i][k] = partial_reduce(w_hat[i][k] + tmp[k]);

@@ -5,7 +5,8 @@ use crate::encodings::{
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
 use crate::helpers::{
-    bit_length, ensure, infinity_norm, mat_vec_mul, mod_pm, partial_reduce, partial_reduce64, vec_add,
+    bit_length, ensure, infinity_norm, mat_vec_mul, mod_pm, partial_reduce, partial_reduce64,
+    vec_add,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -169,7 +170,7 @@ pub(crate) fn sign<
         let mut x: [T; L] = [T::zero(); L];
         for (xi, sh1i) in x.iter_mut().zip(s_hat_1.iter()) {
             for (xij, (chj, sh1ij)) in xi.iter_mut().zip(c_hat.iter().zip(sh1i.iter())) {
-                *xij = partial_reduce64(*chj as i64 * *sh1ij as i64);
+                *xij = partial_reduce64(i64::from(*chj) * i64::from(*sh1ij));
             }
         }
         let c_s_1 = inv_ntt(&x);
@@ -178,7 +179,7 @@ pub(crate) fn sign<
         let mut x: [T; K] = [T::zero(); K];
         for (xi, sh2i) in x.iter_mut().zip(s_hat_2.iter()) {
             for (xij, (chj, sh2ij)) in xi.iter_mut().zip(c_hat.iter().zip(sh2i.iter())) {
-                *xij = partial_reduce64(*chj as i64 * *sh2ij as i64);
+                *xij = partial_reduce64(i64::from(*chj) * i64::from(*sh2ij));
             }
         }
         let c_s_2 = inv_ntt(&x);
@@ -211,7 +212,7 @@ pub(crate) fn sign<
         let mut x: [T; K] = [T::zero(); K];
         for (xi, th0i) in x.iter_mut().zip(t_hat_0.iter()) {
             for (xij, (chj, th0ij)) in xi.iter_mut().zip(c_hat.iter().zip(th0i.iter())) {
-                *xij = partial_reduce64(*chj as i64 * *th0ij as i64);
+                *xij = partial_reduce64(i64::from(*chj) * i64::from(*th0ij));
             }
         }
         let c_t_0 = inv_ntt(&x);
@@ -223,7 +224,7 @@ pub(crate) fn sign<
             for j in 0..256 {
                 mct0[i][j] = partial_reduce(QI - c_t_0[i][j]);
                 wcc[i][j] = partial_reduce(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
-                h[i][j] = make_hint(gamma2, mct0[i][j], wcc[i][j]) as i32;
+                h[i][j] = i32::from(make_hint(gamma2, mct0[i][j], wcc[i][j]));
             }
         }
 
@@ -319,7 +320,7 @@ pub(crate) fn verify<
     let mut t1_d2_hat: [T; K] = [T::zero(); K];
     for i in 0..K {
         for j in 0..256 {
-            t1_d2_hat[i][j] = partial_reduce64(t1_hat[i][j] as i64 * 2i32.pow(D) as i64);
+            t1_d2_hat[i][j] = partial_reduce64(i64::from(t1_hat[i][j]) * 2i64.pow(D));
         }
     }
 
@@ -328,7 +329,7 @@ pub(crate) fn verify<
     let mut cmt_hat: [T; K] = [T::zero(); K];
     for (ntci, ntdi) in cmt_hat.iter_mut().zip(t1_d2_hat.iter()) {
         for (ntcij, (ncj, ntdij)) in ntci.iter_mut().zip(c_hat.iter().zip(ntdi.iter())) {
-            *ntcij = partial_reduce64(*ncj as i64 * *ntdij as i64);
+            *ntcij = partial_reduce64(i64::from(*ncj) * i64::from(*ntdij));
         }
     }
 
@@ -351,7 +352,7 @@ pub(crate) fn verify<
     let qm12gm1 = (QI - 1) / (2 * gamma2) - 1;
     let bl = bit_length(qm12gm1);
     let t_max = 32 * K * bl;
-    let mut tmp = [0u8; 1024];  // TODO: Revisit potential waste of 256 bytes
+    let mut tmp = [0u8; 1024]; // TODO: Revisit potential waste of 256 bytes
     w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max])?;
     let mut hasher = h_xof(&[&mu, &tmp[..t_max]]);
     let mut c_tilde_p = [0u8; 64];
