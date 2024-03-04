@@ -4,10 +4,7 @@ use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
-use crate::helpers::{
-    bit_length, ensure, infinity_norm, mat_vec_mul, mod_pm, partial_reduce, partial_reduce64,
-    vec_add,
-};
+use crate::helpers::{bit_length, ensure, infinity_norm, mat_vec_mul, mod_pm2, partial_reduce32, partial_reduce64, vec_add};
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{Zero, R, T};
@@ -187,7 +184,7 @@ pub(crate) fn sign<
         // 21: z ← y + ⟨⟨c_s_1⟩⟩    ▷ Signer’s response
         for i in 0..L {
             for j in 0..256 {
-                z[i][j] = partial_reduce(y[i][j] + c_s_1[i][j]);
+                z[i][j] = partial_reduce32(y[i][j] + c_s_1[i][j]);
             }
         }
 
@@ -195,7 +192,7 @@ pub(crate) fn sign<
         let mut r0: [R; K] = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                r0[i][j] = low_bits(gamma2, partial_reduce(w[i][j] - c_s_2[i][j]));
+                r0[i][j] = low_bits(gamma2, partial_reduce32(w[i][j] - c_s_2[i][j]));
             }
         }
 
@@ -222,8 +219,8 @@ pub(crate) fn sign<
         let mut wcc = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                mct0[i][j] = partial_reduce(QI - c_t_0[i][j]);
-                wcc[i][j] = partial_reduce(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
+                mct0[i][j] = partial_reduce32(QI - c_t_0[i][j]);
+                wcc[i][j] = partial_reduce32(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
                 h[i][j] = i32::from(make_hint(gamma2, mct0[i][j], wcc[i][j]));
             }
         }
@@ -240,6 +237,8 @@ pub(crate) fn sign<
         // 29: end if
 
         // 30: κ ← κ + ℓ ▷ Increment counter
+        // this is done just prior to each of the 'continue' statements above
+
         // if we made it here, we passed the 'continue' conditions, so have a solution
         break;
 
@@ -250,7 +249,7 @@ pub(crate) fn sign<
     let mut zmq: [R; L] = [R::zero(); L];
     for i in 0..L {
         for j in 0..256 {
-            zmq[i][j] = mod_pm(z[i][j], QU);
+            zmq[i][j] = mod_pm2(z[i][j], QU);
         }
     }
     let sig = sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde, &zmq, &h)?;

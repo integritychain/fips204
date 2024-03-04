@@ -29,25 +29,8 @@ const M: i128 = 2i128.pow(64) / (QI as i128);
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
     (a - (q as i64) * (QI as i64)) as i32
-    // if res >= QI {
-    //     res - QI
-    // } else {
-    //     res
-    // }
 }
 
-/// Barrett reduction  TODO revisit <http://www.acsel-lab.com/arithmetic/arith18/papers/ARITH18_Hasenplaugh.pdf>
-// #[inline(always)]
-// pub(crate) const fn reduce_q64a(a: i64) -> i32 {
-//     let m = 2i64.pow(32) / 8_380_417_i64;
-//     let q = (a * m) >> 32;
-//     let res = (a - q * 8_380_417) as i32;
-//     if res >= QI {
-//         res - QI
-//     } else {
-//         res
-//     }
-// }
 
 /// Partially reduce a signed 32-bit value mod Q ---> `-Q <~ result <~ Q`
 // Considering the positive case for `a`, bits 23 and above can be loosely
@@ -62,7 +45,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 // The negative result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck
 #[inline(always)]
 #[allow(clippy::inline_always)]
-pub(crate) const fn partial_reduce(a: i32) -> i32 {
+pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     let x = (a + (1 << 22)) >> 23;
     let res = a - x * QI;
     debug_assert!(res.abs() < 2i32.pow(23) - 2i32.pow(21) - 2i32.pow(8));
@@ -70,8 +53,8 @@ pub(crate) const fn partial_reduce(a: i32) -> i32 {
 }
 
 #[allow(dead_code)]
-pub(crate) const fn full_reduce(a: i32) -> i32 {
-    let x = partial_reduce(a); // puts us within -Q to +Q
+pub(crate) const fn full_reduce32(a: i32) -> i32 {
+    let x = partial_reduce32(a); // puts us within -Q to +Q
     x + ((x >> 31) & QI) // add Q if negative
 }
 
@@ -83,9 +66,22 @@ pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// If α is a positive integer and m ∈ Z or m ∈ `Z_α` , then m mod± α denotes the unique
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
-pub fn mod_pm(m: i32, a: u32) -> i32 {
+// pub fn mod_pm(m: i32, a: u32) -> i32 {
+//     let a = i32::try_from(a).unwrap();
+//     let t = m.rem_euclid(a);
+//     if t <= (a / 2) {
+//         t
+//     } else {
+//         t - a
+//     }
+// }
+
+pub fn mod_pm2(m: i32, a: u32) -> i32 {
     let a = i32::try_from(a).unwrap();
-    let t = m.rem_euclid(a);
+    //let t = m.rem_euclid(a);
+    let t = partial_reduce32(m);
+    // t + ((t >> 31) & QI) // add Q if negative
+
     if t <= (a / 2) {
         t
     } else {
@@ -108,7 +104,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
                 *e = partial_reduce64(i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]));
             });
             for k in 0..256 {
-                w_hat[i][k] = partial_reduce(w_hat[i][k] + tmp[k]);
+                w_hat[i][k] = partial_reduce32(w_hat[i][k] + tmp[k]);
             }
         }
     }
@@ -132,7 +128,7 @@ pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) 
     let mut result = 0;
     for row in w {
         for element in row {
-            let z_q = mod_pm(*element, QU).abs();
+            let z_q = mod_pm2(*element, QU).abs();
             result = if z_q > result { z_q } else { result };
         }
     }

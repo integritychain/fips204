@@ -501,7 +501,7 @@ mod tests {
         let sigma = sig_encode::<4, 4, { 128 / 4 }, 2420>(
             2i32.pow(17),
             80,
-            &c_tilde.clone().try_into().unwrap(),
+            &c_tilde.clone(),
             &z,
             &h,
         )

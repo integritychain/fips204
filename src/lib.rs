@@ -4,10 +4,14 @@
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 
+
 // Roadmap
 //  1. Clean up; resolve math
 //  2. Signature should just be a byte array
 //  3. Resolve/remove precompute signing
+//     - sk/sign could precompute steps 1-5 of alg 2 (sign)
+//     - pk/verify could precompute steps 1,5, (last part)10 of alg 3 (verify)
+//     - Q: how to design the best API, maybe normal->fast key plus sign-fast & verif-fast
 //  4. infinity_norm() -> check_infinity_norm() w/ early exit
 //  5. More robust unit testing; consider whether to test debug statements: release-vs-test
 
