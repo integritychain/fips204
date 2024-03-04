@@ -498,14 +498,9 @@ mod tests {
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         //let mut sigma = [0u8; 2420];
-        let sigma = sig_encode::<4, 4, { 128 / 4 }, 2420>(
-            2i32.pow(17),
-            80,
-            &c_tilde.clone(),
-            &z,
-            &h,
-        )
-        .unwrap();
+        let sigma =
+            sig_encode::<4, 4, { 128 / 4 }, 2420>(2i32.pow(17), 80, &c_tilde.clone(), &z, &h)
+                .unwrap();
         // let mut c_test = [0u8; 2 * 128 / 8];
         // let mut z_test = [[0i32; 256]; 4];
         // let mut h_test = [[0i32; 256]; 4];

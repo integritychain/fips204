@@ -1,8 +1,28 @@
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 use rand_chacha::rand_core::SeedableRng;
+use rand_core::RngCore;
 
 // cargo flamegraph --test integration
+
+// $ cargo test --release -- --nocapture --ignored
+#[ignore]
+#[test]
+fn forever() {
+    let mut msg = [0u8; 32];
+    let mut i = 0u64;
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
+    loop {
+        rng.fill_bytes(&mut msg);
+        let (pk, sk) = ml_dsa_44::KG::try_keygen_with_rng_vt(&mut rng).unwrap();
+        let sig = sk.try_sign_ct(&msg).unwrap();
+        let ver = pk.try_verify_vt(&msg, &sig);
+        assert!(ver.unwrap());
+        if i % 10000 == 0 {println!("So far i: {}", i)};
+        i += 1;
+    }
+}
+
 
 #[test]
 fn test_44_rounds() {

@@ -72,7 +72,6 @@ mod types;
 pub mod traits;
 
 const QI: i32 = 8_380_417; // 2i32.pow(23) - 2i32.pow(13) + 1; See https://oeis.org/A234388
-const QU: u32 = QI as u32; // 2u32.pow(23) - 2u32.pow(13) + 1;
 const ZETA: i32 = 1753; // See line 906 et al
 const D: u32 = 13;
 

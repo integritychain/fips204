@@ -46,8 +46,8 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     // Brittle...
     if gamma2 & (1 << 17) == 0 {
         // ml-dsa-44
-        xr1  = (rp + 127) >> 7;
-        xr1  = (xr1 * 11275 + (1 << 23)) >> 24;
+        xr1 = (rp + 127) >> 7;
+        xr1 = (xr1 * 11275 + (1 << 23)) >> 24;
         xr1 ^= ((43 - xr1) >> 31) & xr1;
     } else {
         // ml-dsa-65 and ml-dsa-87
@@ -56,10 +56,10 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
         xr1 &= 15;
     }
 
-    let xr0  = rp - xr1 * 2 * gamma2;
+    let xr0 = rp - xr1 * 2 * gamma2;
     let xr0 = xr0 - ((((QI - 1) / 2 - xr0) >> 31) & QI);
 
-    (xr1,xr0)
+    (xr1, xr0)
 }
 
 
@@ -119,21 +119,38 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
     // 1: m ← (q− 1)/(2*γ_2)
-    let m = (QI - 1) / (2 * gamma2);
+    //let m = (QI - 1) / (2 * gamma2);
 
     // 2: (r1, r0) ← Decompose(r)
     let (r1, r0) = decompose(gamma2, r);
 
-    // 3: if h = 1 and r0 > 0 return (r1 + 1) mod m
-    if (h == 1) & (r0 > 0) {
-        return (r1 + 1).rem_euclid(m); // TODO
+    // Step 5 here, to simplify later logic
+    if h == 0 {
+        return r1;
     }
 
+    // 3: if h = 1 and r0 > 0 return (r1 + 1) mod m
     // 4: if h = 1 and r0 ≤ 0 return (r1 − 1) mod m
-    if (h == 1) & (r0 <= 0) {
-        return (r1 - 1).rem_euclid(m); // TODO
+    if gamma2 & (1 << 17) == 0 {
+        // ml-dsa-44; explicit r1 + 1 mod m(43)
+        if r0 > 0 {
+            if r1 == 43 {
+                return 0;
+            }
+            return r1 + 1;
+        } // explicit r1 - 1 mod m(43)
+        if r1 == 0 {
+            return 43;
+        }
+        r1 - 1
+    } else {
+        // ml-dsa-65 and ml-dsa-87; explicit r1 + 1 mod m(16)
+        if r0 > 0 {
+            return (r1 + 1) & 15;
+        } // explicit r1 - 1 mod m(16)
+        (r1 - 1) & 15
     }
 
     // 5: return r1
-    r1
+    // r1  see logic
 }

@@ -1,5 +1,5 @@
 use crate::types::{Zero, R};
-use crate::{QI, QU, ZETA};
+use crate::{QI, ZETA};
 
 
 /// # Macro ensure!()
@@ -52,11 +52,12 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     res
 }
 
-#[allow(dead_code)]
+
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
     let x = partial_reduce32(a); // puts us within -Q to +Q
     x + ((x >> 31) & QI) // add Q if negative
 }
+
 
 /// Bit length required to express `a` in bits
 pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
@@ -66,27 +67,10 @@ pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// If α is a positive integer and m ∈ Z or m ∈ `Z_α` , then m mod± α denotes the unique
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
-// pub fn mod_pm(m: i32, a: u32) -> i32 {
-//     let a = i32::try_from(a).unwrap();
-//     let t = m.rem_euclid(a);
-//     if t <= (a / 2) {
-//         t
-//     } else {
-//         t - a
-//     }
-// }
-
-pub fn mod_pm2(m: i32, a: u32) -> i32 {
-    let a = i32::try_from(a).unwrap();
-    //let t = m.rem_euclid(a);
-    let t = partial_reduce32(m);
-    // t + ((t >> 31) & QI) // add Q if negative
-
-    if t <= (a / 2) {
-        t
-    } else {
-        t - a
-    }
+pub fn center_mod(m: i32) -> i32 {
+    let t = full_reduce32(m);
+    let over2 = (QI/2) - t;
+    t - ((over2 >> 31) & QI) // sub Q if over2 is negative
 }
 
 
@@ -111,6 +95,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     w_hat
 }
 
+
 /// Vector addition; See bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
@@ -128,7 +113,7 @@ pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) 
     let mut result = 0;
     for row in w {
         for element in row {
-            let z_q = mod_pm2(*element, QU).abs();
+            let z_q = center_mod(*element).abs();
             result = if z_q > result { z_q } else { result };
         }
     }
