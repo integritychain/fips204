@@ -392,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "panic: out of range")]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
         let res = coef_from_three_bytes(bytes).expect("panic: out of range");

@@ -1,6 +1,8 @@
 use crate::types::{Zero, R};
 use crate::{Q, ZETA};
 
+// Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
+
 
 /// # Macro ensure!()
 /// If the condition is not met, return an error message. Borrowed from the `anyhow` crate.
@@ -69,7 +71,7 @@ pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// modulo α.  'ready to optimize'
 pub fn center_mod(m: i32) -> i32 {
     let t = full_reduce32(m);
-    let over2 = (Q / 2) - t;
+    let over2 = (Q / 2) - t;  // check if t is larger than Q/2
     t - ((over2 >> 31) & Q) // sub Q if over2 is negative
 }
 
@@ -83,13 +85,9 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     for i in 0..K {
         #[allow(clippy::needless_range_loop)] // clarity
         for j in 0..L {
-            let mut tmp = [0i32; 256];
-            tmp.iter_mut().enumerate().for_each(|(m, e)| {
-                *e = partial_reduce64(i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]));
+            w_hat[i].iter_mut().enumerate().for_each(|(m, e)| {
+                *e = partial_reduce64(i64::from(*e) + i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]));
             });
-            for k in 0..256 {
-                w_hat[i][k] = partial_reduce32(w_hat[i][k] + tmp[k]);
-            }
         }
     }
     w_hat
@@ -110,7 +108,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
 
 
 pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) -> i32 {
-    let mut result = 0;
+    let mut result = 0;  // no early exit
     for row in w {
         for element in row {
             let z_q = center_mod(*element).abs();

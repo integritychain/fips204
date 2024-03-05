@@ -47,10 +47,10 @@ pub(crate) fn ntt<const X: usize>(w: &[R; X]) -> [T; X] {
                     let t = partial_reduce64(zeta * i64::from(w_element[j + len]));
 
                     // 13: w_hat[j + len] ← w_hat[j] − t
-                    w_element[j + len] = w_element[j] - t; // TODO revist: partial_reduce(w_element[j] - t);
+                    w_element[j + len] = w_element[j] - t;
 
                     // 14: w_hat[j] ← w_hat[j] + t
-                    w_element[j] += t; // TODO revisit: partial_reduce(w_element[j] + t);
+                    w_element[j] += t;
 
                     // 15: end for
                 }
