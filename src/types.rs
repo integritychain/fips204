@@ -14,13 +14,7 @@ pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
 
 
-/// Correctly sized signature specific to the target security parameter set. <br>
-/// Implements the [`crate::traits::SerDes`] trait.
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
-pub struct Signature<const SIG_LEN: usize>(pub(crate) [u8; SIG_LEN]);
-
-
-// Note: These types will be reworked; probably struct shells
+// Note: The following internal types may be reworked, perhaps as struct shells
 
 pub(crate) trait Zero {
     fn zero() -> Self;

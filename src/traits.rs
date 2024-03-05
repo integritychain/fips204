@@ -193,7 +193,6 @@ pub trait SerDes {
     /// let sig = sk.try_sign_ct(&message)?; // Use the secret key to generate a message signature
     /// let pk_bytes = pk.into_bytes(); // Serialize the public key
     /// let sk_bytes = sk.into_bytes(); // Serialize the private key
-    /// let sig_bytes = sig.into_bytes(); // Serialize the signature
     /// # Ok(())}
     /// ```
     fn into_bytes(self) -> Self::ByteArray;

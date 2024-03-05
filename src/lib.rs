@@ -7,13 +7,11 @@
 
 // Roadmap
 //  1. Clean up; resolve math
-//  2. Signature should just be a byte array
-//  3. Resolve/remove precompute signing
+//  2. Resolve/remove precompute signing
 //     - sk/sign could precompute steps 1-5 of alg 2 (sign)
 //     - pk/verify could precompute steps 1,5, (last part)10 of alg 3 (verify)
 //     - Q: how to design the best API, maybe normal->fast key plus sign-fast & verif-fast
-//  4. infinity_norm() -> check_infinity_norm() w/ early exit
-//  5. More robust unit testing; consider whether to test debug statements: release-vs-test
+//  3. More robust unit testing; consider whether to test debug statements: release-vs-test
 
 
 // Functionality map per FIPS 204 draft
@@ -62,6 +60,7 @@
 // Note: many of the debug_assert()! and ensure()! guardrails will be removed when
 // the specification is finalized and performance optimizations begin in earnest.
 
+
 mod conversion;
 mod encodings;
 mod hashing;
@@ -75,14 +74,14 @@ mod types;
 pub mod traits;
 
 const Q: i32 = 8_380_417; // 2i32.pow(23) - 2i32.pow(13) + 1; See https://oeis.org/A234388
-const ZETA: i32 = 1753; // See line 906 et al
+const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
 const D: u32 = 13;
 
 
 // This common functionality is injected into each security parameter set module
 macro_rules! functionality {
     () => {
-        use crate::encodings::{pk_decode, sig_decode, sk_decode};
+        use crate::encodings::{pk_decode, sk_decode};
         use crate::ml_dsa;
         use crate::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
         use rand_core::CryptoRngCore;
@@ -102,11 +101,6 @@ macro_rules! functionality {
         /// Correctly sized public key specific to the target security parameter set. <br>
         /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
         pub type PublicKey = crate::types::PublicKey<PK_LEN>;
-
-
-        /// Correctly sized signature specific to the target security parameter set. <br>
-        /// Implements the [`crate::traits::SerDes`] trait.
-        pub type Signature = crate::types::Signature<SIG_LEN>;
 
 
         /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>
@@ -190,15 +184,15 @@ macro_rules! functionality {
 
 
         impl Signer for PrivateKey {
-            type Signature = Signature;
+            type Signature = [u8; SIG_LEN];
 
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
-            ) -> Result<Signature, &'static str> {
+            ) -> Result<Self::Signature, &'static str> {
                 let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
-                Ok(Signature { 0: sig })
+                Ok(sig)
             }
         }
 
@@ -213,43 +207,31 @@ macro_rules! functionality {
 
 
         impl Signer for PrivatePreCompute {
-            type Signature = Signature;
+            type Signature = [u8; SIG_LEN];
 
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
-            ) -> Result<Signature, &'static str> {
+            ) -> Result<Self::Signature, &'static str> {
                 let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
                 )?;
-                Ok(Signature { 0: sig })
+                Ok(sig)
             }
         }
 
 
         impl Verifier for PublicKey {
-            type Signature = Signature;
+            type Signature = [u8; SIG_LEN];
 
-            fn try_verify_vt(&self, message: &[u8], sig: &Signature) -> Result<bool, &'static str> {
+            fn try_verify_vt(&self, message: &[u8], sig: &Self::Signature) -> Result<bool, &'static str> {
                 ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, &message, &sig.0,
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, &message, &sig,
                 )
             }
         }
 
 
         // ----- SERIALIZATION AND DESERIALIZATION ---
-
-        impl SerDes for Signature {
-            type ByteArray = [u8; SIG_LEN];
-
-            fn try_from_bytes(sig: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sig_decode::<K, L, LAMBDA_DIV4>(GAMMA1, OMEGA, &sig)?; //.map_err(|_e| "Signature deserialization failed");
-                Ok(Signature { 0: sig })
-            }
-
-            fn into_bytes(self) -> Self::ByteArray { self.0 }
-        }
-
 
         impl SerDes for PublicKey {
             type ByteArray = [u8; PK_LEN];
@@ -289,14 +271,14 @@ macro_rules! functionality {
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
 /// functions to sign byte-array messages, such as [`traits::Signer::try_sign_ct()`].
 ///
-/// **2)** All three (`PrivateKey`, `PublicKey`and `Signature`) structs implement the [`traits::SerDes`]
-/// trait. The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the
-/// latter two structs into byte-arrays for transmission with the message. Upon receipt, the remote
-/// party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize these byte-arrays
-/// into structs.
+/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
+/// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
+/// into byte-arrays for storage and/or transmission, similar to the message. Upon retrieval and/or receipt,
+/// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
+/// byte-arrays into structs.
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify_vt()`] function implemented on the
-/// [`ml_dsa_44::PublicKey`] struct to verify the message with its [`ml_dsa_44::Signature`] struct.
+/// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-44")]
@@ -331,14 +313,14 @@ pub mod ml_dsa_44 {
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
 /// functions to sign byte-array messages, such as [`traits::Signer::try_sign_ct()`].
 ///
-/// **2)** All three (`PrivateKey`, `PublicKey`and `Signature`) structs implement the [`traits::SerDes`]
-/// trait. The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the
-/// latter two structs into byte-arrays for transmission with the message. Upon receipt, the remote
-/// party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize these byte-arrays
-/// into structs.
+/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
+/// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
+/// into byte-arrays for storage and/or transmission, similar to the message. Upon retrieval and/or receipt,
+/// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
+/// byte-arrays into structs.
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify_vt()`] function implemented on the
-/// [`ml_dsa_44::PublicKey`] struct to verify the message with its [`ml_dsa_44::Signature`] struct.
+/// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-65")]
@@ -373,14 +355,14 @@ pub mod ml_dsa_65 {
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
 /// functions to sign byte-array messages, such as [`traits::Signer::try_sign_ct()`].
 ///
-/// **2)** All three (`PrivateKey`, `PublicKey`and `Signature`) structs implement the [`traits::SerDes`]
-/// trait. The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the
-/// latter two structs into byte-arrays for transmission with the message. Upon receipt, the remote
-/// party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize these byte-arrays
-/// into structs.
+/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
+/// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
+/// into byte-arrays for storage and/or transmission, similar to the message. Upon retrieval and/or receipt,
+/// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
+/// byte-arrays into structs.
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify_vt()`] function implemented on the
-/// [`ml_dsa_44::PublicKey`] struct to verify the message with its [`ml_dsa_44::Signature`] struct.
+/// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-87")]

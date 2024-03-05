@@ -32,16 +32,15 @@ let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
 
 // Generate key pair and signature
 let (pk1, sk) = ml_dsa_44::try_keygen_vt()?;  // Generate both public and secret keys
-let sig1 = sk.try_sign_ct(&message)?;  // Use the secret key to generate a message signature
+let sig = sk.try_sign_ct(&message)?;  // Use the secret key to generate a message signature
 
 // Serialize then send the public key, message and signature
-let (pk_send, msg_send, sig_send) = (pk1.into_bytes(), message, sig1.into_bytes());
+let (pk_send, msg_send, sig_send) = (pk1.into_bytes(), message, sig);
 let (pk_recv, msg_recv, sig_recv) = (pk_send, msg_send, sig_send);
 
 // Deserialize the public key and signature, then verify the message
 let pk2 = ml_dsa_44::PublicKey::try_from_bytes(pk_recv)?;
-let sig2 = ml_dsa_44::Signature::try_from_bytes(sig_recv)?;
-let v = pk2.try_verify_vt(&msg_recv, &sig2)?; // Use the public to verify message signature
+let v = pk2.try_verify_vt(&msg_recv, &sig_recv)?; // Use the public to verify message signature
 assert!(v); 
 # Ok(())
 # }

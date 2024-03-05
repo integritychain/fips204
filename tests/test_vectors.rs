@@ -119,7 +119,7 @@ fn test_sign() {
     let mut rnd = MyRng::new();
     rnd.push(&seed);
     let sig_act = sk.try_sign_with_rng_ct(&mut rnd, &msg);
-    assert_eq!(sig_exp, sig_act.unwrap().into_bytes());
+    assert_eq!(sig_exp, sig_act.unwrap());
 
     let (msg, sk, seed, sig_exp) =
         get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-65.txt");
@@ -127,7 +127,7 @@ fn test_sign() {
     let mut rnd = MyRng::new();
     rnd.push(&seed);
     let sig_act = sk.try_sign_with_rng_ct(&mut rnd, &msg);
-    assert_eq!(sig_exp, sig_act.unwrap().into_bytes());
+    assert_eq!(sig_exp, sig_act.unwrap());
 
     let (msg, sk, seed, sig_exp) =
         get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-87.txt");
@@ -135,7 +135,7 @@ fn test_sign() {
     let mut rnd = MyRng::new();
     rnd.push(&seed);
     let sig_act = sk.try_sign_with_rng_ct(&mut rnd, &msg);
-    assert_eq!(sig_exp, sig_act.unwrap().into_bytes());
+    assert_eq!(sig_exp, sig_act.unwrap());
 }
 
 
@@ -144,21 +144,18 @@ fn test_verify() {
     let (pk, msg, sig) =
         get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-44.txt");
     let pk = ml_dsa_44::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-    let sig = ml_dsa_44::Signature::try_from_bytes(sig.try_into().unwrap()).unwrap();
-    let pass = pk.try_verify_vt(&msg, &sig);
+    let pass = pk.try_verify_vt(&msg, &sig.try_into().unwrap());
     assert!(pass.unwrap());
 
     let (pk, message, sig) =
         get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-65.txt");
     let pk = ml_dsa_65::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-    let sig = ml_dsa_65::Signature::try_from_bytes(sig.try_into().unwrap()).unwrap();
-    let pass = pk.try_verify_vt(&message, &sig);
+    let pass = pk.try_verify_vt(&message, &sig.try_into().unwrap());
     assert!(pass.unwrap());
 
     let (pk, message, sig) =
         get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-87.txt");
     let pk = ml_dsa_87::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-    let sig = ml_dsa_87::Signature::try_from_bytes(sig.try_into().unwrap()).unwrap();
-    let pass = pk.try_verify_vt(&message, &sig);
+    let pass = pk.try_verify_vt(&message, &sig.try_into().unwrap());
     assert!(pass.unwrap());
 }

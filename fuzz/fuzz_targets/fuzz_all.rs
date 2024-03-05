@@ -1,7 +1,4 @@
 #![no_main]
-// rustup default nightly
-// head -c 6292 </dev/urandom > seed1
-// cargo fuzz run fuzz_all -j 4
 
 use libfuzzer_sys::fuzz_target;
 use fips204::ml_dsa_44;
@@ -19,13 +16,11 @@ fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
 
 
     // Deserialize a 'fuzzy' signature
-    let sig = ml_dsa_44::Signature::try_from_bytes(data[2560..2560+2420].try_into().unwrap());
+    let sig: [u8; ml_dsa_44::SIG_LEN] = data[2560..2560+2420].try_into().unwrap();
 
     // Try to use 'fuzzy' signature (a decent (?) proportion will deserialize OK)
-    if let Ok(sig) = sig {
-        let (pk, _) = ml_dsa_44::try_keygen_vt().unwrap(); // Get a good pk
-        let _v = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig);
-    }
+    let (pk, _) = ml_dsa_44::try_keygen_vt().unwrap(); // Get a good pk
+    let _v = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig);
 
 
     // Deserialize a 'fuzzy' public key

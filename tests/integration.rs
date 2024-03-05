@@ -101,9 +101,8 @@ fn test_44_no_verif() {
 
     // Bad signature
     for i in 0..8 {
-        let mut sig_bad = sig.clone().into_bytes();
+        let mut sig_bad = sig.clone();
         sig_bad[i * 10] ^= 0x08;
-        let sig_bad = ml_dsa_44::Signature::try_from_bytes(sig_bad).unwrap();
         let ver = pk.try_verify_vt(&msg, &sig_bad).unwrap();
         assert!(!ver)
     }
