@@ -1,4 +1,5 @@
 
+Figure-of-merit ... no particular care taken to disable turbo boost etc
 
 ~~~
 // $ RUSTFLAGS="-C target-cpu=native" cargo bench

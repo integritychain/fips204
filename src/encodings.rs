@@ -6,7 +6,7 @@ use crate::{
     conversion::{
         bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
     },
-    D, QI,
+    D, Q,
 };
 
 
@@ -24,11 +24,11 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     p: &[u8; 32], t1: &[R; K],
 ) -> Result<[u8; PK_LEN], &'static str> {
     ensure!(
-        t1.iter().all(|t| is_in_range(t, 0, 2i32.pow(bit_length(QI - 1) as u32 - D) - 1)),
+        t1.iter().all(|t| is_in_range(t, 0, 2i32.pow(bit_length(Q - 1) as u32 - D) - 1)),
         "Alg16: t1 out of range"
     );
 
-    let blqd = bit_length(QI - 1) - D as usize;
+    let blqd = bit_length(Q - 1) - D as usize;
     let mut pk = [0u8; PK_LEN];
 
     // 1: pk ← BitsToBytes(ρ)
@@ -70,11 +70,11 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 ) -> Result<([u8; 32], [R; K]), &'static str> {
     debug_assert_eq!(
         pk.len(),
-        32 + 32 * K * (bit_length(QI - 1) - D as usize),
+        32 + 32 * K * (bit_length(Q - 1) - D as usize),
         "Alg17: incorrect pk length"
     );
 
-    let blqd = bit_length(QI - 1) - D as usize;
+    let blqd = bit_length(Q - 1) - D as usize;
     let (mut rho, mut t1): ([u8; 32], [R; K]) = ([0u8; 32], [R::zero(); K]);
 
     // 1: (y, z_0 , . . . , z_{k−1}) ∈ B^{32} × (B^{32(bitlen(q−1)−d))^k} ← pk
@@ -96,7 +96,7 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 
     // 6: return (ρ, t1)
     ensure!(
-        t1.iter().all(|t| is_in_range(t, 0, 2i32.pow(bit_length(QI - 1) as u32 - D) - 1)),
+        t1.iter().all(|t| is_in_range(t, 0, 2i32.pow(bit_length(Q - 1) as u32 - D) - 1)),
         "Alg17: t1 out of range"
     );
     Ok((rho, t1))
@@ -377,7 +377,7 @@ pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA_DIV4: usiz
 pub(crate) fn w1_encode<const K: usize>(
     gamma2: i32, w1: &[R; K], w1_tilde: &mut [u8],
 ) -> Result<(), &'static str> {
-    let qm1_d_2g_m1 = (QI - 1) / (2 * gamma2) - 1;
+    let qm1_d_2g_m1 = (Q - 1) / (2 * gamma2) - 1;
     debug_assert_eq!(
         w1_tilde.len(),
         32 * K * bit_length(qm1_d_2g_m1),

@@ -165,10 +165,10 @@ pub(crate) fn rej_bounded_poly(eta: i32, rhos: &[&[u8]]) -> R {
         xof.read(&mut z);
 
         // 5: z0 ← CoefFromHalfByte(z mod 16, η)
-        let z0 = conversion::coef_from_half_byte_vt(eta, z[0].rem_euclid(16));
+        let z0 = conversion::coef_from_half_byte_vt(eta, z[0] & 0x0f);
 
         // 6: z1 ← CoefFromHalfByte(⌊z/16⌋, η)
-        let z1 = conversion::coef_from_half_byte_vt(eta, z[0] / 16);
+        let z1 = conversion::coef_from_half_byte_vt(eta, z[0] >> 4);
 
         // 7: if z0 != ⊥ then
         if let Ok(z0) = z0 {

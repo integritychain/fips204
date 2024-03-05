@@ -2,7 +2,7 @@
 
 use crate::helpers::{full_reduce32, partial_reduce32};
 use crate::types::{Zero, Zq, R};
-use crate::{D, QI};
+use crate::{D, Q};
 
 
 /// # Algorithm 29: `Power2Round(r)` on page 34.
@@ -57,7 +57,7 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     }
 
     let xr0 = rp - xr1 * 2 * gamma2;
-    let xr0 = xr0 - ((((QI - 1) / 2 - xr0) >> 31) & QI);
+    let xr0 = xr0 - ((((Q - 1) / 2 - xr0) >> 31) & Q);
 
     (xr1, xr0)
 }

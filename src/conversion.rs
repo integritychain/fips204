@@ -2,7 +2,7 @@
 
 use crate::helpers::{bit_length, ensure, is_in_range};
 use crate::types::{Zero, R};
-use crate::QI;
+use crate::Q;
 
 
 // Algorithm 4: `IntegerToBits(x, alpha)` on page 20 is not needed because the pack and unpack
@@ -36,7 +36,7 @@ pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<i32, &'static str> {
     let z = 2i32.pow(16) * bbb2 + 2i32.pow(8) * i32::from(bbb[1]) + i32::from(bbb[0]);
 
     // 5: if z < q then return z
-    if z < QI {
+    if z < Q {
         Ok(z)
 
         // 6: else return ⊥
@@ -136,7 +136,7 @@ pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<()
     let mut bit_index = 0; // Number of bits accumulated in temp
 
     // For every coefficient in w... (which is ensured to be in range)
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
     for coeff in *w {
         // if we have a negative `a` bound, subtract from b and shift into empty/upper part of temp
         if a > 0 {
@@ -210,7 +210,6 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
     for byte in v {
         temp |= i32::from(*byte) << bit_index;
         bit_index += 8;
-        #[allow(clippy::cast_possible_wrap)]
         while bit_index >= bitlen {
             let tmask = temp & (2i32.pow(bitlen) - 1);
             // choice fixed by security parameter, so CT
@@ -303,7 +302,6 @@ pub(crate) fn hint_bit_pack<const K: usize>(
 ///
 /// # Errors
 /// Returns an error on incorrectly sized or illegal inputs.
-//#[allow(clippy::cast_possible_truncation)] // omega as u8; note debug assert
 pub(crate) fn hint_bit_unpack<const K: usize>(
     omega: i32, y_bytes: &[u8],
 ) -> Result<[R; K], &'static str> {
@@ -395,10 +393,9 @@ mod tests {
 
     #[test]
     #[should_panic]
-    #[allow(clippy::should_panic_without_expect)]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
-        let res = coef_from_three_bytes(bytes).unwrap();
+        let res = coef_from_three_bytes(bytes).expect("panic: out of range");
         assert_eq!(res, 0x0056_3412);
     }
 

@@ -59,6 +59,9 @@
 // `debug_assert!()` is used for non-data checks (e.g., program structure, parameters)
 // `ensure!()` is used for data-related checks at runtime (e.g., input validation)
 
+// Note: many of the debug_assert()! and ensure()! guardrails will be removed when
+// the specification is finalized and performance optimizations begin in earnest.
+
 mod conversion;
 mod encodings;
 mod hashing;
@@ -71,7 +74,7 @@ mod types;
 /// All functionality is covered by traits, such that consumers can utilize trait objects as desired.
 pub mod traits;
 
-const QI: i32 = 8_380_417; // 2i32.pow(23) - 2i32.pow(13) + 1; See https://oeis.org/A234388
+const Q: i32 = 8_380_417; // 2i32.pow(23) - 2i32.pow(13) + 1; See https://oeis.org/A234388
 const ZETA: i32 = 1753; // See line 906 et al
 const D: u32 = 13;
 
@@ -298,11 +301,11 @@ macro_rules! functionality {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-44")]
 pub mod ml_dsa_44 {
-    use super::QI;
+    use super::Q;
     const TAU: i32 = 39;
     const LAMBDA: usize = 128;
     const GAMMA1: i32 = 2i32.pow(17);
-    const GAMMA2: i32 = (QI - 1) / 88;
+    const GAMMA2: i32 = (Q - 1) / 88;
     const K: usize = 4;
     const L: usize = 4;
     const ETA: i32 = 2;
@@ -340,11 +343,11 @@ pub mod ml_dsa_44 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
-    use super::QI;
+    use super::Q;
     const TAU: i32 = 49;
     const LAMBDA: usize = 192;
     const GAMMA1: i32 = 2i32.pow(19);
-    const GAMMA2: i32 = (QI - 1) / 32;
+    const GAMMA2: i32 = (Q - 1) / 32;
     const K: usize = 6;
     const L: usize = 5;
     const ETA: i32 = 4;
@@ -382,11 +385,11 @@ pub mod ml_dsa_65 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
-    use super::QI;
+    use super::Q;
     const TAU: i32 = 60;
     const LAMBDA: usize = 256;
     const GAMMA1: i32 = 2i32.pow(19);
-    const GAMMA2: i32 = (QI - 1) / 32;
+    const GAMMA2: i32 = (Q - 1) / 32;
     const K: usize = 8;
     const L: usize = 7;
     const ETA: i32 = 2;

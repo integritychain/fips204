@@ -18,7 +18,9 @@ fn forever() {
         let sig = sk.try_sign_ct(&msg).unwrap();
         let ver = pk.try_verify_vt(&msg, &sig);
         assert!(ver.unwrap());
-        if i % 10000 == 0 {println!("So far i: {}", i)};
+        if i % 10000 == 0 {
+            println!("So far i: {}", i)
+        };
         i += 1;
     }
 }

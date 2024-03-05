@@ -5,13 +5,13 @@ use crate::encodings::{
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
 use crate::helpers::{
-    bit_length, ensure, infinity_norm, mat_vec_mul, center_mod, partial_reduce32, partial_reduce64,
+    bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, partial_reduce32, partial_reduce64,
     vec_add,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{Zero, R, T};
-use crate::{D, QI};
+use crate::{D, Q};
 use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
 
@@ -78,9 +78,7 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 ///
 /// Input: Private key, `sk` ∈ `B^{32+32+64+32·((ℓ+k)·bitlen(2η)+dk)}` and the message `M` ∈ {0,1}^∗ <br>
 /// Output: Signature, `σ` ∈ `B^{32+ℓ·32·(1+bitlen(gamma_1 −1))+ω+k}`
-#[allow(clippy::similar_names)]
-#[allow(clippy::many_single_char_names)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::similar_names, clippy::many_single_char_names)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn sign<
     const K: usize,
@@ -149,7 +147,7 @@ pub(crate) fn sign<
         }
 
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
-        let w1e_len = 32 * K * bit_length((QI - 1) / (2 * gamma2) - 1);
+        let w1e_len = 32 * K * bit_length((Q - 1) / (2 * gamma2) - 1);
         let mut w1_tilde = [0u8; 1024]; // TODO: Revisit potential waste of 256 bytes
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len])?;
         let mut h15 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
@@ -222,7 +220,7 @@ pub(crate) fn sign<
         let mut wcc = [R::zero(); K];
         for i in 0..K {
             for j in 0..256 {
-                mct0[i][j] = partial_reduce32(QI - c_t_0[i][j]);
+                mct0[i][j] = partial_reduce32(Q - c_t_0[i][j]);
                 wcc[i][j] = partial_reduce32(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
                 h[i][j] = i32::from(make_hint(gamma2, mct0[i][j], wcc[i][j]));
             }
@@ -351,7 +349,7 @@ pub(crate) fn verify<
     }
 
     // 12: c_tilde_′ ← H(µ||w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
-    let qm12gm1 = (QI - 1) / (2 * gamma2) - 1;
+    let qm12gm1 = (Q - 1) / (2 * gamma2) - 1;
     let bl = bit_length(qm12gm1);
     let t_max = 32 * K * bl;
     let mut tmp = [0u8; 1024]; // TODO: Revisit potential waste of 256 bytes

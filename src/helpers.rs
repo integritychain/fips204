@@ -1,5 +1,5 @@
 use crate::types::{Zero, R};
-use crate::{QI, ZETA};
+use crate::{Q, ZETA};
 
 
 /// # Macro ensure!()
@@ -23,12 +23,12 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 
 
 /// Partial Barrett-style reduction
-const M: i128 = 2i128.pow(64) / (QI as i128);
+const M: i128 = 2i128.pow(64) / (Q as i128);
 #[allow(clippy::inline_always, clippy::cast_possible_truncation)]
 #[inline(always)]
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
-    (a - (q as i64) * (QI as i64)) as i32
+    (a - (q as i64) * (Q as i64)) as i32
 }
 
 
@@ -47,7 +47,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 #[allow(clippy::inline_always)]
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     let x = (a + (1 << 22)) >> 23;
-    let res = a - x * QI;
+    let res = a - x * Q;
     debug_assert!(res.abs() < 2i32.pow(23) - 2i32.pow(21) - 2i32.pow(8));
     res
 }
@@ -55,7 +55,7 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
 
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
     let x = partial_reduce32(a); // puts us within -Q to +Q
-    x + ((x >> 31) & QI) // add Q if negative
+    x + ((x >> 31) & Q) // add Q if negative
 }
 
 
@@ -69,8 +69,8 @@ pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// modulo α.  'ready to optimize'
 pub fn center_mod(m: i32) -> i32 {
     let t = full_reduce32(m);
-    let over2 = (QI/2) - t;
-    t - ((over2 >> 31) & QI) // sub Q if over2 is negative
+    let over2 = (Q / 2) - t;
+    t - ((over2 >> 31) & Q) // sub Q if over2 is negative
 }
 
 
@@ -81,7 +81,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 ) -> [[i32; 256]; K] {
     let mut w_hat = [[0i32; 256]; K];
     for i in 0..K {
-        #[allow(clippy::needless_range_loop)]
+        #[allow(clippy::needless_range_loop)] // clarity
         for j in 0..L {
             let mut tmp = [0i32; 256];
             tmp.iter_mut().enumerate().for_each(|(m, e)| {
@@ -122,7 +122,6 @@ pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) 
 
 
 /// HAC Algorithm 14.76 Right-to-left binary exponentiation mod Q.
-#[must_use]
 const fn pow_mod_q(g: i32, e: u8) -> i32 {
     let g = g as i64;
     let mut result = 1;
@@ -130,23 +129,22 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
     let mut e = e;
     while e != 0 {
         if e & 1 != 0 {
-            result = (result * s).rem_euclid(QI as i64);
+            result = partial_reduce64(result * s) as i64;
         };
         e >>= 1;
         if e != 0 {
-            s = (s * s).rem_euclid(QI as i64);
+            s = partial_reduce64(s * s) as i64;
         };
     }
-    partial_reduce64(result)
+    full_reduce32(partial_reduce64(result))
 }
 
 
-#[allow(clippy::cast_possible_truncation)] // temporary
 const fn gen_zeta_table() -> [i32; 256] {
     let mut result = [0i32; 256];
     let mut i = 0;
     while i < 256 {
-        result[i] = pow_mod_q(ZETA, (i as u8).reverse_bits());
+        result[i] = pow_mod_q(ZETA, i.to_le_bytes()[0].reverse_bits());
         i += 1;
     }
     result
