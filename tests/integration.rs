@@ -101,7 +101,7 @@ fn test_44_no_verif() {
 
     // Bad signature
     for i in 0..8 {
-        let mut sig_bad = sig.clone();
+        let mut sig_bad = sig;
         sig_bad[i * 10] ^= 0x08;
         let ver = pk.try_verify_vt(&msg, &sig_bad).unwrap();
         assert!(!ver)

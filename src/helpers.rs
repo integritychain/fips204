@@ -71,7 +71,7 @@ pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// modulo α.  'ready to optimize'
 pub fn center_mod(m: i32) -> i32 {
     let t = full_reduce32(m);
-    let over2 = (Q / 2) - t;  // check if t is larger than Q/2
+    let over2 = (Q / 2) - t; // check if t is larger than Q/2
     t - ((over2 >> 31) & Q) // sub Q if over2 is negative
 }
 
@@ -86,7 +86,9 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
         #[allow(clippy::needless_range_loop)] // clarity
         for j in 0..L {
             w_hat[i].iter_mut().enumerate().for_each(|(m, e)| {
-                *e = partial_reduce64(i64::from(*e) + i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]));
+                *e = partial_reduce64(
+                    i64::from(*e) + i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]),
+                );
             });
         }
     }
@@ -108,7 +110,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
 
 
 pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) -> i32 {
-    let mut result = 0;  // no early exit
+    let mut result = 0; // no early exit
     for row in w {
         for element in row {
             let z_q = center_mod(*element).abs();

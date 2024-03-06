@@ -1,6 +1,6 @@
 //! This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
 
-use crate::helpers::{full_reduce32};
+use crate::helpers::full_reduce32;
 use crate::types::{Zero, Zq, R};
 use crate::{D, Q};
 

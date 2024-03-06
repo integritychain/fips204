@@ -10,7 +10,7 @@ use crate::helpers::{
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
-use crate::types::{Zero, R, T};
+use crate::types::{ExpandedPrivateKey, ExpandedPublicKey22, Zero, R, T};
 use crate::{D, Q};
 use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
@@ -74,22 +74,15 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 
 
 /// Algorithm 2 ML-DSA.Sign(sk, M) on page 17
-/// Generates a signature for a message M.
+/// Generates a signature for a message M. Intuitive flow `result = sign_finish(sign_start())`
 ///
 /// Input: Private key, `sk` ∈ `B^{32+32+64+32·((ℓ+k)·bitlen(2η)+dk)}` and the message `M` ∈ {0,1}^∗ <br>
 /// Output: Signature, `σ` ∈ `B^{32+ℓ·32·(1+bitlen(gamma_1 −1))+ω+k}`
-#[allow(clippy::similar_names, clippy::many_single_char_names)]
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn sign<
-    const K: usize,
-    const L: usize,
-    const LAMBDA_DIV4: usize,
-    const SIG_LEN: usize,
-    const SK_LEN: usize,
->(
-    rand_gen: &mut impl CryptoRngCore, beta: i32, eta: i32, gamma1: i32, gamma2: i32, omega: i32,
-    tau: i32, sk: &[u8; SK_LEN], message: &[u8],
-) -> Result<[u8; SIG_LEN], &'static str> {
+pub(crate) fn sign_start<const K: usize, const L: usize, const SK_LEN: usize>(
+    eta: i32,
+    sk: &[u8; SK_LEN],
+    //) -> Result<([u8; 32], [u8; 64], [T; L], [T; K], [T; K], [[T; L]; K]), &'static str> {
+) -> Result<ExpandedPrivateKey<K, L>, &'static str> {
     //
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
     let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
@@ -106,8 +99,49 @@ pub(crate) fn sign<
     // 5:  cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
     let cap_a_hat: [[T; L]; K] = expand_a(&rho);
 
+    Ok(ExpandedPrivateKey { cap_k, tr, s_hat_1, s_hat_2, t_hat_0, cap_a_hat })
+}
+
+
+#[allow(clippy::similar_names, clippy::many_single_char_names)]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn sign_finish<
+    const K: usize,
+    const L: usize,
+    const LAMBDA_DIV4: usize,
+    const SIG_LEN: usize,
+    const SK_LEN: usize,
+>(
+    rand_gen: &mut impl CryptoRngCore,
+    beta: i32,
+    gamma1: i32,
+    gamma2: i32,
+    omega: i32,
+    //    tau: i32, sk: &[u8; SK_LEN], message: &[u8],
+    tau: i32,
+    esk: &ExpandedPrivateKey<K, L>,
+    message: &[u8],
+) -> Result<[u8; SIG_LEN], &'static str> {
+    //
+    // // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
+    // let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
+    //
+    // // 2:  s_hat_1 ← NTT(s_1)
+    // let s_hat_1: [T; L] = ntt(&s_1);
+    //
+    // // 3:  s_hat_2 ← NTT(s_2)
+    // let s_hat_2: [T; K] = ntt(&s_2);
+    //
+    // // 4:  t_hat_0 ← NTT(t_0)
+    // let t_hat_0: [T; K] = ntt(&t_0);
+    //
+    // // 5:  cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
+    // let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+
+    let ExpandedPrivateKey { cap_k, tr, s_hat_1, s_hat_2, t_hat_0, cap_a_hat } = esk;
+
     // 6:  µ ← H(tr||M, 512)    ▷ Compute message representative µ
-    let mut h = h_xof(&[&tr, message]);
+    let mut h = h_xof(&[tr, message]);
     let mut mu = [0u8; 64];
     h.read(&mut mu);
 
@@ -116,7 +150,7 @@ pub(crate) fn sign<
     rand_gen.try_fill_bytes(&mut rnd).map_err(|_| "Alg 2: rng fail")?;
 
     // 8:  ρ′ ← H(K||rnd||µ, 512)    ▷ Compute private random seed
-    let mut h = h_xof(&[&cap_k, &rnd, &mu]);
+    let mut h = h_xof(&[cap_k, &rnd, &mu]);
     let mut rho_prime = [0u8; 64];
     h.read(&mut rho_prime);
 
@@ -135,7 +169,7 @@ pub(crate) fn sign<
 
         // 13: w ← NTT−1 (cap_a_hat ◦ NTT(y))
         let y_hat: [T; L] = ntt(&y);
-        let a_y_hat: [T; K] = mat_vec_mul(&cap_a_hat, &y_hat);
+        let a_y_hat: [T; K] = mat_vec_mul(cap_a_hat, &y_hat);
         let w: [R; K] = inv_ntt(&a_y_hat);
 
         // 14: w_1 ← HighBits(w)            ▷ Signer’s commitment
@@ -260,25 +294,56 @@ pub(crate) fn sign<
 
 
 /// Algorithm 3: `ML-DSA.Verify(pk,M,σ)` on page 19.
-/// Verifies a signature `σ` for a message `M`.
+/// Verifies a signature `σ` for a message `M`. Intuitive flow `result = verify_finish(verify_start())`
 ///
 /// Input: Public key, `pk` ∈ B^{32+32*k*(bitlen(q−1)−d) and message `M` ∈ {0,1}∗. <br>
 /// Input: Signature, `σ` ∈ B^{32+ℓ·32·(1+bitlen(γ1−1))+ω+k}. <br>
 /// Output: Boolean
+pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
+    pk: &[u8; PK_LEN],
+) -> Result<ExpandedPublicKey22<K, L>, &'static str> {
+    //
+    // 1: (ρ,t_1) ← pkDecode(pk)
+    let (rho, t_1): ([u8; 32], [R; K]) = pk_decode(pk)?;
+
+    // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
+    let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+
+    // 6: tr ← H(BytesToBits(pk), 512)
+    let mut hasher = h_xof(&[pk]);
+    let mut tr = [0u8; 64];
+    hasher.read(&mut tr);
+
+    // the last term of:
+    // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
+    let t1_hat: [T; K] = ntt(&t_1);
+    let mut t1_d2_hat: [T; K] = [T::zero(); K];
+    for i in 0..K {
+        for j in 0..256 {
+            t1_d2_hat[i][j] = partial_reduce64(i64::from(t1_hat[i][j]) * 2i64.pow(D));
+        }
+    }
+
+    Ok(ExpandedPublicKey22 { cap_a_hat, tr, t1_d2_hat })
+}
+
+
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn verify<
+pub(crate) fn verify_finish<
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
     const PK_LEN: usize,
     const SIG_LEN: usize,
 >(
-    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, pk: &[u8; PK_LEN], m: &[u8],
-    sig: &[u8; SIG_LEN],
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey22<K, L>,
+    m: &[u8], sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     //
+    let ExpandedPublicKey22 { cap_a_hat, tr, t1_d2_hat } = epk;
+
     // 1: (ρ,t_1) ← pkDecode(pk)
-    let (rho, t_1): ([u8; 32], [R; K]) = pk_decode(pk)?;
+    // --> calculated in verify_start()
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
     let (c_tilde, z, h): ([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>) =
@@ -293,15 +358,13 @@ pub(crate) fn verify<
     ensure!(i_norm < gamma1, "Alg3: i_norm out of range");
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
-    let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+    // --> calculated in verify_start()
 
     // 6: tr ← H(BytesToBits(pk), 512)
-    let mut hasher = h_xof(&[pk]);
-    let mut tr = [0u8; 64];
-    hasher.read(&mut tr);
+    // --> calculated in verify_start()
 
     // 7: µ ← H(tr||M,512)    ▷ Compute message representative µ
-    let mut hasher = h_xof(&[&tr, m]);
+    let mut hasher = h_xof(&[tr, m]);
     let mut mu = [0u8; 64];
     hasher.read(&mut mu);
 
@@ -314,15 +377,9 @@ pub(crate) fn verify<
 
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let z_hat: [T; L] = ntt(&z);
-    let amz_hat: [T; K] = mat_vec_mul(&cap_a_hat, &z_hat);
+    let amz_hat: [T; K] = mat_vec_mul(cap_a_hat, &z_hat);
 
-    let t1_hat: [T; K] = ntt(&t_1);
-    let mut t1_d2_hat: [T; K] = [T::zero(); K];
-    for i in 0..K {
-        for j in 0..256 {
-            t1_d2_hat[i][j] = partial_reduce64(i64::from(t1_hat[i][j]) * 2i64.pow(D));
-        }
-    }
+    // NTT(t_1 · 2^d) --> calculated in verify_start()
 
     let c_hat: T = ntt(&[c])[0];
 

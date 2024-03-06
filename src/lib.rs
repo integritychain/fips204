@@ -7,11 +7,11 @@
 
 // Roadmap
 //  1. Clean up; resolve math
-//  2. Resolve/remove precompute signing
-//     - sk/sign could precompute steps 1-5 of alg 2 (sign)
-//     - pk/verify could precompute steps 1,5, (last part)10 of alg 3 (verify)
-//     - Q: how to design the best API, maybe normal->fast key plus sign-fast & verif-fast
-//  3. More robust unit testing; consider whether to test debug statements: release-vs-test
+//  2. CT inspection
+//  3. implement ct_cm4
+//  4. rework fuzz harness to include expanded keys
+//  5. Intensive/extensive pass on documentation
+//  6. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
 
 
 // Functionality map per FIPS 204 draft
@@ -83,7 +83,7 @@ macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sk_decode};
         use crate::ml_dsa;
-        use crate::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+        use crate::traits::{KeyGen, SerDes, Signer, Verifier};
         use rand_core::CryptoRngCore;
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -93,14 +93,24 @@ macro_rules! functionality {
         // ----- 'EXTERNAL' DATA TYPES -----
 
         /// Correctly sized private key specific to the target security parameter set. <br>
-        /// Implements the [`crate::traits::Signer`], [`crate::traits::SerDes`], and
-        /// [`crate::traits::PreGen`] traits.
+        /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] traits.
         pub type PrivateKey = crate::types::PrivateKey<SK_LEN>;
+
+        /// Expanded private key, specific to the target security parameter set, that contains <br>
+        /// precomputed elements which increase (repeated) signature performance. Implements only
+        /// the [`crate::traits::Signer`] trait.
+        pub type ExpandedPrivateKey = crate::types::ExpandedPrivateKey<K, L>;
 
 
         /// Correctly sized public key specific to the target security parameter set. <br>
         /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
         pub type PublicKey = crate::types::PublicKey<PK_LEN>;
+
+
+        /// Expanded public key, specific to the target security parameter set, that contains <br>
+        /// precomputed elements which increase (repeated) verification performance. Implements only
+        /// the [`crate::traits::Verifier`] traits.
+        pub type ExpandedPublicKey = crate::types::ExpandedPublicKey22<K, L>;
 
 
         /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>
@@ -171,6 +181,8 @@ macro_rules! functionality {
 
 
         impl KeyGen for KG {
+            type ExpandedPrivateKey = ExpandedPrivateKey;
+            type ExpandedPublicKey = ExpandedPublicKey;
             type PrivateKey = PrivateKey;
             type PublicKey = PublicKey;
 
@@ -179,6 +191,20 @@ macro_rules! functionality {
             ) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
+            }
+
+            fn gen_expanded_private_vt(
+                sk: &PrivateKey,
+            ) -> Result<Self::ExpandedPrivateKey, &'static str> {
+                let esk = ml_dsa::sign_start(ETA, &sk.0)?;
+                Ok(esk)
+            }
+
+            fn gen_expanded_public_vt(
+                pk: &PublicKey,
+            ) -> Result<Self::ExpandedPublicKey, &'static str> {
+                let epk = ml_dsa::verify_start(&pk.0)?;
+                Ok(epk)
             }
         }
 
@@ -189,31 +215,23 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
-                    rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
+                let esk = ml_dsa::sign_start(ETA, &self.0)?;
+                let sig = ml_dsa::sign_finish::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
                 )?;
                 Ok(sig)
             }
         }
 
 
-        impl PreGen for PrivateKey {
-            type PreCompute = PrivatePreCompute;
-
-            fn gen_precompute(&self) -> PrivatePreCompute {
-                PrivatePreCompute(self.clone().into_bytes())
-            }
-        }
-
-
-        impl Signer for PrivatePreCompute {
+        impl Signer for ExpandedPrivateKey {
             type Signature = [u8; SIG_LEN];
 
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                let sig = ml_dsa::sign::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
-                    rng, BETA, ETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, message,
+                let sig = ml_dsa::sign_finish::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
                 )?;
                 Ok(sig)
             }
@@ -223,9 +241,24 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_verify_vt(&self, message: &[u8], sig: &Self::Signature) -> Result<bool, &'static str> {
-                ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self.0, &message, &sig,
+            fn try_verify_vt(
+                &self, message: &[u8], sig: &Self::Signature,
+            ) -> Result<bool, &'static str> {
+                let epk = ml_dsa::verify_start(&self.0)?;
+                ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message, &sig,
+                )
+            }
+        }
+
+        impl Verifier for ExpandedPublicKey {
+            type Signature = [u8; SIG_LEN];
+
+            fn try_verify_vt(
+                &self, message: &[u8], sig: &Self::Signature,
+            ) -> Result<bool, &'static str> {
+                ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig,
                 )
             }
         }

@@ -9,6 +9,10 @@ pub trait KeyGen {
     type PublicKey;
     /// A private (secret) key specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
     type PrivateKey;
+    /// An expanded private key containing precomputed elements to increase (repeated) signing performance.
+    type ExpandedPrivateKey;
+    /// An expanded public key containing precomputed elements to increase (repeated) verify performance.
+    type ExpandedPublicKey;
 
     /// Generates a public and private key pair specific to this security parameter set. <br>
     /// This function utilizes the OS default random number generator, and makes no (constant)
@@ -44,7 +48,7 @@ pub trait KeyGen {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     /// use rand_chacha::rand_core::SeedableRng;
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
@@ -58,30 +62,46 @@ pub trait KeyGen {
     fn try_keygen_with_rng_vt(
         rng: &mut impl CryptoRngCore,
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
-}
 
-/// The `PreGen` trait is defined to allow pre-computation of private key material to speed signing.
-pub trait PreGen: Signer + SerDes {
-    /// A private (secret) precompute specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
-    type PreCompute;
-
-    /// # Examples
-    /// ```rust
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
-    /// ///
-    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    /// Generates an expanded private key from the normal/compressed private key.
     ///
-    /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_44::KG::try_keygen_vt()?; // Generate both public and secret keys
-    /// let pre = sk.gen_precompute();
-    /// let sig = pre.try_sign_ct(&message)?; // Use the secret key to generate a message signature
-    /// # Ok(())}
-    /// ```
-    fn gen_precompute(&self) -> Self::PreCompute;
+    /// # Errors
+    /// Propagates internal errors; potential for additional validation as FIPS 204 evolves.
+    fn gen_expanded_private_vt(
+        sk: &Self::PrivateKey,
+    ) -> Result<Self::ExpandedPrivateKey, &'static str>;
+
+    /// Generates an expanded public key from the normal/compressed public key.
+    ///
+    /// # Errors
+    /// Propagates internal errors; potential for additional validation as FIPS 204 evolves.
+    fn gen_expanded_public_vt(
+        pk: &Self::PublicKey,
+    ) -> Result<Self::ExpandedPublicKey, &'static str>;
 }
+
+// /// The `PreGen` trait is defined to allow pre-computation of private key material to speed signing.
+// pub trait PreGen: Signer + SerDes {
+//     /// A private (secret) precompute specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
+//     type PreCompute;
+//
+//     /// # Examples
+//     /// ```rust
+//     /// # use std::error::Error;
+//     /// # fn main() -> Result<(), Box<dyn Error>> {
+//     /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
+//     /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+//     /// ///
+//     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+//     ///
+//     /// // Generate key pair and signature
+//     /// let (pk, sk) = ml_dsa_44::KG::try_keygen_vt()?; // Generate both public and secret keys
+//     /// let pre = sk.gen_precompute();
+//     /// let sig = pre.try_sign_ct(&message)?; // Use the secret key to generate a message signature
+//     /// # Ok(())}
+//     /// ```
+//     fn gen_precompute(&self) -> Self::PreCompute;
+// }
 
 
 /// The Signer trait is implemented for the `PrivateKey` struct on each of the security parameter sets
@@ -100,7 +120,7 @@ pub trait Signer {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
@@ -125,7 +145,7 @@ pub trait Signer {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     /// use rand_chacha::rand_core::SeedableRng;
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
@@ -158,7 +178,7 @@ pub trait Verifier {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
@@ -184,7 +204,7 @@ pub trait SerDes {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
@@ -205,7 +225,7 @@ pub trait SerDes {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// use fips204::ml_dsa_87; // Could also be ml_dsa_44 or ml_dsa_65.
-    /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_87::try_keygen_vt()?; // Generate both public and secret keys
