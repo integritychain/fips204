@@ -35,7 +35,7 @@ pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
 /// the [`crate::traits::Verifier`] traits.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
-pub struct ExpandedPublicKey22<const K: usize, const L: usize> {
+pub struct ExpandedPublicKey<const K: usize, const L: usize> {
     pub(crate) cap_a_hat: [[T; L]; K],
     pub(crate) tr: [u8; 64],
     pub(crate) t1_d2_hat: [T; K],

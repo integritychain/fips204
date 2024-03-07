@@ -1,0 +1,27 @@
+[package]
+name = "ct_cm4-fips204"
+version = "0.1.1"
+license = "MIT OR Apache-2.0"
+description = "Cortex-M4 testbench for FIPS 204 (draft) ML-DSA"
+authors = ["Eric Schorn <eschorn@integritychain.com>"]
+publish = false
+edition = "2021"
+
+
+[dependencies]
+fips204 = { path = "..", default-features = false, features = ["ml-dsa-44"] }
+cortex-m-semihosting = "0.5.0"
+panic-semihosting = { version = "0.6.0", features = ["exit"] }
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.6.15"  # Required by 'most recent' version of stm32f3-discovery below
+stm32f3-discovery = "0.7.2"
+panic-itm = "0.4.2"
+rand_core = { version = "0.6.4", default-features = false }
+
+[profile.dev]
+#opt-level = "s"
+#strip = "symbols"
+#lto = "thin"
+#codegen-units = 1
+#panic = "abort"
+

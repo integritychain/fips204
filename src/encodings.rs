@@ -252,9 +252,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     debug_assert_eq!(start + K * step, sk.len(), "Alg19: length miscalculation");
 
     // Note: spec is not consistent on the range constraints for s1 and s2; this is tighter
-    // Note: lower is_in_range is a positive number, that is converted to negative
-    // consider refactoring with ensure! although this way is more clear (?)
-    let s1_ok = s1.iter().all(|r| is_in_range(r, eta, eta));
+    let s1_ok = s1.iter().all(|r| is_in_range(r, eta, eta)); // NOTE: not CT, but validation
     let s2_ok = s2.iter().all(|r| is_in_range(r, eta, eta));
     let t0_ok = t0.iter().all(|r| is_in_range(r, 2i32.pow(D - 1) - 1, 2i32.pow(D - 1)));
     if s1_ok & s2_ok & t0_ok {

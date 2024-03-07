@@ -110,7 +110,7 @@ macro_rules! functionality {
         /// Expanded public key, specific to the target security parameter set, that contains <br>
         /// precomputed elements which increase (repeated) verification performance. Implements only
         /// the [`crate::traits::Verifier`] traits.
-        pub type ExpandedPublicKey = crate::types::ExpandedPublicKey22<K, L>;
+        pub type ExpandedPublicKey = crate::types::ExpandedPublicKey<K, L>;
 
 
         /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>

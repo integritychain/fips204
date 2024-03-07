@@ -10,7 +10,7 @@ use crate::helpers::{
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
-use crate::types::{ExpandedPrivateKey, ExpandedPublicKey22, Zero, R, T};
+use crate::types::{ExpandedPrivateKey, ExpandedPublicKey, Zero, R, T};
 use crate::{D, Q};
 use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
@@ -79,9 +79,7 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 /// Input: Private key, `sk` ∈ `B^{32+32+64+32·((ℓ+k)·bitlen(2η)+dk)}` and the message `M` ∈ {0,1}^∗ <br>
 /// Output: Signature, `σ` ∈ `B^{32+ℓ·32·(1+bitlen(gamma_1 −1))+ω+k}`
 pub(crate) fn sign_start<const K: usize, const L: usize, const SK_LEN: usize>(
-    eta: i32,
-    sk: &[u8; SK_LEN],
-    //) -> Result<([u8; 32], [u8; 64], [T; L], [T; K], [T; K], [[T; L]; K]), &'static str> {
+    eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<ExpandedPrivateKey<K, L>, &'static str> {
     //
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
@@ -112,31 +110,24 @@ pub(crate) fn sign_finish<
     const SIG_LEN: usize,
     const SK_LEN: usize,
 >(
-    rand_gen: &mut impl CryptoRngCore,
-    beta: i32,
-    gamma1: i32,
-    gamma2: i32,
-    omega: i32,
-    //    tau: i32, sk: &[u8; SK_LEN], message: &[u8],
-    tau: i32,
-    esk: &ExpandedPrivateKey<K, L>,
-    message: &[u8],
+    rand_gen: &mut impl CryptoRngCore, beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32,
+    esk: &ExpandedPrivateKey<K, L>, message: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     //
-    // // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
-    // let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
+    // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
+    // --> calculated in sign_start()
     //
     // // 2:  s_hat_1 ← NTT(s_1)
-    // let s_hat_1: [T; L] = ntt(&s_1);
+    // --> calculated in sign_start()
     //
     // // 3:  s_hat_2 ← NTT(s_2)
-    // let s_hat_2: [T; K] = ntt(&s_2);
+    // --> calculated in sign_start()
     //
     // // 4:  t_hat_0 ← NTT(t_0)
-    // let t_hat_0: [T; K] = ntt(&t_0);
+    // --> calculated in sign_start()
     //
     // // 5:  cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    // let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+    // --> calculated in sign_start()
 
     let ExpandedPrivateKey { cap_k, tr, s_hat_1, s_hat_2, t_hat_0, cap_a_hat } = esk;
 
@@ -301,7 +292,7 @@ pub(crate) fn sign_finish<
 /// Output: Boolean
 pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     pk: &[u8; PK_LEN],
-) -> Result<ExpandedPublicKey22<K, L>, &'static str> {
+) -> Result<ExpandedPublicKey<K, L>, &'static str> {
     //
     // 1: (ρ,t_1) ← pkDecode(pk)
     let (rho, t_1): ([u8; 32], [R; K]) = pk_decode(pk)?;
@@ -324,7 +315,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
         }
     }
 
-    Ok(ExpandedPublicKey22 { cap_a_hat, tr, t1_d2_hat })
+    Ok(ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat })
 }
 
 
@@ -336,11 +327,11 @@ pub(crate) fn verify_finish<
     const PK_LEN: usize,
     const SIG_LEN: usize,
 >(
-    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey22<K, L>,
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>,
     m: &[u8], sig: &[u8; SIG_LEN],
 ) -> Result<bool, &'static str> {
     //
-    let ExpandedPublicKey22 { cap_a_hat, tr, t1_d2_hat } = epk;
+    let ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat } = epk;
 
     // 1: (ρ,t_1) ← pkDecode(pk)
     // --> calculated in verify_start()
