@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>FIPS 204 WASM Demo</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+    <style> body {grid-template-columns: 1fr min(60rem,90%) 1fr;}</style>
+  </head>
+  <body>
+    <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+
+    <h1>FIPS 204 WASM Demo</h1>
+
+
+    <p>This page is a simple demonstration of code from the <a href="https://crates.io/crates/fips204">FIPS 204
+      Rust crate</a> running in the browser via wasm. This demo has a hardcoded random number generator so that
+      its results can be compared to <a href="https://github.com/integritychain/fips204/blob/main/tests/messages.rs">
+      native test cases.</a> Please see section 3.5.1 of the
+      <a href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf">FIPS 204 standard</a> for critical
+      requirements on randomness when utlizing FIPS 204 in production.
+    </p>
+
+    <p>Enter a message to sign below and click on 'Submit'. Keys will be generated, the message signed, and results
+    displayed.</p>
+
+    <p><form action="" id="wasmForm">
+      <input type="text" id="message" class="form-control" placeholder="Enter a message to sign...">
+      <button type="submit">Submit</button>
+    </form></p>
+
+    <pre id="wasm-canvas"></pre>
+
+    <script src="./bootstrap.js"></script>
+
+  </body>
+</html>
