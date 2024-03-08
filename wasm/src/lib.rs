@@ -16,7 +16,7 @@ pub fn sign(message: &str) -> String {
     let sig_hex = hex::encode(&sig);
     let pk_hex = hex::encode(&pk.into_bytes());
 
-    let s0 = format!("The message to sign is: {} len {}\n", message, message.len());
+    let s0 = format!("The message to sign is: {}\n", message);
     let s1 = format!("The seed used to generate the keys is: {}\n\n", seed);
     let s2 = format!("The generated public||private key is: {}\n", sk_hex);
     let s3 = format!("Using that private key, the calculated signature is: {}\n\n", sig_hex);

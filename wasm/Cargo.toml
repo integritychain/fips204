@@ -1,11 +1,12 @@
 [package]
 name = "wasm"
-version = "0.1.0"
-authors = ["eschorn1 <eric.schorn@nccgroup.com>"]
-edition = "2018"
+version = "0.1.1"
+authors = ["Eric Schorn <eschorn@integritychain.com>"]
 description = "Sample web page utilizing FIPS 204 code"
 repository = ""
 license = "MIT OR Apache-2.0"
+publish = false
+edition = "2021"
 
 
 [lib]

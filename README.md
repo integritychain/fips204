@@ -58,6 +58,7 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 it will be done with a minor version bump.
 * All on-by-default features of this library are covered by SemVer.
 * This software is experimental and still under active development -- USE AT YOUR OWN RISK!
+* Code repository contains extensive examples related to benchmarking, fuzzing, CT checks, embedded HW, and WASM use.
 
 ## License
 
