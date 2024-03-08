@@ -1,5 +1,5 @@
 
-Need to rework the rng 
+Need to rework the rng (to return hardcoded values)
 
 ~~~
 See https://docs.rs/dudect-bencher/latest/dudect_bencher/

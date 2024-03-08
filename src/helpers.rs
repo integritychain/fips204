@@ -44,7 +44,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 // cannot generate a carry (and thus we have maximum rounding-down error
 // accumulated), or a = 2**31 - 2**22 - 1, which then suggests (0xFF) Q to
 // be subtracted. Then, a - (a >> 23)*Q is 6283008 or 2**23 - 2**21 - 2**8.
-// The negative result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck
+// The negative result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck #s
 #[inline(always)]
 #[allow(clippy::inline_always)]
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
@@ -56,7 +56,7 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
 
 
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
-    let x = partial_reduce32(a); // puts us within -Q to +Q
+    let x = partial_reduce32(a); // puts us within better than -Q to +Q
     x + ((x >> 31) & Q) // add Q if negative
 }
 
@@ -114,12 +114,14 @@ pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) 
     for row in w {
         for element in row {
             let z_q = center_mod(*element).abs();
-            result = if z_q > result { z_q } else { result };
+            result = if z_q > result { z_q } else { result };  // TODO: check CT
         }
     }
     result
 }
 
+
+// ----- The following functions only run at compile time (thus, not CT etc) -----
 
 /// HAC Algorithm 14.76 Right-to-left binary exponentiation mod Q.
 const fn pow_mod_q(g: i32, e: u8) -> i32 {

@@ -1,0 +1,37 @@
+[package]
+name = "wasm"
+version = "0.1.0"
+authors = ["eschorn1 <eric.schorn@nccgroup.com>"]
+edition = "2018"
+description = "Sample web page utilizing FIPS 204 code"
+repository = ""
+license = "MIT OR Apache-2.0"
+
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2.84"
+fips204 = { path = "../../fips204", default-features = false, features = ["ml-dsa-44"] }
+rand_chacha = "0.3.1"
+
+# The `console_error_panic_hook` crate provides better debugging of panics by
+# logging them with `console.error`. This is great for development, but requires
+# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
+# code size when deploying.
+console_error_panic_hook = { version = "0.1.7", optional = true }
+#rand = { version = "0.9.0-alpha.0" , features = ["js"]}
+rand = "0.8.5"
+getrandom = { version = "0.2", features = ["js"] }
+hex = "0.4.3"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.34"
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

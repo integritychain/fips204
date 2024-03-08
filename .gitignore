@@ -5,3 +5,6 @@
 **/corpus
 /fuzz/.gitignore
 /dudect/Cargo.lock
+**/node_modules
+**/dist
+**/pkg

@@ -7,11 +7,9 @@
 
 // Roadmap
 //  1. Clean up; resolve math
-//  2. CT inspection
-//  3. implement ct_cm4
-//  4. rework fuzz harness to include expanded keys
-//  5. Intensive/extensive pass on documentation
-//  6. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
+//  2. Closer CT inspection
+//  3. Intensive/extensive pass on documentation
+//  4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
 
 
 // Functionality map per FIPS 204 draft
@@ -59,7 +57,7 @@
 
 // Note: many of the debug_assert()! and ensure()! guardrails will be removed when
 // the specification is finalized and performance optimizations begin in earnest.
-
+// The current situation is overkill.
 
 mod conversion;
 mod encodings;
@@ -73,6 +71,7 @@ mod types;
 /// All functionality is covered by traits, such that consumers can utilize trait objects as desired.
 pub mod traits;
 
+// Applies across all security parameter sets
 const Q: i32 = 8_380_417; // 2i32.pow(23) - 2i32.pow(13) + 1; See https://oeis.org/A234388
 const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
 const D: u32 = 13;

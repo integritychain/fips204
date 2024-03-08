@@ -1,35 +1,53 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use fips204::ml_dsa_44;
-use fips204::traits::{SerDes, Signer, Verifier};
+use fips204::ml_dsa_44::{PrivateKey, PublicKey, KG, SIG_LEN};
+use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 
 fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
 
-    // Deserialize a 'fuzzy' secret key
-    let sk = ml_dsa_44::PrivateKey::try_from_bytes(data[0..2560].try_into().unwrap());
+    // A good reference set
+    let (pk_good, sk_good) = KG::try_keygen_vt().unwrap();
+    let sig_good = sk_good.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
 
-    // Try to use 'fuzzy' sk (a decent (?) proportion will deserialize OK)
-    if let Ok(sk) = sk {
-        let _sig = sk.try_sign_ct(&[0u8, 1, 2, 3]);
+    // Extract then deserialize a 'fuzzy' secret key
+    let sk_bytes = data[0..2560].try_into().unwrap();
+    let sk_fuzz = PrivateKey::try_from_bytes(sk_bytes);
+
+    // Extract a 'fuzzy' signature
+    let sig_fuzz: [u8; SIG_LEN] = data[2560..2560+2420].try_into().unwrap();
+
+    // Extract then deserialize a 'fuzzy' public key
+    let pk_bytes = data[2560+2420..2560+2420+1312].try_into().unwrap();
+    let pk_fuzz = PublicKey::try_from_bytes(pk_bytes);
+
+    // Try to use 'fuzzy' sk
+    if let Ok(ref sk) = sk_fuzz {
+        let sig1 = sk.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
+        let sk2 = KG::gen_expanded_private_vt(&sk).unwrap();
+        let sig2 = sk2.try_sign_ct(&[4u8, 5, 6, 7]).unwrap();
+        // ...with good pk
+        let res = pk_good.try_verify_vt(&[0u8, 1, 2, 3], &sig1);
+        assert!(res.is_err() || !res.unwrap());
+        let res = pk_good.try_verify_vt(&[0u8, 1, 2, 3], &sig2);
+        assert!(res.is_err() || !res.unwrap());
     }
 
+    // Try to use 'fuzzy' pk
+    if let Ok(ref pk) = pk_fuzz {
+        let res = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig_fuzz);
+        assert!(res.is_err() || !res.unwrap());
+        let pk2 = KG::gen_expanded_public_vt(&pk).unwrap();
+        let res = pk2.try_verify_vt(&[0u8, 1, 2, 3], &sig_fuzz);
+        assert!(res.is_err() || !res.unwrap());
+        // .. with good sig
+        let res = pk2.try_verify_vt(&[0u8, 1, 2, 3], &sig_good);
+        assert!(res.is_err() || !res.unwrap());
+    }
 
-    // Deserialize a 'fuzzy' signature
-    let sig: [u8; ml_dsa_44::SIG_LEN] = data[2560..2560+2420].try_into().unwrap();
-
-    // Try to use 'fuzzy' signature (a decent (?) proportion will deserialize OK)
-    let (pk, _) = ml_dsa_44::try_keygen_vt().unwrap(); // Get a good pk
-    let _v = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig);
-
-
-    // Deserialize a 'fuzzy' public key
-    let pk = ml_dsa_44::PublicKey::try_from_bytes(data[2560+2420..2560+2420+1312].try_into().unwrap());
-
-    // Try to use 'fuzzy' pk (a decent (?) proportion will deserialize OK)
-    if let Ok(pk) = pk {
-        let (_, sk) = ml_dsa_44::try_keygen_vt().unwrap();
-        let sig2 = sk.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
-        let _v = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig2);
+    // Try to use 'fuzzy' sk and 'fuzzy' pk
+    if let (Ok(sk), Ok(pk)) = (sk_fuzz, pk_fuzz) {
+        let _sig = sk.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
+        let _v = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig_fuzz).unwrap();
     }
 });
