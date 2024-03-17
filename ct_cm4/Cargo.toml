@@ -10,18 +10,21 @@ edition = "2021"
 
 [dependencies]
 fips204 = { path = "..", default-features = false, features = ["ml-dsa-44"] }
-cortex-m-semihosting = "0.5.0"
-panic-semihosting = { version = "0.6.0", features = ["exit"] }
-cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
-cortex-m-rt = "0.6.15"  # Required by 'most recent' version of stm32f3-discovery below
-stm32f3-discovery = "0.7.2"
-panic-itm = "0.4.2"
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"]}
+cortex-m-rt = "0.7.3"
+panic-rtt-target = { version =  "0.1.2", features = ["cortex-m"] }
+microbit-v2 = "0.13.0"
+rtt-target = { version = "0.5.0"} #, features = ["cortex-m"] }
 rand_core = { version = "0.6.4", default-features = false }
+hex-literal = "0.4.1"
+
 
 [profile.dev]
-#opt-level = "s"
-#strip = "symbols"
-#lto = "thin"
-#codegen-units = 1
-#panic = "abort"
+debug = true
+debug-assertions = false
+overflow-checks = false
+lto = true
+opt-level = 3
+codegen-units = 1
 
+# cargo update -p fixed@1.26.0 --precise 1.23.1
