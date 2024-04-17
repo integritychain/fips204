@@ -409,9 +409,12 @@ pub mod ml_dsa_87 {
     const ETA: i32 = 2;
     const BETA: i32 = TAU * ETA;
     const OMEGA: i32 = 75;
-    const SK_LEN: usize = 4896;
-    const PK_LEN: usize = 2592;
-    const SIG_LEN: usize = 4627;
+    /// Private (secret) key length in bytes.
+    pub const SK_LEN: usize = 4896;
+    /// Public key length in bytes.
+    pub const PK_LEN: usize = 2592;
+    /// Signature length in bytes.
+    pub const SIG_LEN: usize = 4627;
 
     functionality!();
 }
