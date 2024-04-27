@@ -1,5 +1,6 @@
 name: test
 
+
 on: [ push, pull_request ]
 
 
@@ -10,33 +11,6 @@ env:
 
 
 jobs:
-
-  coverage:
-    runs-on: ubuntu-latest
-    env:
-      CARGO_TERM_COLOR: always
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        run: rustup update stable
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Generate code coverage
-        run: cargo llvm-cov --all-features --workspace
-    # No codecov account, so stop here for now
-    #  - name: Upload coverage to Codecov
-    #    uses: codecov/codecov-action@v3
-    #      with:
-    #        files: lcov.info
-    #        fail_ci_if_error: true
-
-
-  cargo-deny:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: EmbarkStudios/cargo-deny-action@v1
-
 
   build:
     runs-on: ubuntu-latest
@@ -62,32 +36,58 @@ jobs:
       - run: cargo build --target ${{ matrix.target }} --release --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
 
 
-  test:
+  cargo_audit:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          # 32-bit Linux
-          - target: i686-unknown-linux-gnu
-            rust: 1.72 # MSRV 1.70 GA flaky
-            deps: sudo apt update && sudo apt install gcc-multilib
-          - target: i686-unknown-linux-gnu
-            rust: stable
-            deps: sudo apt update && sudo apt install gcc-multilib
-          # 64-bit Linux
-          - target: x86_64-unknown-linux-gnu
-            rust: 1.72 # MSRV 1.70 GA flaky
-          - target: x86_64-unknown-linux-gnu
-            rust: stable
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: rustsec/audit-check@v1.4.1
         with:
-          toolchain: ${{ matrix.rust }}
-          targets: ${{ matrix.target }}
-      - run: ${{ matrix.deps }}
-      - run: cargo check --target ${{ matrix.target }} --all-features
-      - run: cargo test --target ${{ matrix.target }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+
+  cargo_deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v1
+
+
+  cargo_outdated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo outdated
+        run: cargo install --locked cargo-outdated
+      - name: Run cargo outdated
+        run: cargo outdated -R
+
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
+
+
+  coverage:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace
+    # No codecov account, so stop here for now
+    #  - name: Upload coverage to Codecov
+    #    uses: codecov/codecov-action@v3
+    #      with:
+    #        files: lcov.info
+    #        fail_ci_if_error: true
 
 
   cross:
@@ -132,9 +132,29 @@ jobs:
       - run: cargo doc --all-features
 
 
-  clippy:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # 32-bit Linux
+          - target: i686-unknown-linux-gnu
+            rust: 1.72 # MSRV 1.70 GA flaky
+            deps: sudo apt update && sudo apt install gcc-multilib
+          - target: i686-unknown-linux-gnu
+            rust: stable
+            deps: sudo apt update && sudo apt install gcc-multilib
+          # 64-bit Linux
+          - target: x86_64-unknown-linux-gnu
+            rust: 1.72 # MSRV 1.70 GA flaky
+          - target: x86_64-unknown-linux-gnu
+            rust: stable
     steps:
-      - uses: actions/checkout@v3
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: ${{ matrix.target }}
+      - run: ${{ matrix.deps }}
+      - run: cargo check --target ${{ matrix.target }} --all-features
+      - run: cargo test --target ${{ matrix.target }}

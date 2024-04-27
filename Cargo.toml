@@ -5,9 +5,13 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
+documentation = "https://docs.rs/fips204"
+categories = ["cryptography", "no-std"]
 repository = "https://github.com/integritychain/fips204"
+keywords = ["FIPS204", "lattice", "signature"]
+# MSRV set at 1.70 for debian testing, e.g. https://packages.debian.org/search?keywords=rustc
+# This requires several marginally outdated dependencies, see below
 rust-version = "1.70"
-
 
 
 [features]
@@ -39,13 +43,12 @@ harness = false
 
 [profile.dev]
 debug = true
-lto = true
-opt-level = 3
-codegen-units = 1
+#lto = true
+#opt-level = 3
+#codegen-units = 1
 
 
 [profile.release]
-debug = true
 lto = true
 opt-level = "s"
 codegen-units = 1
@@ -58,3 +61,4 @@ incremental = false
 lto = true
 opt-level = 3
 overflow-checks = false
+codegen-units = 1

@@ -62,14 +62,14 @@ pub(crate) const fn full_reduce32(a: i32) -> i32 {
 
 
 /// Bit length required to express `a` in bits
-pub const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
+pub(crate) const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 
 
 /// Mod +/- see definition on page 6.
 /// If α is a positive integer and m ∈ Z or m ∈ `Z_α` , then m mod± α denotes the unique
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
-pub fn center_mod(m: i32) -> i32 {
+pub(crate) fn center_mod(m: i32) -> i32 {
     let t = full_reduce32(m);
     let over2 = (Q / 2) - t; // check if t is larger than Q/2
     t - ((over2 >> 31) & Q) // sub Q if over2 is negative
@@ -109,7 +109,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
 }
 
 
-pub fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) -> i32 {
+pub(crate) fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) -> i32 {
     let mut result = 0; // no early exit
     for row in w {
         for element in row {

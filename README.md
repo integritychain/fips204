@@ -7,14 +7,16 @@
 ![Rust Version][rustc-image]
 
 [FIPS 204] (Initial Public Draft) Module-Lattice-Based Digital Signature Standard written in pure Rust for server, 
-desktop, browser and embedded applications.
+desktop, browser and embedded applications. The source repository includes examples demonstrating benchmarking,
+an embedded target, constant-time statistical measurements, fuzzing, WASM execution, C FFI and Python bindings.
 
-This crate implements the FIPS 204 **draft** standard in pure Rust with minimal and mainstream dependencies. All 
-three security parameter sets are fully functional. The implementation does not require the standard library, e.g. 
-`#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes the `RNG` so it is suitable for the full 
-range of applications down to the bare-metal. The API is stabilized and the code is heavily biased towards safety 
-and correctness; further performance optimizations will be implemented as the standard matures. This crate will 
-quickly follow any changes to FIPS 204 as they become available.
+This crate implements the FIPS 204 **draft** standard in pure Rust with minimal and mainstream dependencies, **and
+without any unsafe code**. All three security parameter sets are fully functional and tested. The implementation 
+operates in constant-time (TKTK EXCEPTIONS HERE), does not require the standard library, e.g. `#[no_std]`, has no 
+heap allocations, e.g. no `alloc` needed, and exposes the `RNG` so it is suitable for the full range of applications 
+down to the bare-metal. The API is stabilized and the code is heavily biased towards safety and correctness; further 
+performance optimizations will be implemented as the standard matures. This crate will quickly follow any changes 
+to FIPS 204 as they become available.
 
 See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf> for a full description of the target functionality.
 
@@ -52,13 +54,13 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to the first initial public draft of FIPS 204.    
-* Constant-time assurances target the source-code level only, and are a work in progress.
+* Constant-time assurances target the source-code level only on MSRV, with confirmation via
+  manual review/inspection, the embedded target, and the `dudect` dynamic tests.
 * Note that FIPS 204 places specific requirements on randomness per section 3.5.1, hence the exposed `RNG`.
 * Requires Rust **1.70** or higher. The minimum supported Rust version may be changed in the future, but 
-it will be done with a minor version bump.
+  it will be done with a minor version bump (when the major version is larger than 0)..
 * All on-by-default features of this library are covered by SemVer.
-* This software is experimental and still under active development -- USE AT YOUR OWN RISK!
-* Code repository contains extensive examples related to benchmarking, fuzzing, CT checks, embedded HW, and WASM use.
+* The FIPS 204 draft standard and this software is experimental -- USE AT YOUR OWN RISK!
 
 ## License
 

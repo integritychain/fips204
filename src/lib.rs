@@ -1,16 +1,26 @@
 #![no_std]
-#![deny(clippy::pedantic)]
-#![deny(warnings)]
-#![deny(missing_docs)]
+#![deny(clippy::pedantic, warnings, missing_docs, unsafe_code)]
+// Most of the 'allow' category...
+#![deny(absolute_paths_not_starting_with_crate, box_pointers, dead_code)]
+#![deny(elided_lifetimes_in_paths, explicit_outlives_requirements, keyword_idents)]
+#![deny(let_underscore_drop, macro_use_extern_crate, meta_variable_misuse, missing_abi)]
+#![deny(non_ascii_idents, rust_2021_incompatible_closure_captures)]
+#![deny(rust_2021_incompatible_or_patterns, rust_2021_prefixes_incompatible_syntax)]
+#![deny(rust_2021_prelude_collisions, single_use_lifetimes, trivial_casts)]
+#![deny(trivial_numeric_casts, unreachable_pub, unsafe_op_in_unsafe_fn, unstable_features)]
+#![deny(unused_extern_crates, unused_import_braces, unused_lifetimes, unused_macro_rules)]
+#![deny(unused_qualifications, unused_results, variant_size_differences)]
+//
 #![doc = include_str!("../README.md")]
 
+// Implements FIPS 204 draft Module-Lattice-Based Digital Signature Standard.
+// See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf>
 
-// Roadmap
-//  1. Clean up; resolve math
-//  2. Closer CT inspection
-//  3. Intensive/extensive pass on documentation
-//  4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
-
+// TODO: Roadmap
+//   1. Clean up; resolve math
+//   2. Closer CT inspection
+//   3. Intensive/extensive pass on documentation
+//   4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
 
 // Functionality map per FIPS 204 draft
 //
@@ -58,6 +68,10 @@
 // Note: many of the debug_assert()! and ensure()! guardrails will be removed when
 // the specification is finalized and performance optimizations begin in earnest.
 // The current situation is overkill.
+
+/// The `rand_core` types are re-exported so that users of fips203 do not
+/// have to worry about using the exact correct version of `rand_core`.
+pub use rand_core::{CryptoRng, Error as RngError, RngCore};
 
 mod conversion;
 mod encodings;
