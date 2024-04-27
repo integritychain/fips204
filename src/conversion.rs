@@ -33,7 +33,7 @@ pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<i32, &'static str> {
     let bbb2 = i32::from(bbb[2] & 0x7F);
 
     // 4: z ← 2^16·b_2 + 2^8·b1 + b0
-    let z = 2i32.pow(16) * bbb2 + 2i32.pow(8) * i32::from(bbb[1]) + i32::from(bbb[0]);
+    let z = (bbb2 << 16) + (i32::from(bbb[1]) << 8) + i32::from(bbb[0]);
 
     // 5: if z < q then return z
     if z < Q {
@@ -211,7 +211,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
         temp |= i32::from(*byte) << bit_index;
         bit_index += 8;
         while bit_index >= bitlen {
-            let tmask = temp & (2i32.pow(bitlen) - 1);
+            let tmask = temp & ((1 << bitlen) - 1);
             // choice fixed by security parameter, so CT
             w_out[r_index] = if a == 0 { tmask } else { b - tmask };
             bit_index -= bitlen;
@@ -439,9 +439,9 @@ mod tests {
         // Round trip for 32 * 6(bitlen) bytes
         let mut random_bytes = [0u8; 32 * 6];
         rand::thread_rng().fill_bytes(&mut random_bytes);
-        let r = simple_bit_unpack(&random_bytes, 2i32.pow(6) - 1).unwrap();
+        let r = simple_bit_unpack(&random_bytes, (1 << 6) - 1).unwrap();
         let mut res = [0u8; 32 * 6];
-        simple_bit_pack(&r, 2i32.pow(6) - 1, &mut res).unwrap();
+        simple_bit_pack(&r, (1 << 6) - 1, &mut res).unwrap();
         assert_eq!(random_bytes, res);
     }
 
@@ -452,7 +452,7 @@ mod tests {
         // wrong size of bytes
         let mut random_bytes = [0u8; 32 * 7];
         rand::thread_rng().fill_bytes(&mut random_bytes);
-        let res = simple_bit_unpack(&random_bytes, 2i32.pow(6) - 1);
+        let res = simple_bit_unpack(&random_bytes, (1 << 6) - 1);
         assert!(res.is_err());
     }
 
@@ -463,7 +463,7 @@ mod tests {
         // wrong size of bytes
         let mut random_bytes = [0u8; 32 * 7];
         rand::thread_rng().fill_bytes(&mut random_bytes);
-        let res = bit_unpack(&random_bytes, 0, 2i32.pow(6) - 1);
+        let res = bit_unpack(&random_bytes, 0, (1 << 6) - 1);
         assert!(res.is_err());
     }
 
@@ -472,7 +472,7 @@ mod tests {
         let mut random_bytes = [0u8; 32 * 6];
         rand::thread_rng().fill_bytes(&mut random_bytes);
         let r = [0i32; 256];
-        let res = simple_bit_pack(&r, 2i32.pow(6) - 1, &mut random_bytes);
+        let res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         assert!(res.is_ok());
     }
 
@@ -484,7 +484,7 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut random_bytes);
         // wrong size r coeff
         let r = [1024i32; 256];
-        let res = simple_bit_pack(&r, 2i32.pow(6) - 1, &mut random_bytes);
+        let res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         assert!(res.is_err());
     }
 
@@ -493,9 +493,9 @@ mod tests {
     // fn test_bit_pack_roundtrip() {
     //     // Round trip for 32 * 6(bitlen) bytes
     //     let random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
-    //     let mut r = bit_unpack(&random_bytes, 2u32.pow(2), 2u32.pow(6) - 2u32.pow(2) - 1).unwrap();
+    //     let mut r = bit_unpack(&random_bytes, 1 << 2, (1 << 6) - (1 << 2) - 1).unwrap();
     //     let mut res = [0u8; 32 * 6];
-    //     bit_pack(&r, 2u32.pow(2), 2u32.pow(6) - 2u32.pow(2) - 1, &mut res);
+    //     bit_pack(&r, 1 << 2, (1 << 6) - (1 << 2) - 1, &mut res);
     //     assert_eq!(random_bytes, res);
     // }
 

@@ -25,7 +25,7 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 
 
 /// Partial Barrett-style reduction
-const M: i128 = 2i128.pow(64) / (Q as i128);
+const M: i128 = (1 << 64) / (Q as i128);
 #[allow(clippy::inline_always, clippy::cast_possible_truncation)]
 #[inline(always)]
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
@@ -50,7 +50,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     let x = (a + (1 << 22)) >> 23;
     let res = a - x * Q;
-    debug_assert!(res.abs() < 2i32.pow(23) - 2i32.pow(21) - 2i32.pow(8));
+    debug_assert!(res.abs() < (1 << 23) - (1 << 21) - (1 << 8));
     res
 }
 
@@ -114,7 +114,7 @@ pub(crate) fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL];
     for row in w {
         for element in row {
             let z_q = center_mod(*element).abs();
-            result = if z_q > result { z_q } else { result };  // TODO: check CT
+            result = if z_q > result { z_q } else { result }; // TODO: check CT
         }
     }
     result

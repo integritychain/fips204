@@ -81,12 +81,15 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 pub(crate) fn sign_start<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<ExpandedPrivateKey<K, L>, &'static str> {
+    //return Ok(ExpandedPrivateKey { cap_k: [0u8; 32], tr: [0u8; 64], s_hat_1: [[0i32; 256]; L], s_hat_2: [[0i32; 256]; K], t_hat_0: [[0i32; 256]; K], cap_a_hat:[[[0i32; 256]; L]; K] });
     //
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
     let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
+    //return Ok(ExpandedPrivateKey { cap_k: [0u8; 32], tr: *tr, s_hat_1: [[0i32; 256]; L], s_hat_2: [[0i32; 256]; K], t_hat_0: [[0i32; 256]; K], cap_a_hat:[[[0i32; 256]; L]; K] });
 
     // 2:  s_hat_1 ← NTT(s_1)
     let s_hat_1: [T; L] = ntt(&s_1);
+    //return Ok(ExpandedPrivateKey { cap_k: [0u8; 32], tr: [0u8; 64], s_hat_1, s_hat_2: [[0i32; 256]; K], t_hat_0: [[0i32; 256]; K], cap_a_hat:[[[0i32; 256]; L]; K] });
 
     // 3:  s_hat_2 ← NTT(s_2)
     let s_hat_2: [T; K] = ntt(&s_2);
@@ -97,12 +100,11 @@ pub(crate) fn sign_start<const K: usize, const L: usize, const SK_LEN: usize>(
     // 5:  cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
     let cap_a_hat: [[T; L]; K] = expand_a(&rho);
 
-    Ok(ExpandedPrivateKey { cap_k, tr, s_hat_1, s_hat_2, t_hat_0, cap_a_hat })
+    Ok(ExpandedPrivateKey { cap_k: *cap_k, tr: *tr, s_hat_1, s_hat_2, t_hat_0, cap_a_hat })
 }
 
 
 #[allow(clippy::similar_names, clippy::many_single_char_names)]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn sign_finish<
     const K: usize,
     const L: usize,
@@ -311,7 +313,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     let mut t1_d2_hat: [T; K] = [T::zero(); K];
     for i in 0..K {
         for j in 0..256 {
-            t1_d2_hat[i][j] = partial_reduce64(i64::from(t1_hat[i][j]) * 2i64.pow(D));
+            t1_d2_hat[i][j] = partial_reduce64(i64::from(t1_hat[i][j]) << D);
         }
     }
 
@@ -319,7 +321,6 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
 }
 
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn verify_finish<
     const K: usize,
     const L: usize,
