@@ -80,29 +80,6 @@ pub trait KeyGen {
     ) -> Result<Self::ExpandedPublicKey, &'static str>;
 }
 
-// /// The `PreGen` trait is defined to allow pre-computation of private key material to speed signing.
-// pub trait PreGen: Signer + SerDes {
-//     /// A private (secret) precompute specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
-//     type PreCompute;
-//
-//     /// # Examples
-//     /// ```rust
-//     /// # use std::error::Error;
-//     /// # fn main() -> Result<(), Box<dyn Error>> {
-//     /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
-//     /// use fips204::traits::{KeyGen, PreGen, SerDes, Signer, Verifier};
-//     /// ///
-//     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
-//     ///
-//     /// // Generate key pair and signature
-//     /// let (pk, sk) = ml_dsa_44::KG::try_keygen_vt()?; // Generate both public and secret keys
-//     /// let pre = sk.gen_precompute();
-//     /// let sig = pre.try_sign_ct(&message)?; // Use the secret key to generate a message signature
-//     /// # Ok(())}
-//     /// ```
-//     fn gen_precompute(&self) -> Self::PreCompute;
-// }
-
 
 /// The Signer trait is implemented for the `PrivateKey` struct on each of the security parameter sets
 pub trait Signer {
@@ -193,7 +170,10 @@ pub trait Verifier {
     ) -> Result<bool, &'static str>;
 }
 
-/// The `SerDes` trait provides for validated serialization and deserialization of fixed size elements
+/// The `SerDes` trait provides for validated serialization and deserialization of fixed- and correctly-size elements.
+/// Note that FIPS 204 currently states that outside of exact length checks "ML-DSA is not designed to require any
+/// additional public-key validity checks". Nonetheless, a `Result()` is returned during all deserialization operations
+/// to preserve the ability to add future checks (and for symmetry across structures).
 pub trait SerDes {
     /// The fixed-size byte array to be serialized or deserialized
     type ByteArray;

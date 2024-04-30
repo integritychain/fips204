@@ -1,5 +1,5 @@
 #![no_std]
-#![allow(clippy::pedantic, warnings, missing_docs, unsafe_code)]
+#![deny(clippy::pedantic, warnings, missing_docs, unsafe_code)]
 // Most of the 'allow' category...
 #![deny(absolute_paths_not_starting_with_crate, box_pointers, dead_code)]
 #![deny(elided_lifetimes_in_paths, explicit_outlives_requirements, keyword_idents)]
@@ -18,7 +18,7 @@
 
 // TODO: Roadmap
 //   1. Clean up; resolve math
-//   2. Closer CT inspection
+//   2. Closer CT inspection -> top level key_gen is vartime, the rest CT outside of rho (? TBC)
 //   3. Intensive/extensive pass on documentation
 //   4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
 
@@ -62,13 +62,14 @@
 // Algorithm 35 NTT(w) on page 35                         --> ntt.rs
 // Algorithm 36 NTT−1(wˆ) on page 27                      --> ntt.rs
 // Types are in types.rs, traits are in traits.rs...
-// Quite a few security parameters are used as i32 to simplify interop
-// `debug_assert!()` is used for non-data checks (e.g., program structure, parameters)
-// `ensure!()` is used for data-related checks at runtime (e.g., input validation)
 
-// Note: many of the debug_assert()! and ensure()! guardrails will be removed when
-// the specification is finalized and performance optimizations begin in earnest.
-// The current situation is overkill.
+// Note that debug! statements enforce correct program construction and are not involved
+// in any operational dataflow (so are good fuzz targets). The ensure! statements implement
+// conservative dataflow validation. Separately, functions are only generic over security
+// parameters that are directly involved in memory allocation (on the stack). Some coding
+// oddities are driven by the fact that Rust doesn't currently do well with arithmetic on
+// generic parameters
+
 
 /// The `rand_core` types are re-exported so that users of fips203 do not
 /// have to worry about using the exact correct version of `rand_core`.
@@ -107,34 +108,34 @@ macro_rules! functionality {
         // ----- 'EXTERNAL' DATA TYPES -----
 
         /// Correctly sized private key specific to the target security parameter set. <br>
-        /// Implements the [`traits::Signer`] and [`traits::SerDes`] traits.
+        /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] traits.
         pub type PrivateKey = crate::types::PrivateKey<SK_LEN>;
 
         /// Expanded private key, specific to the target security parameter set, that contains <br>
         /// precomputed elements which increase (repeated) signature performance. Implements only
-        /// the [`traits::Signer`] trait.
+        /// the [`crate::traits::Signer`] trait.
         pub type ExpandedPrivateKey = crate::types::ExpandedPrivateKey<K, L>;
 
 
         /// Correctly sized public key specific to the target security parameter set. <br>
-        /// Implements the [`traits::Verifier`] and [`traits::SerDes`] traits.
+        /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
         pub type PublicKey = crate::types::PublicKey<PK_LEN>;
 
 
         /// Expanded public key, specific to the target security parameter set, that contains <br>
         /// precomputed elements which increase (repeated) verification performance. Implements only
-        /// the [`traits::Verifier`] traits.
+        /// the [`crate::traits::Verifier`] traits.
         pub type ExpandedPublicKey = crate::types::ExpandedPublicKey<K, L>;
 
 
         /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>
-        /// Implements the [`traits::KeyGen`] trait.
+        /// Implements the [`crate::traits::KeyGen`] trait.
         #[derive(Clone, Zeroize, ZeroizeOnDrop)]
         pub struct KG(); // Arguable how useful an empty struct+trait is...
 
 
         /// Private precomputed key material derived from a `PrivateKey`. <br>
-        /// Implements the [`traits::Signer`] trait.
+        /// Implements the [`crate::traits::Signer`] trait.
         #[derive(Clone, Zeroize, ZeroizeOnDrop)]
         pub struct PrivatePreCompute([u8; SK_LEN]);
 

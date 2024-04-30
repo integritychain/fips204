@@ -3,7 +3,7 @@
 use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
-use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
+use crate::hashing::{expand_a_vartime, expand_mask, expand_s_vartime, h_xof, sample_in_ball};
 use crate::helpers::{
     bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, partial_reduce32, partial_reduce64,
     vec_add,
@@ -43,10 +43,10 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
     h.read(&mut cap_k);
 
     // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+    let cap_a_hat: [[T; L]; K] = expand_a_vartime(&rho);
 
     // 4: (s_1, s_2 ) ← ExpandS(ρ′)
-    let (s_1, s_2): ([R; L], [R; K]) = expand_s(eta, &rho_prime)?;
+    let (s_1, s_2): ([R; L], [R; K]) = expand_s_vartime(eta, &rho_prime)?;
 
     // 5: t ← NTT−1 (cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
     let s_1_hat: [T; L] = ntt(&s_1);
@@ -98,13 +98,13 @@ pub(crate) fn sign_start<const K: usize, const L: usize, const SK_LEN: usize>(
     let t_hat_0: [T; K] = ntt(&t_0);
 
     // 5:  cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+    let cap_a_hat: [[T; L]; K] = expand_a_vartime(rho);
 
     Ok(ExpandedPrivateKey { cap_k: *cap_k, tr: *tr, s_hat_1, s_hat_2, t_hat_0, cap_a_hat })
 }
 
 
-#[allow(clippy::similar_names, clippy::many_single_char_names)]
+#[allow(clippy::similar_names, clippy::many_single_char_names, clippy::too_many_arguments)]
 pub(crate) fn sign_finish<
     const K: usize,
     const L: usize,
@@ -300,7 +300,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     let (rho, t_1): ([u8; 32], [R; K]) = pk_decode(pk)?;
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
-    let cap_a_hat: [[T; L]; K] = expand_a(&rho);
+    let cap_a_hat: [[T; L]; K] = expand_a_vartime(&rho);
 
     // 6: tr ← H(BytesToBits(pk), 512)
     let mut hasher = h_xof(&[pk]);
@@ -320,7 +320,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     Ok(ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat })
 }
 
-
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn verify_finish<
     const K: usize,
     const L: usize,

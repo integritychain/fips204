@@ -18,9 +18,9 @@ macro_rules! ensure {
 pub(crate) use ensure; // make available throughout crate
 
 
-/// Ensure polynomial w is within -lo to +hi (inclusive)
+/// Ensure all coefficients of polynomial `w` are within -lo to +hi (inclusive)
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
-    w.iter().all(|&e| (e >= -lo) & (e <= hi))
+    w.iter().all(|&e| (e >= -lo) && (e <= hi))
 }
 
 

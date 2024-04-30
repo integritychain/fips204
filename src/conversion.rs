@@ -19,21 +19,27 @@ use crate::Q;
 
 
 /// # Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
-/// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}`.
+/// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}`. Note that this function is only used
+/// in Algorithm 24's `rej_ntt_poly_vartime()` function, which in turn is only used in Algorithm
+/// 26's `expand_a_vartime()` function. This latter function operates on `rho`, which is a component
+/// of the public key passed in the clear. This complicates the (constant) time analysis of
+/// `ml_dsa::key_gen_vartime()`, `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
 ///
 /// **Input**: A byte array of length three, representing bytes `b0`, `b1`, `b2`. <br>
 /// **Output**: An integer modulo `q` or `⊥` (returned as an Error).
 ///
 /// # Errors
-/// Returns an error `⊥` on input between `Q` and `0x7F_FF_FF` (per spec; for rejection sampling).
-pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<i32, &'static str> {
+/// Returns an error `⊥` on input 3 bytes forming values between `Q=0x7F_E0_01` - `0x7F_FF_FF`,
+/// and between `0xFF_E0_01` - `0xFF_FF_FF` (latter range due to masking of bit 7 of byte 2)
+/// per spec; for rejection sampling.
+pub(crate) fn coef_from_three_bytes_vartime(bbb: [u8; 3]) -> Result<i32, &'static str> {
     // 1: if b2 > 127 then
     // 2: b2 ← b2 − 128     ▷ Set the top bit of b2 to zero
     // 3: end if
     let bbb2 = i32::from(bbb[2] & 0x7F);
 
     // 4: z ← 2^16·b_2 + 2^8·b1 + b0
-    let z = (bbb2 << 16) + (i32::from(bbb[1]) << 8) + i32::from(bbb[0]);
+    let z = (bbb2 << 16) | (i32::from(bbb[1]) << 8) | i32::from(bbb[0]);
 
     // 5: if z < q then return z
     if z < Q {
@@ -41,7 +47,7 @@ pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<i32, &'static str> {
 
         // 6: else return ⊥
     } else {
-        Err("Alg8: returns ⊥")
+        Err("Alg 8: returns ⊥")
 
         // 7: end if
     }
@@ -49,25 +55,25 @@ pub(crate) fn coef_from_three_bytes(bbb: [u8; 3]) -> Result<i32, &'static str> {
 
 
 /// # Algorithm 9: `CoefFromHalfByte(b)` on page 22.
-/// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}`.
-/// Not intended to be constant time.
+/// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}`. Note that this function is only used
+/// in Algorithm 27's `expand_s_vartime()` function, which in turn is only used in the
+/// `ml_dsa::keygen_vartime()` functionality using the `rho_prime` private random seed.
+/// It is not involved in signature generation or verification.
 ///
 /// **Input**: Integer `b` ∈ {0, 1, ... , 15}. <br>
 /// **Output**: An integer between `−η` and `η`, or `⊥`. <br>
-/// Security parameter ETA is `η`
-///
-/// # Panics
-/// In debug, requires `eta > 0`.
 ///
 /// # Errors
-/// Returns an error `⊥` on misconfigured or illegal input (`b` > 15).
-pub(crate) fn coef_from_half_byte_vt(eta: i32, b: u8) -> Result<i32, &'static str> {
-    debug_assert!(eta > 0);
-    ensure!(b <= 15, "Alg9: b > 15");
+/// Returns an error `⊥` on out of bounds input (`b` > 15), or `η` (eta) other than 2 & 4.
+pub(crate) fn coef_from_half_byte_vartime(eta: i32, b: u8) -> Result<i32, &'static str> {
+    debug_assert!((eta == 2) | (eta == 4), "Alg 9: incorrect eta");
+    debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
 
     // 1: if η = 2 and b < 15 then return 2 − (b mod 5)
     if (eta == 2) & (b < 15) {
-        Ok(2 - (i32::from(b) % 5))
+        let quot = ((b * (1 << 4)) / 5) >> 4;
+        let rem = b - quot * 5;
+        Ok(2 - i32::from(rem))
 
         // 2: else
     } else {
@@ -78,7 +84,7 @@ pub(crate) fn coef_from_half_byte_vt(eta: i32, b: u8) -> Result<i32, &'static st
 
             // 4: else return ⊥
         } else {
-            Err("Alg9: returns `⊥`")
+            Err("Alg 9: returns `⊥`")
 
             // 5: end if
         }
@@ -90,46 +96,42 @@ pub(crate) fn coef_from_half_byte_vt(eta: i32, b: u8) -> Result<i32, &'static st
 /// # Algorithm 10: `SimpleBitPack(w,b)` on page 22.
 /// Encodes a polynomial `w` into a byte string.
 ///
-/// **Input**: `b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[0, b]`. <br>
+/// **Input**: `b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[0, b]`.
+///            `b` must be positive and have a bit length of less than 20.<br>
 /// **Output**: A byte string of length `32·bitlen(b)`.
-///
-/// # Panics
-/// In debug, requires `b > 0` and `b <= i32::MAX / 32`.
 ///
 /// # Errors
 /// Returns an error on any out-of-range coefficients of `w`.
 pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
-    debug_assert!((1..i32::MAX / 32).contains(&b), "Alg10: b out of range");
-    debug_assert_eq!(bytes_out.len(), 32 * bit_length(b), "Alg10: incorrect size of output bytes");
+    debug_assert!((1..1024*1024).contains(&b), "Alg 10: b out of range"); // plenty of headroom
+    debug_assert!(is_in_range(w, 0, b), "Alg 10: w out of range"); // early detect; repeated within bit_pack
+    debug_assert_eq!(bytes_out.len(), 32 * bit_length(b), "Alg 10: incorrect size of output bytes");
 
-    ensure!(is_in_range(w, 0, b), "Alg10: w out of range");
-    bit_pack(w, 0, b, bytes_out)?;
+    bit_pack(w, 0, b, bytes_out).map_err(|_| "Alg 10: w out of range")?;
     Ok(())
 }
 
 
-/// # Algorithm 11: `BitPack(w,a,b)` on page 22
+/// # Algorithm 11: `BitPack(w,a,b)` on page 22.
 /// Encodes a polynomial `w` into a byte string.
 ///
-/// **Input**: `a, b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[−a, b]`. <br>
+/// **Input**: `a, b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[−a, b]`.
+///            `a` must be non-negative and have a bit length of less than 20.
+///            `b` must be positive and have a bit length of less than 20.<br>
 /// **Output**: A byte string of length `32·bitlen(a + b)`.
-///
-/// # Panics
-/// In debug, requires `a >= 0` and `a <= i32::MAX / 64`.
-/// In debug, requires `b > 0` and `b <= i32::MAX / 64`.
 ///
 /// # Errors
 /// Returns an error on any out-of-range coefficients of `w`.
 pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
-    debug_assert!((0..i32::MAX / 64).contains(&a), "Alg11: a out of range");
-    debug_assert!((1..i32::MAX / 64).contains(&b), "Alg11: b out of range");
+    debug_assert!((0..1024*1024).contains(&a), "Alg 11: a out of range");
+    debug_assert!((1..1024*1024).contains(&b), "Alg 11: b out of range");
     debug_assert_eq!(
         w.len() * bit_length(a + b),
         bytes_out.len() * 8,
-        "Alg11: incorrect size of output bytes"
+        "Alg 11: incorrect size of output bytes"
     );
 
-    ensure!(is_in_range(w, a, b), "Alg11: w out of range");
+    ensure!(is_in_range(w, a, b), "Alg 11: w out of range");
     let bitlen = bit_length(a + b); // Calculate element bit length
     let mut temp = 0u64; // Insert new values on the left/MSB and pop output values from the right/LSB
     let mut byte_index = 0; // Current output byte position
@@ -174,11 +176,11 @@ pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<()
 /// # Errors
 /// Returns an error on `w` out of range and incorrectly sized `v`.
 pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
-    debug_assert!((1..i32::MAX / 32).contains(&b), "Alg12: b out of range");
-    debug_assert_eq!(v.len(), 32 * bit_length(b), "Alg12: incorrectly sized v");
+    debug_assert!((1..i32::MAX / 32).contains(&b), "Alg 12: b out of range");
+    debug_assert_eq!(v.len(), 32 * bit_length(b), "Alg 12: incorrectly sized v");
 
     let w_out = bit_unpack(v, 0, b)?;
-    ensure!(is_in_range(&w_out, 0, b), "Alg12: w out of range");
+    ensure!(is_in_range(&w_out, 0, b), "Alg 12: w out of range");
     Ok(w_out)
 }
 
@@ -197,11 +199,11 @@ pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
 /// # Errors
 /// Returns an error on `w` out of range, or an incorrectly sized `v`.
 pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
-    debug_assert!((0..i32::MAX / 64).contains(&a), "Alg13: a out of range");
-    debug_assert!((1..i32::MAX / 64).contains(&b), "Alg13: b out of range");
-    debug_assert_eq!(v.len(), 32 * bit_length(a + b), "Alg13: incorrectly sized v");
+    debug_assert!((0..i32::MAX / 64).contains(&a), "Alg 13: a out of range");
+    debug_assert!((1..i32::MAX / 64).contains(&b), "Alg 13: b out of range");
+    debug_assert_eq!(v.len(), 32 * bit_length(a + b), "Alg 13: incorrectly sized v");
 
-    let bitlen = bit_length(a + b).try_into().expect("Alg13: try_into fail");
+    let bitlen = bit_length(a + b).try_into().expect("Alg 13: try_into fail");
     let mut w_out = [0i32; 256];
     let mut temp = 0i32;
     let mut r_index = 0;
@@ -219,7 +221,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
             r_index += 1;
         }
     }
-    ensure!(is_in_range(&w_out, a, b), "Alg13: w out of range");
+    ensure!(is_in_range(&w_out, a, b), "Alg 13: w out of range");
     Ok(w_out)
 }
 
@@ -373,21 +375,21 @@ mod tests {
     #[test]
     fn test_coef_from_three_bytes1() {
         let bytes = [0x12u8, 0x34, 0x56];
-        let res = coef_from_three_bytes(bytes).unwrap();
+        let res = coef_from_three_bytes_vartime(bytes).unwrap();
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes2() {
         let bytes = [0x12u8, 0x34, 0x80];
-        let res = coef_from_three_bytes(bytes).unwrap();
+        let res = coef_from_three_bytes_vartime(bytes).unwrap();
         assert_eq!(res, 0x0000_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes3() {
         let bytes = [0x01u8, 0xe0, 0x80];
-        let res = coef_from_three_bytes(bytes).unwrap();
+        let res = coef_from_three_bytes_vartime(bytes).unwrap();
         assert_eq!(res, 0x0000_e001);
     }
 
@@ -395,42 +397,46 @@ mod tests {
     #[should_panic(expected = "panic: out of range")]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
-        let res = coef_from_three_bytes(bytes).expect("panic: out of range");
+        let res = coef_from_three_bytes_vartime(bytes).expect("panic: out of range");
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_half_byte1() {
         let inp = 3;
-        let res = coef_from_half_byte_vt(2, inp).unwrap();
+        let res = coef_from_half_byte_vartime(2, inp).unwrap();
         assert_eq!(-1, res);
     }
 
     #[test]
     fn test_coef_from_half_byte2() {
         let inp = 8;
-        let res = coef_from_half_byte_vt(4, inp).unwrap();
+        let res = coef_from_half_byte_vartime(4, inp).unwrap();
         assert_eq!(-4, res);
     }
 
+    #[should_panic]
+    #[allow(clippy::should_panic_without_expect)]
     #[test]
     fn test_coef_from_half_byte_validation1() {
         let inp = 22;
-        let res = coef_from_half_byte_vt(2, inp);
+        let res = coef_from_half_byte_vartime(2, inp);
         assert!(res.is_err());
     }
 
+    #[should_panic]
+    #[allow(clippy::should_panic_without_expect)]
     #[test]
     fn test_coef_from_half_byte_validation2() {
-        let inp = 15;
-        let res = coef_from_half_byte_vt(2, inp);
+        let inp = 5;
+        let res = coef_from_half_byte_vartime(1, inp);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation3() {
         let inp = 10;
-        let res = coef_from_half_byte_vt(4, inp);
+        let res = coef_from_half_byte_vartime(4, inp);
         assert!(res.is_err());
     }
 
