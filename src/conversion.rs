@@ -456,7 +456,7 @@ mod tests {
         let mut random_bytes = [0u8; 32 * 6];
         rand::thread_rng().fill_bytes(&mut random_bytes);
         let r = [0i32; 256];
-        let _res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
+        simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         // no panic is good news
     }
 
@@ -468,7 +468,7 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut random_bytes);
         // wrong size r coeff
         let r = [1024i32; 256];
-        let _res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
+        simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         // should have paniced by now...
     }
 

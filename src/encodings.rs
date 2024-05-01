@@ -363,7 +363,7 @@ mod tests {
         //let mut t1 = [[0i32; 256]; 4];
         let (rho, t1) = pk_decode::<4, 1312>(&random_pk).unwrap();
         //let mut res = [0u8; 1312];
-        let res = pk_encode::<4, 1312>(&rho, &t1);
+        let res = pk_encode::<4, 1312>(rho, &t1);
         assert_eq!(&random_pk[..], res);
     }
 
@@ -376,7 +376,7 @@ mod tests {
         //let mut t1 = [[0i32; 256]; 6];
         let (rho, t1) = pk_decode::<6, 1952>(&random_pk).unwrap();
         //let mut res = [0u8; 1952];
-        let res = pk_encode::<6, 1952>(&rho, &t1);
+        let res = pk_encode::<6, 1952>(rho, &t1);
         assert_eq!(random_pk, res);
     }
 
@@ -389,7 +389,7 @@ mod tests {
         //let mut t1 = [[0i32; 256]; 8];
         let (rho, t1) = pk_decode::<8, 2592>(&random_pk).unwrap();
         //let mut res = [0u8; 2592];
-        let res = pk_encode::<8, 2592>(&rho, &t1);
+        let res = pk_encode::<8, 2592>(rho, &t1);
         assert_eq!(random_pk, res);
     }
 
