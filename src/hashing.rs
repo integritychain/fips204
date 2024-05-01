@@ -2,7 +2,7 @@
 
 use crate::conversion;
 use crate::helpers::{bit_length, ensure, is_in_range};
-use crate::types::{Zero, R, T};
+use crate::types::{R, T};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
 
@@ -43,7 +43,7 @@ pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> Result<R, &'static str
     xof.read(&mut hpk8); // Save the first 8 bytes for step 9
 
     // 1: c ← 0
-    let mut c = R::zero();
+    let mut c = [0i32; 256];
 
     // 2: k ← 8; k implicitly advances with each sample
     let mut hpk = [0u8];
@@ -102,7 +102,7 @@ pub(crate) fn rej_ntt_poly_vartime(rhos: &[&[u8]]) -> T {
         272 / 8,
         "Alg24: wrong size rho"
     );
-    let mut a_hat = R::zero();
+    let mut a_hat = [0i32; 256];
     let mut xof = h128_xof(rhos);
 
     // 1: j ← 0
@@ -153,7 +153,7 @@ pub(crate) fn rej_bounded_poly_vartime(eta: i32, rhos: &[&[u8]]) -> R {
         "Alg25: wrong size rho"
     );
     let mut z = [0u8];
-    let mut a = R::zero();
+    let mut a = [0i32; 256];
     let mut xof = h_xof(rhos);
 
     // 1: j ← 0
@@ -218,7 +218,7 @@ pub(crate) fn rej_bounded_poly_vartime(eta: i32, rhos: &[&[u8]]) -> R {
 /// **Input**: `ρ ∈ {0,1}^256`. <br>
 /// **Output**: Matrix `A_hat`
 pub(crate) fn expand_a_vartime<const K: usize, const L: usize>(rho: &[u8; 32]) -> [[T; L]; K] {
-    let mut cap_a_hat = [[T::zero(); L]; K];
+    let mut cap_a_hat = [[[0i32; 256]; L]; K];
 
     // 1: for r from 0 to k − 1 do
     for (a_row, r) in cap_a_hat.iter_mut().zip(0..u8::try_from(K).unwrap()) {
@@ -252,7 +252,7 @@ pub(crate) fn expand_a_vartime<const K: usize, const L: usize>(rho: &[u8; 32]) -
 pub(crate) fn expand_s_vartime<const K: usize, const L: usize>(
     eta: i32, rho: &[u8; 64],
 ) -> Result<([R; L], [R; K]), &'static str> {
-    let (mut s1, mut s2) = ([R::zero(); L], [R::zero(); K]);
+    let (mut s1, mut s2) = ([[0i32; 256]; L], [[0i32; 256]; K]);
 
     // 1: for r from 0 to ℓ − 1 do
     for (s1r, r) in s1.iter_mut().zip(0..u8::try_from(L).unwrap()) {
@@ -293,7 +293,7 @@ pub(crate) fn expand_s_vartime<const K: usize, const L: usize>(
 pub(crate) fn expand_mask<const L: usize>(
     gamma1: i32, rho: &[u8; 64], mu: u16,
 ) -> Result<[R; L], &'static str> {
-    let mut s = [R::zero(); L];
+    let mut s = [[0i32; 256]; L];
     let mut v = [0u8; 32 * 20]; // TODO: 640?
 
     // 1: c ← 1 + bitlen (γ1 − 1) ▷ γ1 is always a power of 2

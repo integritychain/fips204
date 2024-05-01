@@ -6,28 +6,28 @@ Near-obvious uplift can be had with more careful modular multiplication & additi
 using fewer reductions. Also, 'u16' arithmetic has a performance penalty.
 
 ~~~
-April 27, 2024
+May 1, 2024
 Intel® Core™ i7-7700K CPU @ 4.20GHz × 8 Circa 2017 w/ Rust 1.77
 
 $ RUSTFLAGS="-C target-cpu=native" cargo bench
 
-ml_dsa_44 keygen        time:   [94.188 µs 94.246 µs 94.316 µs]
-ml_dsa_65 keygen        time:   [176.93 µs 177.11 µs 177.24 µs]
-ml_dsa_87 keygen        time:   [254.57 µs 254.61 µs 254.65 µs]
+ml_dsa_44 keygen        time:   [91.264 µs 91.402 µs 91.555 µs]
+ml_dsa_65 keygen        time:   [169.11 µs 169.23 µs 169.39 µs]
+ml_dsa_87 keygen        time:   [247.51 µs 247.91 µs 248.34 µs]
 
-ml_dsa_44 sk sign       time:   [392.25 µs 395.71 µs 399.07 µs]
-ml_dsa_65 sk sign       time:   [622.84 µs 630.79 µs 638.92 µs]
-ml_dsa_87 sk sign       time:   [760.41 µs 771.05 µs 781.59 µs]
+ml_dsa_44 sk sign       time:   [369.67 µs 373.75 µs 378.01 µs]
+ml_dsa_65 sk sign       time:   [597.12 µs 606.37 µs 615.55 µs]
+ml_dsa_87 sk sign       time:   [734.89 µs 742.40 µs 750.00 µs]
 
-ml_dsa_44 esk sign      time:   [330.93 µs 335.40 µs 339.92 µs]  // Fast sign, 15% improvement
-ml_dsa_65 esk sign      time:   [499.83 µs 507.04 µs 514.29 µs]
-ml_dsa_87 esk sign      time:   [548.43 µs 556.40 µs 564.54 µs]
+ml_dsa_44 esk sign      time:   [313.36 µs 317.30 µs 321.32 µs] // Fast sign, 15% improvement
+ml_dsa_65 esk sign      time:   [495.20 µs 505.25 µs 515.57 µs]
+ml_dsa_87 esk sign      time:   [532.84 µs 541.26 µs 550.20 µs]
 
-ml_dsa 44 pk verify     time:   [128.95 µs 129.21 µs 129.55 µs]
-ml_dsa 65 pk verify     time:   [228.24 µs 228.27 µs 228.32 µs]
-ml_dsa 87 pk verify     time:   [390.17 µs 390.25 µs 390.33 µs]
+ml_dsa 44 pk verify     time:   [129.28 µs 129.40 µs 129.55 µs]
+ml_dsa 65 pk verify     time:   [223.02 µs 223.11 µs 223.23 µs]
+ml_dsa 87 pk verify     time:   [381.66 µs 382.84 µs 384.46 µs]
 
-ml_dsa 44 epk verify    time:   [70.176 µs 70.263 µs 70.385 µs]  // Fast verify, 46% improvement
-ml_dsa 65 epk verify    time:   [124.36 µs 124.40 µs 124.44 µs]
-ml_dsa 87 epk verify    time:   [208.15 µs 208.22 µs 208.31 µs]
+ml_dsa 44 epk verify    time:   [71.255 µs 71.320 µs 71.414 µs] // Fast verif, 45% improvement
+ml_dsa 65 epk verify    time:   [123.49 µs 123.57 µs 123.67 µs]
+ml_dsa 87 epk verify    time:   [205.28 µs 205.45 µs 205.65 µs]
 ~~~

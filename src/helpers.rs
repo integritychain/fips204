@@ -1,4 +1,4 @@
-use crate::types::{Zero, R};
+use crate::types::R;
 use crate::{Q, ZETA};
 
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
@@ -20,7 +20,7 @@ pub(crate) use ensure; // make available throughout crate
 
 /// Ensure all coefficients of polynomial `w` are within -lo to +hi (inclusive)
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
-    w.iter().all(|&e| (e >= -lo) && (e <= hi))
+    w.iter().all(|&e| (e >= -lo) && (e <= hi)) // sucess is CT, failure vartime
 }
 
 
@@ -60,7 +60,7 @@ pub(crate) const fn full_reduce32(a: i32) -> i32 {
     x + ((x >> 31) & Q) // add Q if negative
 }
 
-
+// Note: this is only used on 'fixed' security parameters (not secret values), so as not to impact CT
 /// Bit length required to express `a` in bits
 pub(crate) const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 
@@ -99,7 +99,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 /// Vector addition; See bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
-    let mut result = [R::zero(); K];
+    let mut result = [[0i32; 256]; K];
     for i in 0..vec_a.len() {
         for j in 0..vec_a[i].len() {
             result[i][j] = vec_a[i][j] + vec_b[i][j]; //partial_reduce(vec_a[i][j] + vec_b[i][j]);

@@ -1,14 +1,14 @@
 //! This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
 
 use crate::helpers::full_reduce32;
-use crate::types::{Zero, Zq, R};
+use crate::types::{Zq, R};
 use crate::{D, Q};
 
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
 
 
 /// # Algorithm 29: `Power2Round(r)` on page 34.
-/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1*2^d + r0 mod q`.
+/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·2^d + r0 mod q`.
 ///
 /// **Input**: `r ∈ Zq`. <br>
 /// **Output**: Integers `(r1, r0)`.
@@ -16,7 +16,7 @@ pub(crate) fn power2round<const K: usize>(t: &[R; K]) -> ([R; K], [R; K]) {
     // 1: r+ ← r mod q
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
-    let (mut t_1, mut t_0) = ([R::zero(); K], [R::zero(); K]);
+    let (mut t_1, mut t_0) = ([[0i32; 256]; K], [[0i32; 256]; K]);
     for l in 0..K {
         for m in 0..256 {
             let r = t[l][m]; // full_reduce(t[l][m]);
@@ -29,7 +29,7 @@ pub(crate) fn power2round<const K: usize>(t: &[R; K]) -> ([R; K], [R; K]) {
 
 
 /// # Algorithm 30: `Decompose(r)` on page 34.
-/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1(2·γ_2) + r0 mod q`.
+/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·(2·γ_2) + r0 mod q`.
 /// (this description is not sufficient; r0 is 'centered' wrt `2·γ_2`)
 ///
 /// **Input**: `r ∈ Zq` <br>
@@ -117,7 +117,7 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 /// Returns the high bits of `r` adjusted according to hint `h`
 ///
 /// **Input**: boolean `h`, `r` ∈ `Zq` <br>
-/// **Output**: `r1` ∈ `Z` with `0 ≤ r1 ≤ (q − 1)/(2*γ_2)`
+/// **Output**: `r1` ∈ `Z` with `0 ≤ r1 ≤ (q − 1)/(2·γ_2)`
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
     // 1: m ← (q− 1)/(2*γ_2)

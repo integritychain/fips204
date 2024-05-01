@@ -1,11 +1,11 @@
 //! This file implements functionality from FIPS 204 section 8.1 Conversion Between Data Types
 
 use crate::helpers::{bit_length, ensure, is_in_range};
-use crate::types::{Zero, R};
+use crate::types::R;
 use crate::Q;
 
 
-// Algorithm 4: `IntegerToBits(x, alpha)` on page 20 is not needed because the pack and unpack
+// Algorithm 4: `IntegerToBits(x,alpha)` on page 20 is not needed because the pack and unpack
 // algorithms have been reimplemented at a higher level.
 
 // Algorithm 5: `BitsToInteger(y)` on page 20 is not needed because the pack and unpack
@@ -19,18 +19,19 @@ use crate::Q;
 
 
 /// # Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
-/// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}`. Note that this function is only used
-/// in Algorithm 24's `rej_ntt_poly_vartime()` function, which in turn is only used in Algorithm
-/// 26's `expand_a_vartime()` function. This latter function operates on `rho`, which is a component
-/// of the public key passed in the clear. This complicates the (constant) time analysis of
-/// `ml_dsa::key_gen_vartime()`, `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
+/// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}` used in rejection sampling. Note
+/// that this function is only used in Algorithm 24's `rej_ntt_poly_vartime()` function, which
+/// in turn is only used in Algorithm 26's `expand_a_vartime()` function. This latter function
+/// operates on `rho`, which is a component of the public key passed in the clear. This
+/// complicates the constant time analysis of `ml_dsa::key_gen_vartime()` (non CT),
+/// `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
 ///
-/// **Input**: A byte array of length three, representing bytes `b0`, `b1`, `b2`. <br>
+/// **Input**:  A byte array of length three, representing bytes `b0`, `b1`, `b2`.<br>
 /// **Output**: An integer modulo `q` or `⊥` (returned as an Error).
 ///
 /// # Errors
-/// Returns an error `⊥` on input 3 bytes forming values between `Q=0x7F_E0_01` - `0x7F_FF_FF`,
-/// and between `0xFF_E0_01` - `0xFF_FF_FF` (latter range due to masking of bit 7 of byte 2)
+/// Returns an error `⊥` on input 3 bytes forming values between `Q=0x7F_E0_01`--`0x7F_FF_FF`,
+/// and between `0xFF_E0_01`--`0xFF_FF_FF` (latter range due to masking of bit 7 of byte 2)
 /// per spec; for rejection sampling.
 pub(crate) fn coef_from_three_bytes_vartime(bbb: [u8; 3]) -> Result<i32, &'static str> {
     // 1: if b2 > 127 then
@@ -55,16 +56,19 @@ pub(crate) fn coef_from_three_bytes_vartime(bbb: [u8; 3]) -> Result<i32, &'stati
 
 
 /// # Algorithm 9: `CoefFromHalfByte(b)` on page 22.
-/// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}`. Note that this function is only used
-/// in Algorithm 27's `expand_s_vartime()` function, which in turn is only used in the
-/// `ml_dsa::keygen_vartime()` functionality using the `rho_prime` private random seed.
-/// It is not involved in signature generation or verification.
+/// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}` used in rejection sampling. Note
+/// that this function is only used in Algorithm 25's `rej_bounded_poly_vartime()`
+/// function, which in turn is only used in Algorithm 27's `expand_s_vartime()` function,
+/// which in turn is only used in the `ml_dsa::keygen_vartime()` functionality using the
+/// `rho_prime` private random seed. It is not involved in signature generation or
+/// verification.
 ///
-/// **Input**: Integer `b` ∈ {0, 1, ... , 15}. <br>
-/// **Output**: An integer between `−η` and `η`, or `⊥`. <br>
+/// **Input**:  Integer `b` ∈ {0, 1, ... , 15}.
+///             Security parameter `η` (eta) must be either 2 or 4.<br>
+/// **Output**: An integer between `−η` and `η`, or `⊥`.
 ///
 /// # Errors
-/// Returns an error `⊥` on out of bounds input (`b` > 15), or `η` (eta) other than 2 & 4.
+/// Returns an error `⊥` on when eta = 4 and b > 8 for rejection sampling. (panics on b > 15)
 pub(crate) fn coef_from_half_byte_vartime(eta: i32, b: u8) -> Result<i32, &'static str> {
     debug_assert!((eta == 2) | (eta == 4), "Alg 9: incorrect eta");
     debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
@@ -84,7 +88,7 @@ pub(crate) fn coef_from_half_byte_vartime(eta: i32, b: u8) -> Result<i32, &'stat
 
             // 4: else return ⊥
         } else {
-            Err("Alg 9: returns `⊥`")
+            Err("Alg 9: returns ⊥") // not necessarily an error per se, but rather "try again"
 
             // 5: end if
         }
@@ -94,58 +98,47 @@ pub(crate) fn coef_from_half_byte_vartime(eta: i32, b: u8) -> Result<i32, &'stat
 
 
 /// # Algorithm 10: `SimpleBitPack(w,b)` on page 22.
-/// Encodes a polynomial `w` into a byte string.
+/// Encodes a polynomial `w` into a byte string. This function is not exposed to unvalidated input.
 ///
-/// **Input**: `b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[0, b]`.
-///            `b` must be positive and have a bit length of less than 20.<br>
+/// **Input**:  `b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[0, b]`.
+///             Security parameter `b` must be positive and have a bit length of less than 20.<br>
 /// **Output**: A byte string of length `32·bitlen(b)`.
-///
-/// # Errors
-/// Returns an error on any out-of-range coefficients of `w`.
-pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
-    debug_assert!((1..1024*1024).contains(&b), "Alg 10: b out of range"); // plenty of headroom
+pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) {
+    debug_assert!((1..1024 * 1024).contains(&b), "Alg 10: b out of range"); // plenty of headroom
     debug_assert!(is_in_range(w, 0, b), "Alg 10: w out of range"); // early detect; repeated within bit_pack
     debug_assert_eq!(bytes_out.len(), 32 * bit_length(b), "Alg 10: incorrect size of output bytes");
 
-    bit_pack(w, 0, b, bytes_out).map_err(|_| "Alg 10: w out of range")?;
-    Ok(())
+    bit_pack(w, 0, b, bytes_out);
 }
 
 
 /// # Algorithm 11: `BitPack(w,a,b)` on page 22.
-/// Encodes a polynomial `w` into a byte string.
+/// Encodes a polynomial `w` into a byte string.  This function is not exposed to unvalidated input.
 ///
-/// **Input**: `a, b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[−a, b]`.
-///            `a` must be non-negative and have a bit length of less than 20.
-///            `b` must be positive and have a bit length of less than 20.<br>
+/// **Input**:  `a, b ∈ N` and `w ∈ R` such that the coefficients of `w` are all in `[−a, b]`.
+///             Security parameter `a` must be non-negative and have a bit length of less than 20.
+///             Security parameter `b` must be positive and have a bit length of less than 20.<br>
 /// **Output**: A byte string of length `32·bitlen(a + b)`.
-///
-/// # Errors
-/// Returns an error on any out-of-range coefficients of `w`.
-pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<(), &'static str> {
-    debug_assert!((0..1024*1024).contains(&a), "Alg 11: a out of range");
-    debug_assert!((1..1024*1024).contains(&b), "Alg 11: b out of range");
-    debug_assert_eq!(
-        w.len() * bit_length(a + b),
-        bytes_out.len() * 8,
-        "Alg 11: incorrect size of output bytes"
-    );
+pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) {
+    debug_assert!((0..1024 * 1024).contains(&a), "Alg 11: a out of range");
+    debug_assert!((1..1024 * 1024).contains(&b), "Alg 11: b out of range");
+    debug_assert!(is_in_range(w, a, b), "Alg 11: w out of range");
+    debug_assert_eq!(w.len() * bit_length(a + b), bytes_out.len() * 8, "Alg 11: bad output size");
 
-    ensure!(is_in_range(w, a, b), "Alg 11: w out of range");
-    let bitlen = bit_length(a + b); // Calculate element bit length
-    let mut temp = 0u64; // Insert new values on the left/MSB and pop output values from the right/LSB
+    let bitlen = bit_length(a + b); // Calculate each element bit length
+    let mut temp = 0u32; // To insert new values on the left/MSB and pop output values from the right/LSB
     let mut byte_index = 0; // Current output byte position
     let mut bit_index = 0; // Number of bits accumulated in temp
 
-    // For every coefficient in w... (which is ensured to be in range)
+    // For every coefficient in w... (which is known to be in range)
     #[allow(clippy::cast_sign_loss)]
     for coeff in *w {
         // if we have a negative `a` bound, subtract from b and shift into empty/upper part of temp
         if a > 0 {
-            temp |= ((b - coeff) as u64) << bit_index;
+            temp |= ((b - coeff) as u32) << bit_index;
         // Otherwise, we just shift and drop into empty/upper part of temp
         } else {
-            temp |= (coeff as u64) << bit_index;
+            temp |= (coeff as u32) << bit_index;
         }
         // account for the amount of bits we now have in temp
         bit_index += bitlen;
@@ -159,49 +152,48 @@ pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) -> Result<()
             bit_index -= 8;
         }
     }
-    Ok(())
 }
 
 
 /// # Algorithm 12: `SimpleBitUnpack(v,b)` on page 23.
-/// Reverses the procedure `SimpleBitPack`.
+/// Reverses the procedure `SimpleBitPack`. Used in Algorithm 17's `pkDecode()` function which
+/// does take untrusted input via deserialization (and `verify_start()`).
 ///
-/// **Input**: `b ∈ N` and a byte string `v` of length 32·bitlen(b). <br>
-/// **Output**: A polynomial `w ∈ R`, with coefficients in `[0, 2^c−1]`, where `c = bitlen(b)`. <br>
-/// When `b + 1` is a power of 2, the coefficients are in `[0, b]`.
-///
-/// # Panics
-/// In debug, requires `b > 0` and `b <= i32::MAX / 32`.
+/// **Input**:  `b ∈ N` and a byte string `v` of length 32·bitlen(b).
+///             Security parameter `b` must be positive and have a bit length of less than 20.<br>
+/// **Output**: A polynomial `w ∈ R`, with coefficients in `[0, 2^c−1]`, where `c = bitlen(b)`.
+///             When `b + 1` is a power of 2, the coefficients are in `[0, b]`.
 ///
 /// # Errors
-/// Returns an error on `w` out of range and incorrectly sized `v`.
+/// Returns an error on `w` out of range.
 pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
-    debug_assert!((1..i32::MAX / 32).contains(&b), "Alg 12: b out of range");
-    debug_assert_eq!(v.len(), 32 * bit_length(b), "Alg 12: incorrectly sized v");
+    debug_assert!((1..1024 * 1024).contains(&b), "Alg 12: b out of range");
+    debug_assert_eq!(v.len(), 32 * bit_length(b), "Alg 12: bad output size");
 
-    let w_out = bit_unpack(v, 0, b)?;
-    ensure!(is_in_range(&w_out, 0, b), "Alg 12: w out of range");
+    // Note that `w_out` is correctly range checked (via ensure!) in `bit_unpack()`
+    let w_out = bit_unpack(v, 0, b).map_err(|_| "Alg 12: w out of range")?;
     Ok(w_out)
 }
 
 
 /// # Algorithm 13: `BitUnpack(v,a,b)` on page 23.
-/// Reverses the procedure `BitPack`.
+/// Reverses the procedure `BitPack`. Used in Algorithm 12 above, as well as
+/// Algorithm 19's `skDecode()` function, Algorithm 21's `sigDecode()` function,
+/// and Algorithm 28's `expand_mask()` function. The latter function is used in
+///`ml_dsa::sign_finish()`. The first three (12/19/21) take untrusted input.
 ///
-/// **Input**: `a, b ∈ N` and a byte string `v` of length `32·bitlen(a + b)`. <br>
-/// **Output**: A polynomial `w ∈ R`, with coefficients in `[b − 2c + 1, b]`, where `c = bitlen(a + b)`. <br>
-/// When `a + b + 1` is a power of 2, the coefficients are in `[−a, b]`.
-///
-/// # Panics
-/// In debug, requires `a >= 0` and `a <= i32::MAX / 64`.
-/// In debug, requires `b > 0` and `b < i32::MAX / 64`.
+/// **Input**:  `a, b ∈ N` and a byte string `v` of length `32·bitlen(a + b)`.
+///             Security parameter `a` must be non-negative and have a bit length of less than 20.
+///             Security parameter `b` must be positive and have a bit length of less than 20.<br>
+/// **Output**: A polynomial `w ∈ R`, with coefficients in `[b − 2^c + 1, b]`, where `c = bitlen(a + b)`. <br>
+///             When `a + b + 1` is a power of 2, the coefficients are in `[−a, b]`.
 ///
 /// # Errors
-/// Returns an error on `w` out of range, or an incorrectly sized `v`.
+/// Returns an error on `w` out of range.
 pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
-    debug_assert!((0..i32::MAX / 64).contains(&a), "Alg 13: a out of range");
-    debug_assert!((1..i32::MAX / 64).contains(&b), "Alg 13: b out of range");
-    debug_assert_eq!(v.len(), 32 * bit_length(a + b), "Alg 13: incorrectly sized v");
+    debug_assert!((0..1024 * 1024).contains(&a), "Alg 13: a out of range");
+    debug_assert!((1..1024 * 1024).contains(&b), "Alg 13: b out of range");
+    debug_assert_eq!(v.len(), 32 * bit_length(a + b), "Alg 13: bad output size");
 
     let bitlen = bit_length(a + b).try_into().expect("Alg 13: try_into fail");
     let mut w_out = [0i32; 256];
@@ -221,7 +213,9 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
             r_index += 1;
         }
     }
-    ensure!(is_in_range(&w_out, a, b), "Alg 13: w out of range");
+
+    let bot = i32::abs(b - 2i32.pow(bitlen) + 1); // b − 2^c + 1 (as abs)
+    ensure!(is_in_range(&w_out, bot, b), "Alg 13: w out of range");
     Ok(w_out)
 }
 
@@ -229,27 +223,17 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
 /// # Algorithm 14: `HintBitPack(h)` on page 24.
 /// Encodes a polynomial vector `h` with binary coefficients into a byte string.
 ///
-/// **Input**: A polynomial vector `h ∈ R^k_2` such that at most `ω` of the coefficients in `h` are equal to `1`. <br>
+/// **Input**:  A polynomial vector `h ∈ R^k_2` such that at most `ω` of the coefficients in `h` are equal to `1`.
+///             Security parameters `ω` (omega) and k must sum to be less than 256. <br>
 /// **Output**: A byte string `y` of length `ω + k`.
-///
-/// # Panics
-/// In debug, requires `y` of length `ω + k`.
-/// In debug, requires 1 < `ω + k` < 255
-///
-/// # Errors
-/// Returns an error on too many `1` in `h`, or values other than `0` & `1` in h
-pub(crate) fn hint_bit_pack<const K: usize>(
-    omega: i32, h: &[R; K], y_bytes: &mut [u8],
-) -> Result<(), &'static str> {
-    let omega_u = usize::try_from(omega).expect("Alg14: omega try_into fail");
-    debug_assert!((1..255).contains(&(omega_u + K)), "Alg14: omega out of range");
-    debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg14: incorrectly sized output bytes");
-
-    // TODO: reconsider whether these should be debug_assert! or ensure!
-    ensure!(h.iter().all(|r| is_in_range(r, 0, 1)), "Alg14: h not 0/1");
-    ensure!(
+pub(crate) fn hint_bit_pack<const K: usize>(omega: i32, h: &[R; K], y_bytes: &mut [u8]) {
+    let omega_u = usize::try_from(omega).expect("Alg 14: omega try_into fail");
+    debug_assert!((1..255).contains(&(omega_u + K)), "Alg 14: omega+K out of range");
+    debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 14: bad output size");
+    debug_assert!(h.iter().all(|r| is_in_range(r, 0, 1)), "Alg 14: h not 0/1");
+    debug_assert!(
         h.iter().all(|&r| r.iter().filter(|&e| *e == 1).sum::<i32>() <= omega),
-        "Alg14: too many 1's in h"
+        "Alg 14: too many 1's in h"
     );
 
     // 1: y ∈ B^{ω+k} ← 0^{ω+k}
@@ -273,8 +257,6 @@ pub(crate) fn hint_bit_pack<const K: usize>(
                 // 7: Index ← Index + 1
                 index += 1;
 
-                // slightly redundant, per count in second ensure above
-                ensure!(index < y_bytes.len(), "Alg14: index has gone out of range");
                 // 8: end if
             }
 
@@ -282,37 +264,33 @@ pub(crate) fn hint_bit_pack<const K: usize>(
         }
 
         // 10: y[ω + i] ← Index ▷ Store the value of Index after processing h[i]
-        y_bytes[omega_u + i] = u8::try_from(index).map_err(|_| "Alg14: index > u8::MAX")?;
+        y_bytes[omega_u + i] = index.to_le_bytes()[0];
 
         // 11: end for
     }
 
     // 12: return y
-    Ok(())
 }
 
 
 /// # Algorithm 15: `HintBitUnpack(y)` on page 24.
 /// Reverses the procedure `HintBitPack`.
 ///
-/// **Input**: A byte string `y` of length `ω + k`. <br>
+/// **Input**:  A byte string `y` of length `ω + k`.
+///             Security parameters `ω` (omega) and k must sum to be less than 256. <br>
 /// **Output**: A polynomial vector `h ∈ R^k_2` or `⊥` (as an Error).
 ///
-/// # Panics
-/// In debug, requires `y` of length `ω + k`.
-/// In debug, requires 1 < `ω + k` < 255
-///
 /// # Errors
-/// Returns an error on incorrectly sized or illegal inputs.
+/// Returns an error on invalid input.
 pub(crate) fn hint_bit_unpack<const K: usize>(
     omega: i32, y_bytes: &[u8],
 ) -> Result<[R; K], &'static str> {
-    let omega_u = usize::try_from(omega).expect("Alg15: omega try_into fail");
-    debug_assert_eq!(y_bytes.len(), omega_u + K);
-    debug_assert!((0..255usize).contains(&(omega_u + K)), "Alg15: omega too large");
+    let omega_u = usize::try_from(omega).expect("Alg 15: omega try_into fail");
+    debug_assert!((K + 1..255).contains(&(omega_u + K)), "Alg 15: omega+K too large");
+    debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 15: bad output size");
 
     // 1: h ∈ R^k_2 ∈ ← 0^k
-    let mut h = [R::zero(); K];
+    let mut h = [[0i32; 256]; K];
 
     // 2: Index ← 0
     let mut index = 0;
@@ -322,7 +300,7 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
         //
         // 4: if y[ω + i] < Index or y[ω + i] > ω then return ⊥
         if (y_bytes[omega_u + i] < index) | (y_bytes[omega_u + i] > omega.to_le_bytes()[0]) {
-            return Err("Alg15: returns ⊥ a");
+            return Err("Alg 15a: returns ⊥");
 
             // 5: end if
         }
@@ -347,7 +325,7 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
         //
         // 12: if y[Index] != 0 then return ⊥
         if y_bytes[index as usize] != 0 {
-            return Err("Alg15: returns ⊥ b");
+            return Err("Alg 15b: returns ⊥");
 
             // 13: end if
         }
@@ -359,9 +337,9 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
     }
 
     // 16: return h
-    ensure!(
+    debug_assert!(
         h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega),
-        "Alg15: too many 1's in h"
+        "Alg 15: too many 1's in h"
     );
     Ok(h)
 }
@@ -447,7 +425,7 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut random_bytes);
         let r = simple_bit_unpack(&random_bytes, (1 << 6) - 1).unwrap();
         let mut res = [0u8; 32 * 6];
-        simple_bit_pack(&r, (1 << 6) - 1, &mut res).unwrap();
+        simple_bit_pack(&r, (1 << 6) - 1, &mut res);
         assert_eq!(random_bytes, res);
     }
 
@@ -478,8 +456,8 @@ mod tests {
         let mut random_bytes = [0u8; 32 * 6];
         rand::thread_rng().fill_bytes(&mut random_bytes);
         let r = [0i32; 256];
-        let res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
-        assert!(res.is_ok());
+        let _res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
+        // no panic is good news
     }
 
     #[test]
@@ -490,8 +468,8 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut random_bytes);
         // wrong size r coeff
         let r = [1024i32; 256];
-        let res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
-        assert!(res.is_err());
+        let _res = simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
+        // should have paniced by now...
     }
 
     // TODO: reword to start with bit_pack..
