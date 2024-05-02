@@ -46,7 +46,7 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
     let cap_a_hat: [[T; L]; K] = expand_a_vartime(&rho);
 
     // 4: (s_1, s_2 ) ← ExpandS(ρ′)
-    let (s_1, s_2): ([R; L], [R; K]) = expand_s_vartime(eta, &rho_prime)?;
+    let (s_1, s_2): ([R; L], [R; K]) = expand_s_vartime(eta, &rho_prime);
 
     // 5: t ← NTT−1 (cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
     let s_1_hat: [T; L] = ntt(&s_1);
@@ -158,7 +158,7 @@ pub(crate) fn sign_finish<
     loop {
         //
         // 12: y ← ExpandMask(ρ′ , κ)
-        let y: [R; L] = expand_mask(gamma1, &rho_prime, k)?;
+        let y: [R; L] = expand_mask(gamma1, &rho_prime, k);
 
         // 13: w ← NTT−1 (cap_a_hat ◦ NTT(y))
         let y_hat: [T; L] = ntt(&y);
@@ -176,7 +176,7 @@ pub(crate) fn sign_finish<
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
         let w1e_len = 32 * K * bit_length((Q - 1) / (2 * gamma2) - 1);
         let mut w1_tilde = [0u8; 1024]; // TODO: Revisit potential waste of 256 bytes
-        w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len])?;
+        w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len]);
         let mut h15 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
         h15.read(&mut c_tilde);
 
@@ -186,7 +186,7 @@ pub(crate) fn sign_finish<
         // c_tilde_2 is never used!
 
         // 17: c ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
-        let c: R = sample_in_ball(tau, &c_tilde_1)?;
+        let c: R = sample_in_ball(tau, &c_tilde_1);
 
         // 18: c_hat ← NTT(c)
         let c_hat: T = ntt(&[c])[0];
@@ -365,7 +365,7 @@ pub(crate) fn verify_finish<
     c_tilde_1.copy_from_slice(&c_tilde[0..32]); // c_tilde_2 is just discarded...
 
     // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
-    let c: R = sample_in_ball(tau, &c_tilde_1)?;
+    let c: R = sample_in_ball(tau, &c_tilde_1);
 
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let z_hat: [T; L] = ntt(&z);
@@ -402,7 +402,7 @@ pub(crate) fn verify_finish<
     let bl = bit_length(qm12gm1);
     let t_max = 32 * K * bl;
     let mut tmp = [0u8; 1024]; // TODO: Revisit potential waste of 256 bytes
-    w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max])?;
+    w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max]);
     let mut hasher = h_xof(&[&mu, &tmp[..t_max]]);
     let mut c_tilde_p = [0u8; 64];
     hasher.read(&mut c_tilde_p); // leftover to be ignored

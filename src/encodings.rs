@@ -3,7 +3,7 @@
 use crate::conversion::{
     bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
 };
-use crate::helpers::{bit_length, ensure, is_in_range};
+use crate::helpers::{bit_length, is_in_range};
 use crate::types::R;
 use crate::{D, Q};
 
@@ -19,6 +19,7 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 ) -> [u8; PK_LEN] {
     let blqd = bit_length(Q - 1) - D as usize;
     debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 16: t1 out of range");
+    debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 17: bad pk/config size");
     let mut pk = [0u8; PK_LEN];
 
     // 1: pk ← BitsToBytes(ρ)
@@ -50,13 +51,15 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 /// **Output**: `ρ ∈ {0, 1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d} − 1]`).
 ///
 /// # Errors
-/// Returns an error when `simple_bit_unpack()` invocation finds an element of `t1` is out of range.
+/// Returns an error when the internal `simple_bit_unpack()` invocation finds an element of
+/// `t1` is out of range.
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     pk: &[u8; PK_LEN],
 ) -> Result<(&[u8; 32], [R; K]), &'static str> {
     let blqd = bit_length(Q - 1) - D as usize;
     debug_assert_eq!(pk.len(), 32 + 32 * K * blqd, "Alg 17: incorrect pk length");
+    debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 17: bad pk/config size");
 
     // 1: (y, z_0 , . . . , z_{k−1}) ∈ B^{32} × (B^{32(bitlen(q−1)−d))^k} ← pk
 
@@ -89,7 +92,7 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 ///            `s2 ∈ R^k` with coefficients in `[−η, η]`,
 ///            `t0 ∈ R^k` with coefficients in `[−2^{d-1} + 1, 2^{d-1}]`.
 ///             Security parameter `η` (eta) must be either 2 or 4.<br>
-/// **Output**: Private key, `sk ∈ B^{32+32+64+32·((k+ℓ)·bitlen(2η)+dk)}`
+/// **Output**: Private key, `sk ∈ B^{32+32+64+32·((k+ℓ)·bitlen(2·η)+d·k)}`
 pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s1: &[R; L], s2: &[R; K], t0: &[R; K],
 ) -> [u8; SK_LEN] {
@@ -97,7 +100,12 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     debug_assert!((eta == 2) | (eta == 4), "Alg 18: incorrect eta");
     debug_assert!(s1.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s1 out of range");
     debug_assert!(s2.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s2 out of range");
-    debug_assert!(t0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg18: t0 out of range");
+    debug_assert!(t0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg 18: t0 out of range");
+    debug_assert_eq!(
+        SK_LEN,
+        128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
+        "Alg 18: bad sk/config size"
+    );
 
     let mut sk = [0u8; SK_LEN];
 
@@ -160,6 +168,11 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<(&[u8; 32], &[u8; 32], &[u8; 64], [R; L], [R; K], [R; K]), &'static str> {
     debug_assert!((eta == 2) | (eta == 4), "Alg 19: incorrect eta");
+    debug_assert_eq!(
+        SK_LEN,
+        128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
+        "Alg 19: bad sk/config size"
+    );
     let top = 1 << (D - 1);
     let (mut s1, mut s2, mut t0) = ([[0i32; 256]; L], [[0i32; 256]; K], [[0i32; 256]; K]);
 
@@ -235,7 +248,7 @@ pub(crate) fn sig_encode<
     debug_assert_eq!(
         SIG_LEN,
         LAMBDA_DIV4 + L * 32 * (1 + bit_length(gamma1 - 1)) + omega.unsigned_abs() as usize + K,
-        "Alg 20: bad output size"
+        "Alg 20: bad sig/config size"
     );
 
     let mut sigma = [0u8; SIG_LEN];
@@ -273,13 +286,18 @@ pub(crate) fn sig_encode<
 /// # Errors
 /// Returns an error when decoded coefficients fall out of range.
 #[allow(clippy::type_complexity)]
-pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA_DIV4: usize, const SIG_LEN: usize>(
+pub(crate) fn sig_decode<
+    const K: usize,
+    const L: usize,
+    const LAMBDA_DIV4: usize,
+    const SIG_LEN: usize,
+>(
     gamma1: i32, omega: i32, sigma: &[u8; SIG_LEN],
 ) -> Result<([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>), &'static str> {
     debug_assert_eq!(
         SIG_LEN,
         LAMBDA_DIV4 + L * 32 * (1 + bit_length(gamma1 - 1)) + omega.unsigned_abs() as usize + K,
-        "Alg 21: bad output size"
+        "Alg 21: bad sig/config size"
     );
 
     let mut c_tilde = [0u8; LAMBDA_DIV4];
@@ -310,27 +328,19 @@ pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA_DIV4: usiz
 
 
 /// # Algorithm 22: `w1Encode(w1)` on page 28.
-/// Encodes a polynomial vector `w1` into a bit string.
+/// Encodes a polynomial vector `w1` into a bit string. Used in `ml_dsa::sign_finish()` and
+/// `ml_dsa::verify_finish()`, and not exposed to untrusted input.
 ///
 /// **Input**: `w1 ∈ R^k` with coefficients in `[0, (q − 1)/(2γ_2) − 1]`.
 /// **Output**: A bit string representation, `w1_tilde ∈ {0,1}^{32·k·bitlen((q-1)/(2γ2)−1)}`.
-///
-/// # Panics
-/// In debug, requires correctly sized `w1_tilde`.
-///
-/// # Errors
-/// Returns an error if any `w1` coefficients fall out of range
-/// Propagates any errors generated by called functions.
-pub(crate) fn w1_encode<const K: usize>(
-    gamma2: i32, w1: &[R; K], w1_tilde: &mut [u8],
-) -> Result<(), &'static str> {
+pub(crate) fn w1_encode<const K: usize>(gamma2: i32, w1: &[R; K], w1_tilde: &mut [u8]) {
     let qm1_d_2g_m1 = (Q - 1) / (2 * gamma2) - 1;
     debug_assert_eq!(
         w1_tilde.len(),
         32 * K * bit_length(qm1_d_2g_m1),
-        "Alg22: incorrect size for w1_tilde"
+        "Alg 22: bad w1_tilde/config size"
     );
-    ensure!(w1.iter().all(|r| is_in_range(r, 0, qm1_d_2g_m1)), "Alg22: w1 out of range");
+    debug_assert!(w1.iter().all(|r| is_in_range(r, 0, qm1_d_2g_m1)), "Alg 22: w1 out of range");
 
     // 1: w1_tilde ← ()
 
@@ -345,7 +355,6 @@ pub(crate) fn w1_encode<const K: usize>(
     }
 
     // 5: return w^tilde_1
-    Ok(())
 }
 
 
@@ -445,8 +454,7 @@ mod tests {
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         //let mut sigma = [0u8; 2420];
-        let sigma =
-            sig_encode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
+        let sigma = sig_encode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
         // let mut c_test = [0u8; 2 * 128 / 8];
         // let mut z_test = [[0i32; 256]; 4];
         // let mut h_test = [[0i32; 256]; 4];

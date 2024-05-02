@@ -20,7 +20,7 @@ pub(crate) use ensure; // make available throughout crate
 
 /// Ensure all coefficients of polynomial `w` are within -lo to +hi (inclusive)
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
-    w.iter().all(|&e| (e >= -lo) && (e <= hi)) // sucess is CT, failure vartime
+    w.iter().all(|&e| (e >= -lo) && (e <= hi)) // success is CT, failure vartime
 }
 
 
@@ -32,7 +32,6 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     let q = (a as i128 * M) >> 64;
     (a - (q as i64) * (Q as i64)) as i32
 }
-
 
 /// Partially reduce a signed 32-bit value mod Q ---> `-Q <~ result <~ Q`
 // Considering the positive case for `a`, bits 23 and above can be loosely

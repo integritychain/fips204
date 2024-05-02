@@ -88,7 +88,7 @@ mod types;
 pub mod traits;
 
 // Applies across all security parameter sets
-const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1; See https://oeis.org/A234388
+const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; See https://oeis.org/A234388
 const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
 const D: u32 = 13;
 
