@@ -4,10 +4,7 @@ use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
 use crate::hashing::{expand_a_vartime, expand_mask, expand_s_vartime, h_xof, sample_in_ball};
-use crate::helpers::{
-    bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, partial_reduce32, partial_reduce64,
-    vec_add,
-};
+use crate::helpers::{bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, partial_reduce32, partial_reduce64, vec_add};
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{ExpandedPrivateKey, ExpandedPublicKey, R, T};
