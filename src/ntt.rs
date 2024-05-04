@@ -1,7 +1,8 @@
 //! This file implements functionality from FIPS 204 section 8.5 `NTT` and `invNTT`
 
-use crate::helpers;
-use crate::helpers::{mont_reduce, partial_reduce64};
+use crate::{helpers, Q};
+//use crate::helpers::{mont_reduce, partial_reduce64};
+use crate::helpers::{full_reduce32, mont_reduce};
 use crate::types::{R, T};
 
 
@@ -109,8 +110,8 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
                 k -= 1;
 
                 // 10: zeta ← −ζ^{brv(k)} mod q
-                let zeta = -helpers::ZETA_TABLE[k];
-                //let zeta = -helpers::ZETA_TABLE_MONT[k];
+                //let zeta = -helpers::ZETA_TABLE[k];
+                let zeta = -helpers::ZETA_TABLE_MONT[k];
 
                 // 11: for j from start to start + len − 1 do
                 for j in start..(start + len) {
@@ -126,8 +127,8 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
 
                     // 15: w_{j+len} ← zeta · w_{j+len}
                     w_element[j + len] =
-                        partial_reduce64(i64::from(zeta) * i64::from(w_element[j + len]));
-                        //mont_reduce(i64::from(zeta) * i64::from(w_element[j + len]));
+                        //partial_reduce64(i64::from(zeta) * i64::from(w_element[j + len]));
+                        mont_reduce(i64::from(zeta) * i64::from(w_element[j + len]));
 
                     // 16: end for
                 }
@@ -145,14 +146,16 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
         }
 
         // 21: f ← 8347681          ▷ f = 256^{−1} mod q
-        let f = 8_347_681_i64;
-        //let f = 41978;
+        //let f = 8_347_681_i64;
+        // TODO const:
+        let f = (8_347_681_i64).wrapping_mul(2i64.pow(32)).rem_euclid(i64::from(Q));
+
 
         // 22: for j from 0 to 255 do
         // 23: wj ← f · wj
         for i in &mut *w_element {
-            *i = partial_reduce64(f * i64::from(*i));
-            //*i = mont_reduce(f * i64::from(*i));
+            //*i = partial_reduce64(f * i64::from(*i));
+            *i = full_reduce32(mont_reduce(f * i64::from(*i)));
         }
 
         // 24: end for
