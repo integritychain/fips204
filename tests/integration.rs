@@ -22,7 +22,7 @@ fn forever() {
         // now, confirm that we do not accept an invalid signature
         rng.fill_bytes(&mut flip);
         let index = u32::from_le_bytes(flip[0..4].try_into().unwrap()); // index of byte to flip
-        let mut sig2 = sig.clone();
+        let mut sig2 = sig.copy();
         sig2[index as usize % (sig2.len() - 2)] ^= if flip[4] != 0 {flip[4]} else {0x55};  // investigate sig[last]
         let ver = pk.try_verify_vt(&msg, &sig2);
         if ver.is_ok() && ver.unwrap() {
@@ -32,7 +32,7 @@ fn forever() {
             eprintln!("pk is       {}\n", hex::encode(pk.into_bytes()));
             eprintln!("good sig is {}\n", hex::encode(sig));
             eprintln!("bad sig is  {}\n", hex::encode(sig2));
-            assert_eq!(ver.unwrap(), false); // fail and stop
+            assert!(!ver.unwrap()); // fail and stop if 'verified'
         }
         if i % 10000 == 0 {
             println!("So far i: {}", i)
