@@ -4,7 +4,9 @@ use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
 use crate::hashing::{expand_a_vartime, expand_mask, expand_s_vartime, h_xof, sample_in_ball};
-use crate::helpers::{bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, partial_reduce32, partial_reduce64, vec_add};
+use crate::helpers::{
+    bit_length, center_mod, infinity_norm, mat_vec_mul, partial_reduce32, partial_reduce64, vec_add,
+};
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{ExpandedPrivateKey, ExpandedPublicKey, R, T};
@@ -78,15 +80,12 @@ pub(crate) fn key_gen<const K: usize, const L: usize, const PK_LEN: usize, const
 pub(crate) fn sign_start<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<ExpandedPrivateKey<K, L>, &'static str> {
-    //return Ok(ExpandedPrivateKey { cap_k: [0u8; 32], tr: [0u8; 64], s_hat_1: [[0i32; 256]; L], s_hat_2: [[0i32; 256]; K], t_hat_0: [[0i32; 256]; K], cap_a_hat:[[[0i32; 256]; L]; K] });
     //
     // 1:  (ρ, K, tr, s_1 , s_2 , t_0 ) ← skDecode(sk)
     let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
-    //return Ok(ExpandedPrivateKey { cap_k: [0u8; 32], tr: *tr, s_hat_1: [[0i32; 256]; L], s_hat_2: [[0i32; 256]; K], t_hat_0: [[0i32; 256]; K], cap_a_hat:[[[0i32; 256]; L]; K] });
 
     // 2:  s_hat_1 ← NTT(s_1)
     let s_hat_1: [T; L] = ntt(&s_1);
-    //return Ok(ExpandedPrivateKey { cap_k: [0u8; 32], tr: [0u8; 64], s_hat_1, s_hat_2: [[0i32; 256]; K], t_hat_0: [[0i32; 256]; K], cap_a_hat:[[[0i32; 256]; L]; K] });
 
     // 3:  s_hat_2 ← NTT(s_2)
     let s_hat_2: [T; K] = ntt(&s_2);
@@ -148,7 +147,8 @@ pub(crate) fn sign_finish<
     let mut k = 0u16;
 
     // 10: (z, h) ← ⊥    ▷ we will handle ⊥ inline with 'continue'
-    let (mut z, mut h) = ([[0i32; 256]; L], [[0i32; 256]; K]);
+    let mut z: [[i32; 256]; L];
+    let mut h: [[i32; 256]; K];
     let mut c_tilde = [0u8; LAMBDA_DIV4];
 
     // 11: while (z, h) = ⊥ do    ▷ Rejection sampling loop (with continue for ⊥)
@@ -163,12 +163,8 @@ pub(crate) fn sign_finish<
         let w: [R; K] = inv_ntt(&a_y_hat);
 
         // 14: w_1 ← HighBits(w)            ▷ Signer’s commitment
-        let mut w_1: [R; K] = [[0i32; 256]; K];
-        for i in 0..K {
-            for j in 0..256 {
-                w_1[i][j] = high_bits(gamma2, w[i][j]);
-            }
-        }
+        let w_1: [R; K] =
+            core::array::from_fn(|k| core::array::from_fn(|n| high_bits(gamma2, w[k][n])));
 
         // 15: c_tilde ∈ {0,1}^{2Lambda} ← H(µ || w1Encode(w_1), 2Lambda)     ▷ Commitment hash
         let w1e_len = 32 * K * bit_length((Q - 1) / (2 * gamma2) - 1);
@@ -178,8 +174,7 @@ pub(crate) fn sign_finish<
         h15.read(&mut c_tilde);
 
         // 16: (c_tilde_1 , c_tilde_2) ∈ {0,1}^256 × {0,1}^{2Lambda-256} ← c_tilde    ▷ First 256 bits of commitment hash
-        let mut c_tilde_1 = [0u8; 32];
-        c_tilde_1.copy_from_slice(&c_tilde[0..32]);
+        let c_tilde_1: [u8; 32] = core::array::from_fn(|i| c_tilde[i]);
         // c_tilde_2 is never used!
 
         // 17: c ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
@@ -189,37 +184,30 @@ pub(crate) fn sign_finish<
         let c_hat: T = ntt(&[c])[0];
 
         // 19: ⟨⟨c_s_1 ⟩⟩ ← NTT−1 (c_hat ◦ s_hat_1)
-        let mut x: [T; L] = [[0i32; 256]; L];
-        for (xi, sh1i) in x.iter_mut().zip(s_hat_1.iter()) {
-            for (xij, (chj, sh1ij)) in xi.iter_mut().zip(c_hat.iter().zip(sh1i.iter())) {
-                *xij = partial_reduce64(i64::from(*chj) * i64::from(*sh1ij));
-            }
-        }
-        let c_s_1 = inv_ntt(&x);
+        let cs1_hat: [T; L] = core::array::from_fn(|l| {
+            core::array::from_fn(|n| {
+                partial_reduce64(i64::from(c_hat[n]) * i64::from(s_hat_1[l][n]))
+            })
+        });
+        let c_s_1 = inv_ntt(&cs1_hat);
 
         // 20: ⟨⟨c_s_2 ⟩⟩ ← NTT−1 (c_hat ◦ s_hat_2)
-        let mut x: [T; K] = [[0i32; 256]; K];
-        for (xi, sh2i) in x.iter_mut().zip(s_hat_2.iter()) {
-            for (xij, (chj, sh2ij)) in xi.iter_mut().zip(c_hat.iter().zip(sh2i.iter())) {
-                *xij = partial_reduce64(i64::from(*chj) * i64::from(*sh2ij));
-            }
-        }
-        let c_s_2 = inv_ntt(&x);
+        let cs2_hat: [T; K] = core::array::from_fn(|k| {
+            core::array::from_fn(|n| {
+                partial_reduce64(i64::from(c_hat[n]) * i64::from(s_hat_2[k][n]))
+            })
+        });
+        let c_s_2 = inv_ntt(&cs2_hat);
 
         // 21: z ← y + ⟨⟨c_s_1⟩⟩    ▷ Signer’s response
-        for i in 0..L {
-            for j in 0..256 {
-                z[i][j] = partial_reduce32(y[i][j] + c_s_1[i][j]);
-            }
-        }
+        z = core::array::from_fn(|l| {
+            core::array::from_fn(|n| partial_reduce32(y[l][n] + c_s_1[l][n]))
+        });
 
         // 22: r0 ← LowBits(w − ⟨⟨c_s_2⟩⟩)
-        let mut r0: [R; K] = [[0i32; 256]; K];
-        for i in 0..K {
-            for j in 0..256 {
-                r0[i][j] = low_bits(gamma2, partial_reduce32(w[i][j] - c_s_2[i][j]));
-            }
-        }
+        let r0: [R; K] = core::array::from_fn(|k| {
+            core::array::from_fn(|n| low_bits(gamma2, partial_reduce32(w[k][n] - c_s_2[k][n])))
+        });
 
         // 23: if ||z||∞ ≥ Gamma1 − β or ||r0||∞ ≥ Gamma2 − β then (z, h) ← ⊥    ▷ Validity checks
         let z_norm = infinity_norm(&z);
@@ -231,24 +219,24 @@ pub(crate) fn sign_finish<
         }
 
         // 25: ⟨⟨c_t_0 ⟩⟩ ← NTT−1 (c_hat ◦ t_hat_0)
-        let mut x: [T; K] = [[0i32; 256]; K];
-        for (xi, th0i) in x.iter_mut().zip(t_hat_0.iter()) {
-            for (xij, (chj, th0ij)) in xi.iter_mut().zip(c_hat.iter().zip(th0i.iter())) {
-                *xij = partial_reduce64(i64::from(*chj) * i64::from(*th0ij));
-            }
-        }
-        let c_t_0 = inv_ntt(&x);
+        let ct0_hat: [T; K] = core::array::from_fn(|k| {
+            core::array::from_fn(|n| {
+                partial_reduce64(i64::from(c_hat[n]) * i64::from(t_hat_0[k][n]))
+            })
+        });
+        let c_t_0 = inv_ntt(&ct0_hat);
 
         // 26: h ← MakeHint(−⟨⟨c_t_0⟩⟩, w − ⟨⟨c_s_2⟩⟩ + ⟨⟨c_t_0⟩⟩)    ▷ Signer’s hint
-        let mut mct0 = [[0i32; 256]; K];
-        let mut wcc = [[0i32; 256]; K];
-        for i in 0..K {
-            for j in 0..256 {
-                mct0[i][j] = partial_reduce32(Q - c_t_0[i][j]);
-                wcc[i][j] = partial_reduce32(w[i][j] - c_s_2[i][j] + c_t_0[i][j]);
-                h[i][j] = i32::from(make_hint(gamma2, mct0[i][j], wcc[i][j]));
-            }
-        }
+        h = core::array::from_fn(|k| {
+            core::array::from_fn(|n| {
+                i32::from(make_hint(
+                    gamma2,
+                    partial_reduce32(Q - c_t_0[k][n]),
+                    partial_reduce32(w[k][n] - c_s_2[k][n] + c_t_0[k][n]),
+                ))
+            })
+        });
+
 
         // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
         if (infinity_norm(&c_t_0) >= gamma2)
@@ -271,12 +259,7 @@ pub(crate) fn sign_finish<
     }
 
     // 32: σ ← sigEncode(c_tilde, z mod± q, h)
-    let mut zmq: [R; L] = [[0i32; 256]; L];
-    for i in 0..L {
-        for j in 0..256 {
-            zmq[i][j] = center_mod(z[i][j]);
-        }
-    }
+    let zmq: [R; L] = core::array::from_fn(|l| core::array::from_fn(|n| center_mod(z[l][n])));
     let sig = sig_encode::<K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde, &zmq, &h);
 
     Ok(sig) // 33: return σ
@@ -307,17 +290,14 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     // the last term of:
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let t1_hat: [T; K] = ntt(&t_1);
-    let mut t1_d2_hat: [T; K] = [[0i32; 256]; K];
-    for i in 0..K {
-        for j in 0..256 {
-            t1_d2_hat[i][j] = partial_reduce64(i64::from(t1_hat[i][j]) << D);
-        }
-    }
+    let t1_d2_hat: [T; K] = core::array::from_fn(|k| {
+        core::array::from_fn(|n| partial_reduce64(i64::from(t1_hat[k][n]) << D))
+    });
 
     Ok(ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::similar_names)]
 pub(crate) fn verify_finish<
     const K: usize,
     const L: usize,
@@ -343,8 +323,8 @@ pub(crate) fn verify_finish<
         return Ok(false);
         // 4: end if
     };
-    let i_norm = infinity_norm(&z);
-    ensure!(i_norm < gamma1, "Alg3: i_norm out of range");
+    let h = h.unwrap();
+    debug_assert!(infinity_norm(&z) < gamma1, "Alg 3: i_norm out of range");
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
     // --> calculated in verify_start()
@@ -358,39 +338,28 @@ pub(crate) fn verify_finish<
     hasher.read(&mut mu);
 
     // 8: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2λ-256} ← c_tilde
-    let mut c_tilde_1 = [0u8; 32];
-    c_tilde_1.copy_from_slice(&c_tilde[0..32]); // c_tilde_2 is just discarded...
+    let c_tilde_1 = <&[u8; 32]>::try_from(&c_tilde[0..32]).expect("cannot fail");
+    // c_tilde_2 is just discarded...
 
     // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
-    let c: R = sample_in_ball(tau, &c_tilde_1);
+    let c: R = sample_in_ball(tau, c_tilde_1);
 
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let z_hat: [T; L] = ntt(&z);
-    let amz_hat: [T; K] = mat_vec_mul(cap_a_hat, &z_hat);
-
+    let az_hat: [T; K] = mat_vec_mul(cap_a_hat, &z_hat);
     // NTT(t_1 · 2^d) --> calculated in verify_start()
-
     let c_hat: T = ntt(&[c])[0];
-
-    let mut cmt_hat: [T; K] = [[0i32; 256]; K];
-    for (ntci, ntdi) in cmt_hat.iter_mut().zip(t1_d2_hat.iter()) {
-        for (ntcij, (ncj, ntdij)) in ntci.iter_mut().zip(c_hat.iter().zip(ntdi.iter())) {
-            *ntcij = partial_reduce64(i64::from(*ncj) * i64::from(*ntdij));
-        }
-    }
-
-    let mut wp_approx: [R; K] = [[0i32; 256]; K];
-    for i in 0..K {
-        let mut tmp = [0i32; 256];
-        (0..256).for_each(|j| tmp[j] = amz_hat[i][j] - cmt_hat[i][j]);
-        wp_approx[i] = inv_ntt(&[tmp])[0];
-    }
+    let wp_approx: [T; K] = inv_ntt(&core::array::from_fn(|k| {
+        core::array::from_fn(|n| {
+            az_hat[k][n] - partial_reduce64(i64::from(c_hat[n]) * i64::from(t1_d2_hat[k][n]))
+        })
+    }));
 
     // 11: w′_1 ← UseHint(h, w′_Approx)    ▷ Reconstruction of signer’s commitment
     let mut wp_1: [R; K] = [[0i32; 256]; K];
     for i in 0..K {
         for j in 0..256 {
-            wp_1[i][j] = use_hint(gamma2, h.ok_or("h scrambled 3")?[i][j], wp_approx[i][j]);
+            wp_1[i][j] = use_hint(gamma2, h[i][j], wp_approx[i][j]);
         }
     }
 
@@ -408,7 +377,6 @@ pub(crate) fn verify_finish<
     let left = infinity_norm(&z) < (gamma1 - beta);
     let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4];
     let right = h
-        .ok_or("h scrambled 4")?
         .iter()
         .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
     Ok(left & center & right)

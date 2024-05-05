@@ -3,7 +3,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Correctly sized private key specific to the target security parameter set. <br>
 /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, Zeroize, ZeroizeOnDrop, Debug)]
 #[repr(align(8))]
 pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 

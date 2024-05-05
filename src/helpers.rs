@@ -76,7 +76,7 @@ pub(crate) fn center_mod(m: i32) -> i32 {
 
 
 /// Matrix by vector multiplication; See top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
-#[must_use]  // TODO: MONT?!?!???
+#[must_use] // TODO: MONT?!?!???
 pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     a_hat: &[[[i32; 256]; L]; K], u_hat: &[[i32; 256]; L],
 ) -> [[i32; 256]; K] {
@@ -157,7 +157,7 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
 ///////////////////////
 
 #[allow(dead_code)]
-const QINV: i64 = 58_728_449;  // (Q * QINV) % 2**32 = 1
+const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
 
 #[allow(dead_code, clippy::cast_possible_truncation)]
 pub(crate) const fn mont_reduce(a: i64) -> i32 {
@@ -177,7 +177,8 @@ const fn gen_zeta_table_mont() -> [i32; 256] {
     let mut i = 0_usize;
     while i < 256 {
         let result_norm = pow_mod_q(ZETA, i.to_le_bytes()[0].reverse_bits());
-        let result_mont = (result_norm as i64).wrapping_mul(2i64.pow(32)).rem_euclid(Q as i64) as i32;
+        let result_mont =
+            (result_norm as i64).wrapping_mul(2i64.pow(32)).rem_euclid(Q as i64) as i32;
         result[i] = result_mont;
         i += 1;
     }
