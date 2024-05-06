@@ -98,12 +98,8 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 /// Vector addition; See bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
-    let mut result = [[0i32; 256]; K];
-    for i in 0..vec_a.len() {
-        for j in 0..vec_a[i].len() {
-            result[i][j] = vec_a[i][j] + vec_b[i][j]; //partial_reduce(vec_a[i][j] + vec_b[i][j]);
-        }
-    }
+    let result: [[i32; 256]; K] =
+        core::array::from_fn(|k| core::array::from_fn(|n| vec_a[k][n] + vec_b[k][n]));
     result
 }
 

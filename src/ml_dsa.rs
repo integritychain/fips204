@@ -356,12 +356,9 @@ pub(crate) fn verify_finish<
     }));
 
     // 11: w′_1 ← UseHint(h, w′_Approx)    ▷ Reconstruction of signer’s commitment
-    let mut wp_1: [R; K] = [[0i32; 256]; K];
-    for i in 0..K {
-        for j in 0..256 {
-            wp_1[i][j] = use_hint(gamma2, h[i][j], wp_approx[i][j]);
-        }
-    }
+    let wp_1: [R; K] = core::array::from_fn(|k| {
+        core::array::from_fn(|n| use_hint(gamma2, h[k][n], wp_approx[k][n]))
+    });
 
     // 12: c_tilde_′ ← H(µ||w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
     let qm12gm1 = (Q - 1) / (2 * gamma2) - 1;
@@ -376,8 +373,6 @@ pub(crate) fn verify_finish<
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
     let left = infinity_norm(&z) < (gamma1 - beta);
     let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4];
-    let right = h
-        .iter()
-        .all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
+    let right = h.iter().all(|&r| r.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
     Ok(left & center & right)
 }

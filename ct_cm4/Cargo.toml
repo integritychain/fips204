@@ -1,6 +1,6 @@
 [package]
-name = "ct_cm4-fips204"
-version = "0.1.1"
+name = "fips204-ct_cm4"
+version = "0.1.2"
 license = "MIT OR Apache-2.0"
 description = "Cortex-M4 testbench for FIPS 204 (draft) ML-DSA"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
