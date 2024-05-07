@@ -15,7 +15,7 @@ pub(crate) fn ntt<const X: usize>(w: &[R; X]) -> [T; X] {
     // 1: for j from 0 to 255 do
     // 2: w_hat[j] ← w_j
     // 3: end for
-    let mut w_hat = *w;
+    let mut w_hat: [T; X] = core::array::from_fn(|x| T(core::array::from_fn(|n| w[x].0[n])));
 
     // for each element of w_hat
     for w_element in &mut w_hat {
@@ -45,13 +45,13 @@ pub(crate) fn ntt<const X: usize>(w: &[R; X]) -> [T; X] {
                 for j in start..(start + len) {
                     //
                     // 12: t ← zeta · w_hat[ j + len]
-                    let t = mont_reduce(zeta * i64::from(w_element[j + len]));
+                    let t = mont_reduce(zeta * i64::from(w_element.0[j + len]));
 
                     // 13: w_hat[j + len] ← w_hat[j] − t
-                    w_element[j + len] = w_element[j] - t;
+                    w_element.0[j + len] = w_element.0[j] - t;
 
                     // 14: w_hat[j] ← w_hat[j] + t
-                    w_element[j] += t;
+                    w_element.0[j] += t;
 
                     // 15: end for
                 }
@@ -86,7 +86,8 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
     // 1: for j from 0 to 255 do
     // 2: w_j ← w_hat[j]
     // 3: end for
-    let mut w_out = *w_hat;
+    //let mut w_out = w_hat.clone();
+    let mut w_out: [R; X] = core::array::from_fn(|x| R(core::array::from_fn(|n| w_hat[x].0[n])));
 
     // for each element of w_hat
     for w_element in &mut w_out {
@@ -117,18 +118,18 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
                 for j in start..(start + len) {
                     //
                     // 12: t ← w_j
-                    let t = w_element[j];
+                    let t = w_element.0[j];
 
                     // 13: w_j ← t + w_{j+len}
-                    w_element[j] = t + w_element[j + len];
+                    w_element.0[j] = t + w_element.0[j + len];
 
                     // 14: w_{j+len} ← t − w_{j+len}
-                    w_element[j + len] = t - w_element[j + len];
+                    w_element.0[j + len] = t - w_element.0[j + len];
 
                     // 15: w_{j+len} ← zeta · w_{j+len}
-                    w_element[j + len] =
+                    w_element.0[j + len] =
                         //partial_reduce64(i64::from(zeta) * i64::from(w_element[j + len]));
-                        mont_reduce(i64::from(zeta) * i64::from(w_element[j + len]));
+                        mont_reduce(i64::from(zeta) * i64::from(w_element.0[j + len]));
 
                     // 16: end for
                 }
@@ -153,7 +154,7 @@ pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
 
         // 22: for j from 0 to 255 do
         // 23: wj ← f · wj
-        for i in &mut *w_element {
+        for i in &mut w_element.0 {
             //*i = partial_reduce64(f * i64::from(*i));
             *i = full_reduce32(mont_reduce(f * i64::from(*i)));
         }

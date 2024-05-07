@@ -2,7 +2,7 @@
 
 use crate::conversion::{bit_unpack, coef_from_half_byte_vartime, coef_from_three_bytes_vartime};
 use crate::helpers::{bit_length, is_in_range};
-use crate::types::{R, T};
+use crate::types::{R, R0, T, T0};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
 
@@ -40,7 +40,7 @@ pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> R {
     xof.read(&mut hpk8); // Save the first 8 bytes for step 9
 
     // 1: c ← 0
-    let mut c = [0i32; 256];
+    let mut c = R0;
 
     // 2: k ← 8; k implicitly advances with each sample
     let mut hpk = [0u8];
@@ -63,13 +63,13 @@ pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> R {
         let j = hpk[0];
 
         // 8: ci ← cj
-        c[i] = c[usize::from(j)];
+        c.0[i] = c.0[usize::from(j)];
 
         // 9: c_j ← (−1)^{H(ρ)[i+τ−256]
         let index = i + tau - 256;
         let bite = hpk8[index / 8];
         let shifted = bite >> (index & 0x07);
-        c[usize::from(j)] = 1 - 2 * i32::from(shifted & 0x01);
+        c.0[usize::from(j)] = 1 - 2 * i32::from(shifted & 0x01);
 
         // 10: k ← k + 1   (implicit)
 
@@ -77,7 +77,7 @@ pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> R {
     }
 
     // 12: return c
-    debug_assert!(c.iter().filter(|e| e.abs() != 0).count() == tau, "Alg 23: bad hamming weight");
+    debug_assert!(c.0.iter().filter(|e| e.abs() != 0).count() == tau, "Alg 23: bad hamming weight");
     c
 }
 
@@ -92,7 +92,7 @@ pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> R {
 /// **Output**: An element `a_hat ∈ Tq`.
 pub(crate) fn rej_ntt_poly_vartime(rhos: &[&[u8]]) -> T {
     debug_assert_eq!(rhos.iter().map(|&i| i.len()).sum::<usize>(), 272 / 8, "Alg 24: bad rho size");
-    let mut a_hat = [0i32; 256];
+    let mut a_hat = T0;
     let mut xof = h128_xof(rhos);
 
     // 1: j ← 0
@@ -112,7 +112,7 @@ pub(crate) fn rej_ntt_poly_vartime(rhos: &[&[u8]]) -> T {
 
         // 6: if a_hat[j] != ⊥ then
         if let Ok(res) = a_hat_j {
-            a_hat[j] = res; // Good result, save it and carry on
+            a_hat.0[j] = res; // Good result, save it and carry on
 
             // 7: j ← j + 1
             j += 1;
@@ -139,7 +139,7 @@ pub(crate) fn rej_ntt_poly_vartime(rhos: &[&[u8]]) -> T {
 pub(crate) fn rej_bounded_poly_vartime(eta: i32, rhos: &[&[u8]]) -> R {
     debug_assert_eq!(rhos.iter().map(|&i| i.len()).sum::<usize>(), 528 / 8, "Alg25: bad rho size");
     let mut z = [0u8];
-    let mut a = [0i32; 256];
+    let mut a = R0;
     let mut xof = h_xof(rhos);
 
     // 1: j ← 0
@@ -163,7 +163,7 @@ pub(crate) fn rej_bounded_poly_vartime(eta: i32, rhos: &[&[u8]]) -> R {
         if let Ok(z0) = z0 {
             //
             // 8: a_j ← z0
-            a[j] = z0;
+            a.0[j] = z0;
 
             // 9: j ← j + 1
             j += 1;
@@ -176,7 +176,7 @@ pub(crate) fn rej_bounded_poly_vartime(eta: i32, rhos: &[&[u8]]) -> R {
             if j < 256 {
                 //
                 // 12: aj ← z1
-                a[j] = z1;
+                a.0[j] = z1;
 
                 // 13: j ← j + 1
                 j += 1;
@@ -211,7 +211,7 @@ pub(crate) fn expand_a_vartime<const K: usize, const L: usize>(rho: &[u8; 32]) -
     // 4:   end for
     // 5: end for
 
-    let cap_a_hat: [[[i32; 256]; L]; K] = core::array::from_fn(|r| {
+    let cap_a_hat: [[T; L]; K] = core::array::from_fn(|r| {
         core::array::from_fn(|s| rej_ntt_poly_vartime(&[&rho[..], &[s as u8], &[r as u8]]))
     });
     cap_a_hat
@@ -237,13 +237,13 @@ pub(crate) fn expand_s_vartime<const K: usize, const L: usize>(
     // 1: for r from 0 to ℓ − 1 do
     // 2: s1[r] ← RejBoundedPoly(ρ||IntegerToBits(r, 16))
     // 3: end for
-    let s1: [[i32; 256]; L] =
+    let s1: [R; L] =
         core::array::from_fn(|r| rej_bounded_poly_vartime(eta, &[rho, &[r as u8], &[0]]));
 
     // 4: for r from 0 to k − 1 do
     // 5: s2[r] ← RejBoundedPoly(ρ||IntegerToBits(r + ℓ, 16))
     // 6: end for
-    let s2: [[i32; 256]; K] =
+    let s2: [R; K] =
         core::array::from_fn(|r| rej_bounded_poly_vartime(eta, &[rho, &[(r + L) as u8], &[0]]));
 
     // 7: return (s_1 , s_2)
@@ -260,7 +260,7 @@ pub(crate) fn expand_s_vartime<const K: usize, const L: usize>(
 /// **Input**: A bit string `ρ ∈ {0,1}^512` and a non-negative integer `µ`. <br>
 /// **Output**: Vector `s ∈ R^ℓ_q`.
 pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) -> [R; L] {
-    let mut s = [[0i32; 256]; L];
+    let mut s = [R0; L];
     let mut v = [0u8; 32 * 20]; // TODO: 640?
 
     // 1: c ← 1 + bitlen (γ1 − 1) ▷ γ1 is always a power of 2

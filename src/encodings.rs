@@ -4,7 +4,7 @@ use crate::conversion::{
     bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
 };
 use crate::helpers::{bit_length, is_in_range};
-use crate::types::R;
+use crate::types::{R, R0};
 use crate::{D, Q};
 
 
@@ -67,7 +67,7 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     let rho = <&[u8; 32]>::try_from(&pk[0..32]).expect("cannot fail");
 
     // 3: for i from 0 to k − 1 do
-    let mut t1: [R; K] = [[0i32; 256]; K]; // tricky to get `?` inside a closure
+    let mut t1: [R; K] = [R0; K]; // tricky to get `?` inside a closure
     for i in 0..K {
         //
         // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1)) ▷ This is always in the correct range
@@ -174,7 +174,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
         "Alg 19: bad sk/config size"
     );
     let top = 1 << (D - 1);
-    let (mut s1, mut s2, mut t0) = ([[0i32; 256]; L], [[0i32; 256]; K], [[0i32; 256]; K]);
+    let (mut s1, mut s2, mut t0) = ([R0; L], [R0; K], [R0; K]);
 
     // 1: (f, g, h, y_0, . . . , y_{ℓ−1}, z_0, . . . , z_{k−1}, w_0, . . . , w_{k−1)}) ∈
     //    B^32 × B^32 × B^64 × B^{32·bitlen(2η)}^l × B^{32·bitlen(2η)}^k × B^{32d}^k ← sk
@@ -301,7 +301,7 @@ pub(crate) fn sig_decode<
     );
 
     let mut c_tilde = [0u8; LAMBDA_DIV4];
-    let mut z: [R; L] = [[0i32; 256]; L];
+    let mut z: [R; L] = [R0; L];
 
     // 1: (ω, x_0, ... , x_{ℓ−1}, y) ∈ B^{λ/4} × Bℓ·32·(1+bitlen(γ_1−1))+ω+k ← σ
 
@@ -402,9 +402,9 @@ mod tests {
         assert_eq!(random_pk, res);
     }
 
-    fn get_vec(max: u32) -> [i32; 256] {
-        let mut rnd_r = [0i32; 256];
-        rnd_r
+    fn get_vec(max: u32) -> R {
+        let mut rnd_r = R0; //[0i32; 256];
+        rnd_r.0
             .iter_mut()
             .for_each(|e| *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap()));
         rnd_r

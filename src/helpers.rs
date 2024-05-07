@@ -1,4 +1,4 @@
-use crate::types::R;
+use crate::types::{R, T, T0};
 use crate::{Q, ZETA};
 
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
@@ -20,7 +20,7 @@ pub(crate) use ensure; // make available throughout crate
 
 /// Ensure all coefficients of polynomial `w` are within -lo to +hi (inclusive)
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
-    w.iter().all(|&e| (e >= -lo) && (e <= hi)) // success is CT, failure vartime
+    w.0.iter().all(|&e| (e >= -lo) && (e <= hi)) // success is CT, failure vartime
 }
 
 
@@ -78,15 +78,15 @@ pub(crate) fn center_mod(m: i32) -> i32 {
 /// Matrix by vector multiplication; See top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
 #[must_use] // TODO: MONT?!?!???
 pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
-    a_hat: &[[[i32; 256]; L]; K], u_hat: &[[i32; 256]; L],
-) -> [[i32; 256]; K] {
-    let mut w_hat = [[0i32; 256]; K];
+    a_hat: &[[T; L]; K], u_hat: &[T; L],
+) -> [T; K] {
+    let mut w_hat = [T0; K];
     for i in 0..K {
         #[allow(clippy::needless_range_loop)] // clarity
         for j in 0..L {
-            w_hat[i].iter_mut().enumerate().for_each(|(m, e)| {
+            w_hat[i].0.iter_mut().enumerate().for_each(|(m, e)| {
                 *e = partial_reduce64(
-                    i64::from(*e) + i64::from(a_hat[i][j][m]) * i64::from(u_hat[j][m]),
+                    i64::from(*e) + i64::from(a_hat[i][j].0[m]) * i64::from(u_hat[j].0[m]),
                 );
             });
         }
@@ -98,17 +98,17 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 /// Vector addition; See bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
-    let result: [[i32; 256]; K] =
-        core::array::from_fn(|k| core::array::from_fn(|n| vec_a[k][n] + vec_b[k][n]));
+    let result: [R; K] =
+        core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])));
     result
 }
 
 
-pub(crate) fn infinity_norm<const ROW: usize, const COL: usize>(w: &[[i32; COL]; ROW]) -> i32 {
+pub(crate) fn infinity_norm<const ROW: usize>(w: &[R; ROW]) -> i32 {
     let mut result = 0; // no early exit
     for row in w {
-        for element in row {
-            let z_q = center_mod(*element).abs();
+        for element in row.0 {
+            let z_q = center_mod(element).abs();
             result = if z_q > result { z_q } else { result }; // TODO: check CT
         }
     }

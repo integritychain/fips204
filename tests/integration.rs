@@ -23,7 +23,7 @@ fn forever() {
         rng.fill_bytes(&mut flip);
         let index = u32::from_le_bytes(flip[0..4].try_into().unwrap()); // index of byte to flip
         let mut sig2 = core::array::from_fn(|i| sig[i]);
-        sig2[index as usize % (sig2.len() - 2)] ^= if flip[4] != 0 { flip[4] } else { 0x55 }; // investigate sig[last]
+        sig2[index as usize % sig2.len()] ^= if flip[4] != 0 { flip[4] } else { 0x55 }; // investigate sig[last]
         let ver = pk.try_verify_vt(&msg, &sig2);
         if ver.is_ok() && ver.unwrap() {
             eprintln!("Msg is      {}\n", hex::encode(msg));

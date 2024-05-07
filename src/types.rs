@@ -3,7 +3,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Correctly sized private key specific to the target security parameter set. <br>
 /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.
-#[derive(Clone, Zeroize, ZeroizeOnDrop, Debug)]
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 
@@ -41,11 +41,14 @@ pub struct ExpandedPublicKey<const K: usize, const L: usize> {
     pub(crate) t1_d2_hat: [T; K],
 }
 
+#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
+#[repr(align(8))]
+pub(crate) struct R (pub(crate) [i32; 256]);
+pub(crate) const R0: R = R([0i32;256]);
 
-// Note: The following internal types may be reworked, perhaps as struct shells
-
-pub(crate) type R = [i32; 256];
-
-pub(crate) type T = [i32; 256];
+#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
+#[repr(align(8))]
+pub(crate) struct T (pub(crate) [i32; 256]);
+pub(crate) const T0: T = T([0i32;256]);
 
 pub(crate) type Zq = i32;

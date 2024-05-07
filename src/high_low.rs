@@ -16,15 +16,10 @@ pub(crate) fn power2round<const K: usize>(t: &[R; K]) -> ([R; K], [R; K]) {
     // 1: r+ ← r mod q
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
-    let (mut t_1, mut t_0) = ([[0i32; 256]; K], [[0i32; 256]; K]);
-    for l in 0..K {
-        for m in 0..256 {
-            let r = t[l][m]; // full_reduce(t[l][m]);
-            t_1[l][m] = (r + (1 << (D - 1)) - 1) >> D;
-            t_0[l][m] = r - (t_1[l][m] << D);
-        }
-    }
-    (t_1, t_0)
+    let r_1: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| (t[k].0[n] + (1 << (D - 1)) - 1) >> D)));
+    let r_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| t[k].0[n] - (r_1[k].0[n] << D))));
+
+    (r_1, r_0)
 }
 
 
@@ -106,7 +101,7 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
     let r1 = high_bits(gamma2, r);
 
     // 2: v1 ← HighBits(r + z)
-    let v1 = high_bits(gamma2, r + z); //partial_reduce32(r + z));
+    let v1 = high_bits(gamma2, r + z);
 
     // 3: return [[r1 != v1]]
     r1 != v1
@@ -114,14 +109,14 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 
 
 /// # Algorithm 34: `UseHint(h,r)` on page 35.
-/// Returns the high bits of `r` adjusted according to hint `h`
+/// Returns the high bits of `r` adjusted according to hint `h`.
+/// This function uses public data from the signature; thus does not need to be constant time
 ///
 /// **Input**: boolean `h`, `r` ∈ `Zq` <br>
 /// **Output**: `r1` ∈ `Z` with `0 ≤ r1 ≤ (q − 1)/(2·γ_2)`
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
     // 1: m ← (q− 1)/(2*γ_2)
-    //let m = (QI - 1) / (2 * gamma2);
 
     // 2: (r1, r0) ← Decompose(r)
     let (r1, r0) = decompose(gamma2, r);

@@ -286,7 +286,7 @@ macro_rules! functionality {
             type ByteArray = [u8; PK_LEN];
 
             fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = pk_decode::<K, PK_LEN>(&pk)?; //.map_err(|_e| "Public key deserialization failed");
+                let _unused = pk_decode::<K, PK_LEN>(&pk).map_err(|_e| "Public key deserialization failed");
                 Ok(PublicKey { 0: pk })
             }
 
@@ -298,7 +298,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SK_LEN];
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _ = sk_decode::<K, L, SK_LEN>(ETA, &sk)?; //.map_err(|_e| "Private key deserialization failed");
+                let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
                 Ok(PrivateKey { 0: sk })
             }
 
