@@ -69,25 +69,24 @@ pub(crate) const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
 pub(crate) fn center_mod(m: i32) -> i32 {
-    let t = full_reduce32(m);
+    let t = partial_reduce32(m);
     let over2 = (Q / 2) - t; // check if t is larger than Q/2
     t - ((over2 >> 31) & Q) // sub Q if over2 is negative
 }
 
 
 /// Matrix by vector multiplication; See top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
-#[must_use] // TODO: MONT?!?!???
+#[must_use]
 pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     a_hat: &[[T; L]; K], u_hat: &[T; L],
 ) -> [T; K] {
     let mut w_hat = [T0; K];
+    let u_hat_mont = to_mont(u_hat);
     for i in 0..K {
         #[allow(clippy::needless_range_loop)] // clarity
         for j in 0..L {
-            w_hat[i].0.iter_mut().enumerate().for_each(|(m, e)| {
-                *e = partial_reduce64(
-                    i64::from(*e) + i64::from(a_hat[i][j].0[m]) * i64::from(u_hat[j].0[m]),
-                );
+            w_hat[i].0.iter_mut().enumerate().for_each(|(n, e)| {
+                *e += mont_reduce(i64::from(a_hat[i][j].0[n]) * i64::from(u_hat_mont[j].0[n]));
             });
         }
     }
@@ -100,6 +99,17 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
     let result: [R; K] =
         core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])));
+    result
+}
+
+
+#[allow(clippy::cast_possible_truncation)] // as i32
+pub(crate) fn to_mont<const L: usize>(vec_a: &[T; L]) -> [T; L] {
+    let result: [T; L] = core::array::from_fn(|l| {
+        T(core::array::from_fn(|n| {
+            partial_reduce64(i64::from(vec_a[l].0[n]).wrapping_mul(1 << 32))
+        }))
+    });
     result
 }
 
@@ -137,25 +147,12 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
 }
 
 
-// const fn gen_zeta_table() -> [i32; 256] {
-//     let mut result = [0i32; 256];
-//     let mut i = 0;
-//     while i < 256 {
-//         result[i] = pow_mod_q(ZETA, i.to_le_bytes()[0].reverse_bits());
-//         i += 1;
-//     }
-//     result
-// }
-
-// #[allow(dead_code)]
-// pub(crate) static ZETA_TABLE: [i32; 256] = gen_zeta_table();
-
 ///////////////////////
 
 #[allow(dead_code)]
 const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
 
-#[allow(dead_code, clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn mont_reduce(a: i64) -> i32 {
     let t = a.wrapping_mul(QINV) as i32;
     let t = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
@@ -164,7 +161,6 @@ pub(crate) const fn mont_reduce(a: i64) -> i32 {
     t as i32
 }
 
-#[allow(dead_code)]
 pub(crate) static ZETA_TABLE_MONT: [i32; 256] = gen_zeta_table_mont();
 
 #[allow(clippy::cast_possible_truncation)]

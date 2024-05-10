@@ -467,29 +467,4 @@ mod tests {
         simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         // no panic is good news
     }
-
-    // #[test]
-    // #[should_panic]
-    // #[allow(clippy::should_panic_without_expect)]
-    // fn test_simple_bit_pack_validation2() {
-    //     let mut random_bytes = [0u8; 32 * 7];
-    //     rand::thread_rng().fill_bytes(&mut random_bytes);
-    //     // wrong size r coeff
-    //     let r = [1024i32; 256];
-    //     simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
-    //     // should have paniced by now...
-    // }
-
-    // TODO: reword to start with bit_pack..
-    // #[test]
-    // fn test_bit_pack_roundtrip() {
-    //     // Round trip for 32 * 6(bitlen) bytes
-    //     let random_bytes: Vec<u8> = (0..32 * 6).map(|_| rand::random::<u8>()).collect();
-    //     let mut r = bit_unpack(&random_bytes, 1 << 2, (1 << 6) - (1 << 2) - 1).unwrap();
-    //     let mut res = [0u8; 32 * 6];
-    //     bit_pack(&r, 1 << 2, (1 << 6) - (1 << 2) - 1, &mut res);
-    //     assert_eq!(random_bytes, res);
-    // }
-
-    // TODO test hint_bit_pack and hint_bit_unpack
 }

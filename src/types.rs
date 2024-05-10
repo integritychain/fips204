@@ -16,9 +16,9 @@ pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 pub struct ExpandedPrivateKey<const K: usize, const L: usize> {
     pub(crate) cap_k: [u8; 32],
     pub(crate) tr: [u8; 64],
-    pub(crate) s_hat_1: [T; L],
-    pub(crate) s_hat_2: [T; K],
-    pub(crate) t_hat_0: [T; K],
+    pub(crate) s_hat_1_mont: [T; L],
+    pub(crate) s_hat_2_mont: [T; K],
+    pub(crate) t_hat_0_mont: [T; K],
     pub(crate) cap_a_hat: [[T; L]; K],
 }
 
@@ -38,17 +38,17 @@ pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
 pub struct ExpandedPublicKey<const K: usize, const L: usize> {
     pub(crate) cap_a_hat: [[T; L]; K],
     pub(crate) tr: [u8; 64],
-    pub(crate) t1_d2_hat: [T; K],
+    pub(crate) t1_d2_hat_mont: [T; K],
 }
 
 #[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
-pub(crate) struct R (pub(crate) [i32; 256]);
-pub(crate) const R0: R = R([0i32;256]);
+pub(crate) struct R(pub(crate) [i32; 256]);
+pub(crate) const R0: R = R([0i32; 256]);
 
 #[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
-pub(crate) struct T (pub(crate) [i32; 256]);
-pub(crate) const T0: T = T([0i32;256]);
+pub(crate) struct T(pub(crate) [i32; 256]);
+pub(crate) const T0: T = T([0i32; 256]);
 
 pub(crate) type Zq = i32;

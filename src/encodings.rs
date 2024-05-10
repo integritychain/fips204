@@ -404,7 +404,8 @@ mod tests {
 
     fn get_vec(max: u32) -> R {
         let mut rnd_r = R0; //[0i32; 256];
-        rnd_r.0
+        rnd_r
+            .0
             .iter_mut()
             .for_each(|e| *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap()));
         rnd_r
@@ -413,11 +414,6 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_sk_encode_decode_roundtrip1() {
-        // TODO: figure out how to best test this correctly
-        //  - should the skDecode function return a result (probably)
-        //  - double check the range of the input operands (most are +/- ETA, but last one is 2^d-1)
-        //  - maybe need to rework one/two of the conversion functions in a similar fashion
-
         // D=13 ETA=2 K=4 L=4 SK_LEN=2560
         let (rho, k) = (rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>());
         let mut tr = [0u8; 64];
@@ -453,14 +449,9 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut c_tilde);
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
-        //let mut sigma = [0u8; 2420];
         let sigma = sig_encode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
-        // let mut c_test = [0u8; 2 * 128 / 8];
-        // let mut z_test = [[0i32; 256]; 4];
-        // let mut h_test = [[0i32; 256]; 4];
         let (c_test, z_test, h_test) =
             sig_decode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &sigma).unwrap();
-        //        assert!(res.is_ok());
         assert_eq!(c_tilde[0..8], c_test[0..8]);
         assert_eq!(z, z_test);
         assert_eq!(h, h_test.unwrap());

@@ -16,8 +16,11 @@ pub(crate) fn power2round<const K: usize>(t: &[R; K]) -> ([R; K], [R; K]) {
     // 1: r+ ← r mod q
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
-    let r_1: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| (t[k].0[n] + (1 << (D - 1)) - 1) >> D)));
-    let r_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| t[k].0[n] - (r_1[k].0[n] << D))));
+    let r_1: [R; K] = core::array::from_fn(|k| {
+        R(core::array::from_fn(|n| (t[k].0[n] + (1 << (D - 1)) - 1) >> D))
+    });
+    let r_0: [R; K] =
+        core::array::from_fn(|k| R(core::array::from_fn(|n| t[k].0[n] - (r_1[k].0[n] << D))));
 
     (r_1, r_0)
 }

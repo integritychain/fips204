@@ -17,7 +17,7 @@
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf>
 
 // TODO: Roadmap
-//   1. Clean up; resolve (mont) math; investigate potential h[last] weakness good/bad sig
+//   1. Clean up; resolve (mont) math
 //   2. Closer CT inspection -> top level key_gen is vartime, the rest CT outside of rho (? TBC)
 //   3. Intensive/extensive pass on documentation
 //   4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
@@ -103,7 +103,6 @@ macro_rules! functionality {
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
-
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
@@ -231,7 +230,6 @@ macro_rules! functionality {
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 let esk = ml_dsa::sign_start(ETA, &self.0)?;
-                //return Ok([0u8; SIG_LEN]);
                 let sig = ml_dsa::sign_finish::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
                 )?;
@@ -267,6 +265,7 @@ macro_rules! functionality {
             }
         }
 
+
         impl Verifier for ExpandedPublicKey {
             type Signature = [u8; SIG_LEN];
 
@@ -286,7 +285,8 @@ macro_rules! functionality {
             type ByteArray = [u8; PK_LEN];
 
             fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _unused = pk_decode::<K, PK_LEN>(&pk).map_err(|_e| "Public key deserialization failed");
+                let _unused =
+                    pk_decode::<K, PK_LEN>(&pk).map_err(|_e| "Public key deserialization failed");
                 Ok(PublicKey { 0: pk })
             }
 
@@ -298,7 +298,8 @@ macro_rules! functionality {
             type ByteArray = [u8; SK_LEN];
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
+                let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk)
+                    .map_err(|_e| "Private key deserialization failed");
                 Ok(PrivateKey { 0: sk })
             }
 
