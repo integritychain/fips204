@@ -214,7 +214,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
         }
     }
 
-    let bot = i32::abs(b - 2i32.pow(bitlen) + 1); // b − 2^c + 1 (as abs)
+    let bot = i32::abs(b - (1 << bitlen) + 1); // b − 2^c + 1 (as abs)
     ensure!(is_in_range(&w_out, bot, b), "Alg 13: w out of range");
     Ok(w_out)
 }

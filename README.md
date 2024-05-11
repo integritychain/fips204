@@ -12,7 +12,7 @@ an embedded target, constant-time statistical measurements, fuzzing, WASM execut
 
 This crate implements the FIPS 204 **draft** standard in pure Rust with minimal and mainstream dependencies, **and
 without any unsafe code**. All three security parameter sets are fully functional and tested. The implementation 
-operates in constant-time (TKTK EXCEPTIONS HERE), does not require the standard library, e.g. `#[no_std]`, has no 
+operates in constant-time (EXCEPTIONS NOTED HERE), does not require the standard library, e.g. `#[no_std]`, has no 
 heap allocations, e.g. no `alloc` needed, and exposes the `RNG` so it is suitable for the full range of applications 
 down to the bare-metal. The API is stabilized and the code is heavily biased towards safety and correctness; further 
 performance optimizations will be implemented as the standard matures. This crate will quickly follow any changes 

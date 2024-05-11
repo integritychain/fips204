@@ -4,7 +4,7 @@ use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 use rand_core::{CryptoRng, RngCore};
 
 
-// Test RNG to regurgitate incremented values when 'asked'
+// Test RNG to supply incremented values when 'asked'
 #[repr(align(8))]
 struct TestRng {
     value: u32,

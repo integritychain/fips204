@@ -25,27 +25,41 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 
 
 /// Partial Barrett-style reduction
-const M: i128 = (1 << 64) / (Q as i128);
-#[allow(clippy::inline_always, clippy::cast_possible_truncation)]
-#[inline(always)]
+// Arguably very slightly faster than single-step i128 below; worth more experimentation
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
-    let q = (a as i128 * M) >> 64;
-    (a - (q as i64) * (Q as i64)) as i32
+    const M: i64 = (1 << 48) / (Q as i64);
+    debug_assert!(a < (i64::MAX / 64));
+    let x = a >> 23;
+    let a = a - x * (Q as i64);
+    let x = a >> 23;
+    let a = a - x * (Q as i64);
+    let q = (a * M) >> 48;
+    let res = a - q * (Q as i64);
+    debug_assert!(res < 2 * Q as i64);
+    res as i32
 }
+
+
+#[allow(dead_code)]
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
+    const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
+    debug_assert!(a < (i64::MAX / 64));
+    let q = (a as i128 * MM as i128) >> 64; // only top half is relevant
+    let res = a - (q as i64 * Q as i64);
+    debug_assert!(res < 2 * Q as i64);
+    res as i32
+}
+
+
+
 
 /// Partially reduce a signed 32-bit value mod Q ---> `-Q <~ result <~ Q`
 // Considering the positive case for `a`, bits 23 and above can be loosely
 // viewed as the 'number of Q' contained within `a` (with some rounding-down
 // error). So, increment these bits and then subtract off the corresponding
-// number of Q. The result is within (better than) -Q < res < Q. This
-// approach also works for negative values. For the extreme positive `a`
-// result, consider all bits set except for position 22 so the increment
-// cannot generate a carry (and thus we have maximum rounding-down error
-// accumulated), or a = 2**31 - 2**22 - 1, which then suggests (0xFF) Q to
-// be subtracted. Then, a - (a >> 23)*Q is 6283008 or 2**23 - 2**21 - 2**8.
-// The negative result works out to -6283008. Note Q is 2**23 - 2**13 + 1.  TODO: Recheck #s
-#[inline(always)]
-#[allow(clippy::inline_always)]
+// number of Q. The result is within (better than) -Q < res < Q.
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     let x = (a + (1 << 22)) >> 23;
     let res = a - x * Q;
@@ -56,7 +70,9 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
 
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
     let x = partial_reduce32(a); // puts us within better than -Q to +Q
-    x + ((x >> 31) & Q) // add Q if negative
+    let x = x + ((x >> 31) & Q); // add Q if negative
+    debug_assert!(x < Q);
+    x
 }
 
 // Note: this is only used on 'fixed' security parameters (not secret values), so as not to impact CT
@@ -107,7 +123,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
 pub(crate) fn to_mont<const L: usize>(vec_a: &[T; L]) -> [T; L] {
     let result: [T; L] = core::array::from_fn(|l| {
         T(core::array::from_fn(|n| {
-            partial_reduce64(i64::from(vec_a[l].0[n]).wrapping_mul(1 << 32))
+            partial_reduce64(i64::from(vec_a[l].0[n]) << 32)
         }))
     });
     result
@@ -152,7 +168,7 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
 #[allow(dead_code)]
 const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation)] // as i32
 pub(crate) const fn mont_reduce(a: i64) -> i32 {
     let t = a.wrapping_mul(QINV) as i32;
     let t = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
@@ -169,8 +185,7 @@ const fn gen_zeta_table_mont() -> [i32; 256] {
     let mut i = 0_usize;
     while i < 256 {
         let result_norm = pow_mod_q(ZETA, i.to_le_bytes()[0].reverse_bits());
-        let result_mont =
-            (result_norm as i64).wrapping_mul(2i64.pow(32)).rem_euclid(Q as i64) as i32;
+        let result_mont = (result_norm as i64).wrapping_mul(1 << 32).rem_euclid(Q as i64) as i32;
         result[i] = result_mont;
         i += 1;
     }

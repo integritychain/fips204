@@ -261,7 +261,7 @@ pub(crate) fn expand_s_vartime<const K: usize, const L: usize>(
 /// **Output**: Vector `s ∈ R^ℓ_q`.
 pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) -> [R; L] {
     let mut s = [R0; L];
-    let mut v = [0u8; 32 * 20]; // TODO: 640?
+    let mut v = [0u8; 32 * 20];
 
     // 1: c ← 1 + bitlen (γ1 − 1) ▷ γ1 is always a power of 2
     let c = 1 + bit_length(gamma1 - 1); // c will either be 18 or 20

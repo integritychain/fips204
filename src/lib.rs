@@ -17,7 +17,6 @@
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf>
 
 // TODO: Roadmap
-//   1. Clean up; resolve (mont) math
 //   2. Closer CT inspection -> top level key_gen is vartime, the rest CT outside of rho (? TBC)
 //   3. Intensive/extensive pass on documentation
 //   4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test

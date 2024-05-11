@@ -5,8 +5,8 @@ use crate::encodings::{
 };
 use crate::hashing::{expand_a_vartime, expand_mask, expand_s_vartime, h_xof, sample_in_ball};
 use crate::helpers::{
-    bit_length, center_mod, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont,
-    vec_add,
+    bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32,
+    to_mont, vec_add,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -344,7 +344,7 @@ pub(crate) fn verify_finish<
         // 4: end if
     };
     let h = h.unwrap();
-    debug_assert!(infinity_norm(&z) < gamma1, "Alg 3: i_norm out of range");
+    ensure!(infinity_norm(&z) <= gamma1, "Alg 3: i_norm out of range");
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
     // --> calculated in verify_start()

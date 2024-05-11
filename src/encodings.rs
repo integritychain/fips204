@@ -53,7 +53,6 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 /// # Errors
 /// Returns an error when the internal `simple_bit_unpack()` invocation finds an element of
 /// `t1` is out of range.
-#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     pk: &[u8; PK_LEN],
 ) -> Result<(&[u8; 32], [R; K]), &'static str> {

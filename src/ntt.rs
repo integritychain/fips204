@@ -83,7 +83,7 @@ pub(crate) fn ntt<const X: usize>(w: &[R; X]) -> [T; X] {
 pub(crate) fn inv_ntt<const X: usize>(w_hat: &[T; X]) -> [R; X] {
     //
     #[allow(clippy::cast_possible_truncation)]
-    const F: i64 = 8_347_681_i128.wrapping_mul(2i128.pow(32)).rem_euclid(Q as i128) as i64;
+    const F: i64 = 8_347_681_i128.wrapping_mul(1 << 32).rem_euclid(Q as i128) as i64;
     //
     // 1: for j from 0 to 255 do
     // 2: w_j ← w_hat[j]

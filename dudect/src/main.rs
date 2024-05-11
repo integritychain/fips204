@@ -17,7 +17,7 @@ impl RngCore for TestRng {
 
     fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
         out.iter_mut().for_each(|b| *b = self.value);
-        self.value = self.value.wrapping_add(1);
+        //self.value = self.value.wrapping_add(1);
         Ok(())
     }
 }
@@ -25,11 +25,14 @@ impl RngCore for TestRng {
 impl CryptoRng for TestRng {}
 
 
+// TODO: note to self. goal is to show timing is independent of secret key, not randomness nor message.
+// so rnd gen could be kept constant
+
 fn sign(runner: &mut CtRunner, mut _rng: &mut BenchRng) {
     const ITERATIONS_INNER: usize = 5;
     const ITERATIONS_OUTER: usize = 100_000;
 
-    let message = [0u8, 1, 2, 3, 4, 5, 6, 7];  // TODO: consider whether this should be left/right
+    let message = [0u8, 1, 2, 3, 4, 5, 6, 7];  // TODO: consider whether this should be left/right (no)
 
     let (_pk1, sk_right) = ml_dsa_44::try_keygen_vt().unwrap();  // Generate both public and secret keys
     let (_pk2, sk_left) = ml_dsa_44::try_keygen_vt().unwrap();  // Generate both public and secret keys
@@ -40,7 +43,7 @@ fn sign(runner: &mut CtRunner, mut _rng: &mut BenchRng) {
     // Interleave left and right
     for i in (0..(ITERATIONS_OUTER)).step_by(2) {
         classes[i] = Class::Left;
-        refs[i] = (34, &sk_left);  // 34 = rng seed
+        refs[i] = (12, &sk_left);  // 12 = rng seed
     }
 
     for (class, tuple) in classes.into_iter().zip(refs.into_iter()) {
