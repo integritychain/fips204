@@ -25,7 +25,7 @@ codegen-units = 1
 
 
 [profile.release]
-debug = true
+debug = false #true
 debug-assertions = false
 incremental = false
 lto = true

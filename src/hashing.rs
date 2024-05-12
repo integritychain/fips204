@@ -41,7 +41,6 @@ pub(crate) fn sample_in_ball(tau: i32, rho: &[u8; 32]) -> R {
 
     // 1: c ← 0
     let mut c = R0;
-
     // 2: k ← 8; k implicitly advances with each sample
     let mut hpk = [0u8];
 

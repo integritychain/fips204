@@ -53,8 +53,6 @@ pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
 }
 
 
-
-
 /// Partially reduce a signed 32-bit value mod Q ---> `-Q <~ result <~ Q`
 // Considering the positive case for `a`, bits 23 and above can be loosely
 // viewed as the 'number of Q' contained within `a` (with some rounding-down

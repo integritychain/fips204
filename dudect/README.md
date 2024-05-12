@@ -4,6 +4,7 @@ Need to rework the rng (to return hardcoded values)
 ~~~
 See https://docs.rs/dudect-bencher/latest/dudect_bencher/
 
+$ RUSTFLAGS="-C target-cpu=native" cargo run --release
 $ RUSTFLAGS="-C target-cpu=native" cargo run --release -- --continuous sign
 running 1 benchmark continuously
 bench sign seeded with 0x9eddf0cb1f0a9394
