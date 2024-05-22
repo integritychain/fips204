@@ -72,7 +72,7 @@ pub(crate) fn coef_from_three_bytes_vartime<const CTEST: bool>(
 ///
 /// # Errors
 /// Returns an error `⊥` on when eta = 4 and b > 8 for rejection sampling. (panics on b > 15)
-#[allow(clippy::cast_possible_truncation)]  // rem as u8
+#[allow(clippy::cast_possible_truncation)] // rem as u8
 pub(crate) fn coef_from_half_byte_vartime<const CTEST: bool>(
     eta: i32, b: u8,
 ) -> Result<i32, &'static str> {

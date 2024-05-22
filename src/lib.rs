@@ -307,12 +307,16 @@ macro_rules! functionality {
         }
 
         // ----- SUPPORT FOR DUDECT CONSTANT TIME MEASUREMENTS ---
+        /// This function supports the dudect constant-time measurement framework.
+        ///
+        /// # Errors
+        /// Returns an error when the random number generator fails; propagates internal errors.
         #[cfg(feature = "dudect")]
         pub fn dudect_keygen_sign_with_rng(
-            rng: &mut impl CryptoRngCore, message: &[u8]
+            rng: &mut impl CryptoRngCore, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             //let (pk, sk) = KG::try_keygen_with_rng_vt(rng).unwrap();
-            let (pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
+            let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             //Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
