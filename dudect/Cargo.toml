@@ -9,7 +9,7 @@ rust-version = "1.70"
 
 
 [dependencies]
-fips204 = { path = ".." }
+fips204 = { path = "..", features = ["dudect"] }
 dudect-bencher = "0.6"
 rand_core = { version = "0.6.4", default-features = false }
 

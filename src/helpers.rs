@@ -120,9 +120,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
 #[allow(clippy::cast_possible_truncation)] // as i32
 pub(crate) fn to_mont<const L: usize>(vec_a: &[T; L]) -> [T; L] {
     let result: [T; L] = core::array::from_fn(|l| {
-        T(core::array::from_fn(|n| {
-            partial_reduce64(i64::from(vec_a[l].0[n]) << 32)
-        }))
+        T(core::array::from_fn(|n| partial_reduce64(i64::from(vec_a[l].0[n]) << 32)))
     });
     result
 }

@@ -1,5 +1,5 @@
 #![no_std]
-#![allow(clippy::pedantic, warnings, missing_docs, unsafe_code)]
+#![deny(clippy::pedantic, warnings, missing_docs, unsafe_code)]
 // Most of the 'allow' category...
 #![deny(absolute_paths_not_starting_with_crate, box_pointers, dead_code)]
 #![deny(elided_lifetimes_in_paths, explicit_outlives_requirements, keyword_idents)]
@@ -102,6 +102,7 @@ macro_rules! functionality {
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
+        const CTEST: bool = false; // None of the 'real'functionality should be hobbled by this constant-time flag
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
@@ -202,14 +203,14 @@ macro_rules! functionality {
             fn try_keygen_with_rng_vt(
                 rng: &mut impl CryptoRngCore,
             ) -> Result<(PublicKey, PrivateKey), &'static str> {
-                let (pk, sk) = ml_dsa::key_gen::<K, L, PK_LEN, SK_LEN>(rng, ETA)?;
+                let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             }
 
             fn gen_expanded_private_vt(
                 sk: &PrivateKey,
             ) -> Result<Self::ExpandedPrivateKey, &'static str> {
-                let esk = ml_dsa::sign_start(ETA, &sk.0)?;
+                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
                 Ok(esk)
             }
 
@@ -228,8 +229,8 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                let esk = ml_dsa::sign_start(ETA, &self.0)?;
-                let sig = ml_dsa::sign_finish::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
                 )?;
                 Ok(sig)
@@ -243,7 +244,7 @@ macro_rules! functionality {
             fn try_sign_with_rng_ct(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                let sig = ml_dsa::sign_finish::<K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                     rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
                 )?;
                 Ok(sig)
@@ -303,6 +304,21 @@ macro_rules! functionality {
             }
 
             fn into_bytes(self) -> Self::ByteArray { self.0 }
+        }
+
+        // ----- SUPPORT FOR DUDECT CONSTANT TIME MEASUREMENTS ---
+        #[cfg(feature = "dudect")]
+        pub fn dudect_keygen_sign_with_rng(
+            rng: &mut impl CryptoRngCore, message: &[u8]
+        ) -> Result<[u8; SIG_LEN], &'static str> {
+            //let (pk, sk) = KG::try_keygen_with_rng_vt(rng).unwrap();
+            let (pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
+            //Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
+            let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
+            let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
+            )?;
+            Ok(sig)
         }
     };
 }

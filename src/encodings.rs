@@ -235,6 +235,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
 ///            `h ∈ R^k_2`. <br>
 /// **Output**: Signature, `σ ∈ B^{λ/4+l·32·(1+bitlen(γ_1-1)+ω+k}`
 pub(crate) fn sig_encode<
+    const CTEST: bool,
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
@@ -267,7 +268,7 @@ pub(crate) fn sig_encode<
     }
 
     // 5: σ ← σ || HintBitPack (h)
-    hint_bit_pack::<K>(omega, h, &mut sigma[start + L * step..]);
+    hint_bit_pack::<CTEST, K>(omega, h, &mut sigma[start + L * step..]);
 
     sigma
 }
@@ -448,7 +449,8 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut c_tilde);
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
-        let sigma = sig_encode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
+        let sigma =
+            sig_encode::<false, 4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
         let (c_test, z_test, h_test) =
             sig_decode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &sigma).unwrap();
         assert_eq!(c_tilde[0..8], c_test[0..8]);

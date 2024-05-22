@@ -20,6 +20,7 @@ default-rng = ["rand_core/getrandom"]
 ml-dsa-44 = []
 ml-dsa-65 = []
 ml-dsa-87 = []
+dudect = []
 
 
 [dependencies]

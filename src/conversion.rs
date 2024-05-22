@@ -33,11 +33,14 @@ use crate::Q;
 /// Returns an error `⊥` on input 3 bytes forming values between `Q=0x7F_E0_01`--`0x7F_FF_FF`,
 /// and between `0xFF_E0_01`--`0xFF_FF_FF` (latter range due to masking of bit 7 of byte 2)
 /// per spec; for rejection sampling.
-pub(crate) fn coef_from_three_bytes_vartime(bbb: [u8; 3]) -> Result<i32, &'static str> {
+pub(crate) fn coef_from_three_bytes_vartime<const CTEST: bool>(
+    bbb: [u8; 3],
+) -> Result<i32, &'static str> {
     // 1: if b2 > 127 then
     // 2: b2 ← b2 − 128     ▷ Set the top bit of b2 to zero
     // 3: end if
     let bbb2 = i32::from(bbb[2] & 0x7F);
+    let bbb2 = if CTEST { bbb2 & 0x0F } else { bbb2 };
 
     // 4: z ← 2^16·b_2 + 2^8·b1 + b0
     let z = (bbb2 << 16) | (i32::from(bbb[1]) << 8) | i32::from(bbb[0]);
@@ -69,15 +72,20 @@ pub(crate) fn coef_from_three_bytes_vartime(bbb: [u8; 3]) -> Result<i32, &'stati
 ///
 /// # Errors
 /// Returns an error `⊥` on when eta = 4 and b > 8 for rejection sampling. (panics on b > 15)
-pub(crate) fn coef_from_half_byte_vartime(eta: i32, b: u8) -> Result<i32, &'static str> {
+#[allow(clippy::cast_possible_truncation)]  // rem as u8
+pub(crate) fn coef_from_half_byte_vartime<const CTEST: bool>(
+    eta: i32, b: u8,
+) -> Result<i32, &'static str> {
+    const M5: u32 = ((1u32 << 24) / 5) + 1;
     debug_assert!((eta == 2) | (eta == 4), "Alg 9: incorrect eta");
     debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
 
+    let b = if CTEST { b & 0x07 } else { b };
     // 1: if η = 2 and b < 15 then return 2 − (b mod 5)
     if (eta == 2) & (b < 15) {
-        let quot = ((b * (1 << 4)) / 5) >> 4;
-        let rem = b - quot * 5;
-        Ok(2 - i32::from(rem))
+        let quot = (u32::from(b) * M5) >> 24;
+        let rem = u32::from(b) - quot * 5;
+        Ok(2 - i32::from(rem as u8))
 
         // 2: else
     } else {
@@ -88,7 +96,7 @@ pub(crate) fn coef_from_half_byte_vartime(eta: i32, b: u8) -> Result<i32, &'stat
 
             // 4: else return ⊥
         } else {
-            Err("Alg 9: returns ⊥") // not necessarily an error per se, but rather "try again"
+            Err("Alg 9: returns ⊥") // not necessarily an error per se, but rather "try again" (we can have eta==2 & b == 15)
 
             // 5: end if
         }
@@ -226,7 +234,9 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
 /// **Input**:  A polynomial vector `h ∈ R^k_2` such that at most `ω` of the coefficients in `h` are equal to `1`.
 ///             Security parameters `ω` (omega) and k must sum to be less than 256. <br>
 /// **Output**: A byte string `y` of length `ω + k`.
-pub(crate) fn hint_bit_pack<const K: usize>(omega: i32, h: &[R; K], y_bytes: &mut [u8]) {
+pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
+    omega: i32, h: &[R; K], y_bytes: &mut [u8],
+) {
     let omega_u = usize::try_from(omega).expect("Alg 14: omega try_into fail");
     debug_assert!((1..255).contains(&(omega_u + K)), "Alg 14: omega+K out of range");
     debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 14: bad output size");
@@ -249,7 +259,10 @@ pub(crate) fn hint_bit_pack<const K: usize>(omega: i32, h: &[R; K], y_bytes: &mu
         for j in 0..256 {
             //
             // 5: if h[i]_j != 0 then
-            if h[i].0[j] != 0 {
+            if CTEST & (index > (y_bytes.len() - 1)) {
+                continue;
+            };
+            if CTEST | (h[i].0[j] != 0) {
                 //
                 // 6: y[Index] ← j      ▷ Store the locations of the nonzero coefficients in h[i]
                 y_bytes[index] = j.to_le_bytes()[0];
@@ -361,21 +374,21 @@ mod tests {
     #[test]
     fn test_coef_from_three_bytes1() {
         let bytes = [0x12u8, 0x34, 0x56];
-        let res = coef_from_three_bytes_vartime(bytes).unwrap();
+        let res = coef_from_three_bytes_vartime::<false>(bytes).unwrap();
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes2() {
         let bytes = [0x12u8, 0x34, 0x80];
-        let res = coef_from_three_bytes_vartime(bytes).unwrap();
+        let res = coef_from_three_bytes_vartime::<false>(bytes).unwrap();
         assert_eq!(res, 0x0000_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes3() {
         let bytes = [0x01u8, 0xe0, 0x80];
-        let res = coef_from_three_bytes_vartime(bytes).unwrap();
+        let res = coef_from_three_bytes_vartime::<false>(bytes).unwrap();
         assert_eq!(res, 0x0000_e001);
     }
 
@@ -383,21 +396,21 @@ mod tests {
     #[should_panic(expected = "panic: out of range")]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
-        let res = coef_from_three_bytes_vartime(bytes).expect("panic: out of range");
+        let res = coef_from_three_bytes_vartime::<false>(bytes).expect("panic: out of range");
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_half_byte1() {
         let inp = 3;
-        let res = coef_from_half_byte_vartime(2, inp).unwrap();
+        let res = coef_from_half_byte_vartime::<false>(2, inp).unwrap();
         assert_eq!(-1, res);
     }
 
     #[test]
     fn test_coef_from_half_byte2() {
         let inp = 8;
-        let res = coef_from_half_byte_vartime(4, inp).unwrap();
+        let res = coef_from_half_byte_vartime::<false>(4, inp).unwrap();
         assert_eq!(-4, res);
     }
 
@@ -406,7 +419,7 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte_validation1() {
         let inp = 22;
-        let res = coef_from_half_byte_vartime(2, inp);
+        let res = coef_from_half_byte_vartime::<false>(2, inp);
         assert!(res.is_err());
     }
 
@@ -415,14 +428,14 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte_validation2() {
         let inp = 5;
-        let res = coef_from_half_byte_vartime(1, inp);
+        let res = coef_from_half_byte_vartime::<false>(1, inp);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation3() {
         let inp = 10;
-        let res = coef_from_half_byte_vartime(4, inp);
+        let res = coef_from_half_byte_vartime::<false>(4, inp);
         assert!(res.is_err());
     }
 
