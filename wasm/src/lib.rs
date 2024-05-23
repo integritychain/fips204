@@ -8,9 +8,9 @@ use fips204::traits::{SerDes, Signer, Verifier};
 pub fn sign(message: &str) -> String {
     let seed = 123;
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-    let (pk, sk) = ml_dsa_44::try_keygen_with_rng_vt(&mut rng).expect("keygen failed");
-    let sig = sk.try_sign_with_rng_ct(&mut rng, message.as_ref()).expect("sign failed");
-    assert!(pk.try_verify_vt(message.as_ref(), &sig).expect("verify error"), "verify failed");
+    let (pk, sk) = ml_dsa_44::try_keygen_with_rng(&mut rng).expect("keygen failed");
+    let sig = sk.try_sign_with_rng(&mut rng, message.as_ref()).expect("sign failed");
+    assert!(pk.try_verify(message.as_ref(), &sig).expect("verify error"), "verify failed");
 
     let sk_hex = hex::encode(&sk.into_bytes());
     let sig_hex = hex::encode(&sig);

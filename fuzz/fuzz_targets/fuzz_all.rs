@@ -7,8 +7,8 @@ use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
 
     // A good reference set
-    let (pk_good, sk_good) = KG::try_keygen_vt().unwrap();
-    let sig_good = sk_good.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
+    let (pk_good, sk_good) = KG::try_keygen().unwrap();
+    let sig_good = sk_good.try_sign(&[0u8, 1, 2, 3]).unwrap();
 
     // Extract then deserialize a 'fuzzy' secret key
     let sk_bytes = data[0..2560].try_into().unwrap();
@@ -23,31 +23,31 @@ fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
 
     // Try to use 'fuzzy' sk
     if let Ok(ref sk) = sk_fuzz {
-        let sig1 = sk.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
-        let sk2 = KG::gen_expanded_private_vt(&sk).unwrap();
-        let sig2 = sk2.try_sign_ct(&[4u8, 5, 6, 7]).unwrap();
+        let sig1 = sk.try_sign(&[0u8, 1, 2, 3]).unwrap();
+        let sk2 = KG::gen_expanded_private(&sk).unwrap();
+        let sig2 = sk2.try_sign(&[4u8, 5, 6, 7]).unwrap();
         // ...with good pk
-        let res = pk_good.try_verify_vt(&[0u8, 1, 2, 3], &sig1);
+        let res = pk_good.try_verify(&[0u8, 1, 2, 3], &sig1);
         assert!(res.is_err() || !res.unwrap());
-        let res = pk_good.try_verify_vt(&[0u8, 1, 2, 3], &sig2);
+        let res = pk_good.try_verify(&[0u8, 1, 2, 3], &sig2);
         assert!(res.is_err() || !res.unwrap());
     }
 
     // Try to use 'fuzzy' pk
     if let Ok(ref pk) = pk_fuzz {
-        let res = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig_fuzz);
+        let res = pk.try_verify(&[0u8, 1, 2, 3], &sig_fuzz);
         assert!(res.is_err() || !res.unwrap());
-        let pk2 = KG::gen_expanded_public_vt(&pk).unwrap();
-        let res = pk2.try_verify_vt(&[0u8, 1, 2, 3], &sig_fuzz);
+        let pk2 = KG::gen_expanded_public(&pk).unwrap();
+        let res = pk2.try_verify(&[0u8, 1, 2, 3], &sig_fuzz);
         assert!(res.is_err() || !res.unwrap());
         // .. with good sig
-        let res = pk2.try_verify_vt(&[0u8, 1, 2, 3], &sig_good);
+        let res = pk2.try_verify(&[0u8, 1, 2, 3], &sig_good);
         assert!(res.is_err() || !res.unwrap());
     }
 
     // Try to use 'fuzzy' sk and 'fuzzy' pk
     if let (Ok(sk), Ok(pk)) = (sk_fuzz, pk_fuzz) {
-        let _sig = sk.try_sign_ct(&[0u8, 1, 2, 3]).unwrap();
-        let _v = pk.try_verify_vt(&[0u8, 1, 2, 3], &sig_fuzz).unwrap();
+        let _sig = sk.try_sign(&[0u8, 1, 2, 3]).unwrap();
+        let _v = pk.try_verify(&[0u8, 1, 2, 3], &sig_fuzz).unwrap();
     }
 });

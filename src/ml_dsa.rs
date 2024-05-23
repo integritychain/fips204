@@ -3,7 +3,7 @@
 use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
-use crate::hashing::{expand_a_vartime, expand_mask, expand_s_vartime, h_xof, sample_in_ball};
+use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
 use crate::helpers::{
     bit_length, center_mod, ensure, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32,
     to_mont, vec_add,
@@ -49,10 +49,10 @@ pub(crate) fn key_gen<
     h.read(&mut cap_k);
 
     // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a_vartime::<CTEST, K, L>(&rho);
+    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
 
     // 4: (s_1, s_2 ) ← ExpandS(ρ′)
-    let (s_1, s_2): ([R; L], [R; K]) = expand_s_vartime::<CTEST, K, L>(eta, &rho_prime);
+    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, &rho_prime);
 
     // 5: t ← NTT−1 (cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
     let s_1_hat: [T; L] = ntt(&s_1);
@@ -104,7 +104,7 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
     let t_hat_0_mont: [T; K] = to_mont(&ntt(&t_0));
 
     // 5:  cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a_vartime::<CTEST, K, L>(rho);
+    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
 
     Ok(ExpandedPrivateKey {
         cap_k: *cap_k,
@@ -309,7 +309,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     let (rho, t_1): (&[u8; 32], [R; K]) = pk_decode(pk)?;
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
-    let cap_a_hat: [[T; L]; K] = expand_a_vartime::<false, K, L>(rho);
+    let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(rho);
 
     // 6: tr ← H(BytesToBits(pk), 512)
     let mut hasher = h_xof(&[pk]);

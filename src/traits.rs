@@ -15,10 +15,12 @@ pub trait KeyGen {
     type ExpandedPublicKey;
 
     /// Generates a public and private key pair specific to this security parameter set. <br>
-    /// This function utilizes the OS default random number generator, and makes no (constant)
-    /// timing assurances.
+    /// This function utilizes the **OS default** random number generator. This function operates
+    /// in constant-time relative to secret data (which specifically excludes the OS random
+    /// number generator, the `rho` value stored in the public key, and the hash-derived
+    /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
     /// # Errors
-    /// Returns an error when the random number generator fails; propagates internal errors.
+    /// Returns an error when the random number generator fails.
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -29,20 +31,22 @@ pub trait KeyGen {
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_44::KG::try_keygen_vt()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign_ct(&message)?; // Use the secret key to generate a message signature
+    /// let (pk, sk) = ml_dsa_44::KG::try_keygen()?; // Generate both public and secret keys
+    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
     /// # Ok(())}
     /// ```
     #[cfg(feature = "default-rng")]
-    fn try_keygen_vt() -> Result<(Self::PublicKey, Self::PrivateKey), &'static str> {
-        Self::try_keygen_with_rng_vt(&mut OsRng)
+    fn try_keygen() -> Result<(Self::PublicKey, Self::PrivateKey), &'static str> {
+        Self::try_keygen_with_rng(&mut OsRng)
     }
 
     /// Generates a public and private key pair specific to this security parameter set. <br>
-    /// This function utilizes a supplied random number generator, and makes no (constant)
-    /// timing assurances..
+    /// This function utilizes the **provided** random number generator. This function operates
+    /// in constant-time relative to secret data (which specifically excludes the provided random
+    /// number generator, the `rho` value stored in the public key, and the hash-derived
+    /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
     /// # Errors
-    /// Returns an error when the random number generator fails; propagates internal errors.
+    /// Returns an error when the random number generator fails.
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -55,11 +59,11 @@ pub trait KeyGen {
     /// let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_44::KG::try_keygen_with_rng_vt(&mut rng)?;  // Generate both public and secret keys
-    /// let sig = sk.try_sign_ct(&message)?;  // Use the secret key to generate a message signature
+    /// let (pk, sk) = ml_dsa_44::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
+    /// let sig = sk.try_sign(&message)?;  // Use the secret key to generate a message signature
     /// # Ok(())}
     /// ```
-    fn try_keygen_with_rng_vt(
+    fn try_keygen_with_rng(
         rng: &mut impl CryptoRngCore,
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
@@ -67,7 +71,7 @@ pub trait KeyGen {
     ///
     /// # Errors
     /// Propagates internal errors; potential for additional validation as FIPS 204 evolves.
-    fn gen_expanded_private_vt(
+    fn gen_expanded_private(
         sk: &Self::PrivateKey,
     ) -> Result<Self::ExpandedPrivateKey, &'static str>;
 
@@ -75,9 +79,7 @@ pub trait KeyGen {
     ///
     /// # Errors
     /// Propagates internal errors; potential for additional validation as FIPS 204 evolves.
-    fn gen_expanded_public_vt(
-        pk: &Self::PublicKey,
-    ) -> Result<Self::ExpandedPublicKey, &'static str>;
+    fn gen_expanded_public(pk: &Self::PublicKey) -> Result<Self::ExpandedPublicKey, &'static str>;
 }
 
 
@@ -102,13 +104,13 @@ pub trait Signer {
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_vt()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign_ct(&message)?; // Use the secret key to generate a message signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
+    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
     /// # Ok(())}
     /// ```
     #[cfg(feature = "default-rng")]
-    fn try_sign_ct(&self, message: &[u8]) -> Result<Self::Signature, &'static str> {
-        self.try_sign_with_rng_ct(&mut OsRng, message)
+    fn try_sign(&self, message: &[u8]) -> Result<Self::Signature, &'static str> {
+        self.try_sign_with_rng(&mut OsRng, message)
     }
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
@@ -129,11 +131,11 @@ pub trait Signer {
     /// let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng_vt(&mut rng)?;  // Generate both public and secret keys
-    /// let sig = sk.try_sign_with_rng_ct(&mut rng, &message)?;  // Use the secret key to generate a message signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
+    /// let sig = sk.try_sign_with_rng(&mut rng, &message)?;  // Use the secret key to generate a message signature
     /// # Ok(())}
     /// ```
-    fn try_sign_with_rng_ct(
+    fn try_sign_with_rng(
         &self, rng: &mut impl CryptoRngCore, message: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 }
@@ -160,14 +162,13 @@ pub trait Verifier {
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_vt()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign_ct(&message)?; // Use the secret key to generate a message signature
-    /// let v = pk.try_verify_vt(&message, &sig)?; // Use the public to verify message signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
+    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
+    /// let v = pk.try_verify(&message, &sig)?; // Use the public to verify message signature
     /// # Ok(())}
     /// ```
-    fn try_verify_vt(
-        &self, message: &[u8], signature: &Self::Signature,
-    ) -> Result<bool, &'static str>;
+    fn try_verify(&self, message: &[u8], signature: &Self::Signature)
+        -> Result<bool, &'static str>;
 }
 
 /// The `SerDes` trait provides for validated serialization and deserialization of fixed- and correctly-size elements.
@@ -189,8 +190,8 @@ pub trait SerDes {
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_vt()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign_ct(&message)?; // Use the secret key to generate a message signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
+    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
     /// let pk_bytes = pk.into_bytes(); // Serialize the public key
     /// let sk_bytes = sk.into_bytes(); // Serialize the private key
     /// # Ok(())}
@@ -208,7 +209,7 @@ pub trait SerDes {
     /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     ///
     /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_87::try_keygen_vt()?; // Generate both public and secret keys
+    /// let (pk, sk) = ml_dsa_87::try_keygen()?; // Generate both public and secret keys
     /// let pk_bytes = pk.into_bytes(); // Serialize the public key
     /// let sk_bytes = sk.into_bytes(); // Serialize the private key
     /// let pk2 = ml_dsa_87::PublicKey::try_from_bytes(pk_bytes)?;

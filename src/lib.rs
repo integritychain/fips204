@@ -16,12 +16,6 @@
 // Implements FIPS 204 draft Module-Lattice-Based Digital Signature Standard.
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf>
 
-// TODO: Roadmap
-//   2. Closer CT inspection -> top level key_gen is vartime, the rest CT outside of rho (? TBC)
-//   3. Intensive/extensive pass on documentation
-//   4. Revisit/expand unit testing; consider whether to test debug statements: release-vs-test
-
-
 // Functionality map per FIPS 204 draft
 //
 // Algorithm 1 ML-DSA.KeyGen() on page 15                 --> ml_dsa.rs
@@ -67,10 +61,15 @@
 // conservative dataflow validation. Separately, functions are only generic over security
 // parameters that are directly involved in memory allocation (on the stack). Some coding
 // oddities are driven by the fact that Rust doesn't currently do well with arithmetic on
-// generic parameters
+// generic parameters.
 
+// Note that the `CTEST` generic parameter supports constant-time measurements by dudect. This
+// is done by carefully removing timing variability of non-secret data (such as the rejection
+// sampling of hash derived from rho). All (normal) crate functionality has this set to `false`
+// except for the single function (per namespace) `dudect_keygen_sign_with_rng()` which is only
+// exposed when the non-default `dudect` feature is enabled.
 
-/// The `rand_core` types are re-exported so that users of fips203 do not
+/// The `rand_core` types are re-exported so that users of fips204 do not
 /// have to worry about using the exact correct version of `rand_core`.
 pub use rand_core::{CryptoRng, Error as RngError, RngCore};
 
@@ -89,10 +88,10 @@ pub mod traits;
 // Applies across all security parameter sets
 const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; See https://oeis.org/A234388
 const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
-const D: u32 = 13;
+const D: u32 = 13; // See table 1 page 13 second row
 
 
-// This common functionality is injected into each security parameter set module
+// This common functionality is injected into each security parameter set namespace
 macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sk_decode};
@@ -102,7 +101,7 @@ macro_rules! functionality {
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
-        const CTEST: bool = false; // None of the 'real'functionality should be hobbled by this constant-time flag
+        const CTEST: bool = false;
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
@@ -132,20 +131,15 @@ macro_rules! functionality {
         #[derive(Clone, Zeroize, ZeroizeOnDrop)]
         pub struct KG(); // Arguable how useful an empty struct+trait is...
 
-
-        /// Private precomputed key material derived from a `PrivateKey`. <br>
-        /// Implements the [`crate::traits::Signer`] trait.
-        #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-        pub struct PrivatePreCompute([u8; SK_LEN]);
-
-
         // ----- PRIMARY FUNCTIONS ---
 
         /// Generates a public and private key pair specific to this security parameter set. <br>
-        /// This function utilizes the OS default random number generator, and makes no (constant)
-        /// timing assurances.
+        /// This function utilizes the **OS default** random number generator. This function operates
+        /// in constant-time relative to secret data (which specifically excludes the OS random
+        /// number generator, the `rho` value stored in the public key, and the hash-derived
+        /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
         /// # Errors
-        /// Returns an error when the random number generator fails; propagates internal errors.
+        /// Returns an error when the random number generator fails.
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -156,21 +150,21 @@ macro_rules! functionality {
         /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
         ///
         /// // Generate key pair and signature
-        /// let (pk1, sk) = ml_dsa_44::try_keygen_vt()?;  // Generate both public and secret keys
-        /// let sig1 = sk.try_sign_ct(&message)?;  // Use the secret key to generate a message signature
+        /// let (pk1, sk) = ml_dsa_44::try_keygen()?; // Generate both public and secret keys
+        /// let sig1 = sk.try_sign(&message)?; // Use the secret key to generate a message signature
         /// # Ok(())}
         /// ```
         #[cfg(feature = "default-rng")]
-        pub fn try_keygen_vt() -> Result<(PublicKey, PrivateKey), &'static str> {
-            KG::try_keygen_vt()
-        }
+        pub fn try_keygen() -> Result<(PublicKey, PrivateKey), &'static str> { KG::try_keygen() }
 
 
         /// Generates a public and private key pair specific to this security parameter set. <br>
-        /// This function utilizes a supplied random number generator, and makes no (constant)
-        /// timing assurances.
+        /// This function utilizes the **provided** random number generator. This function operates
+        /// in constant-time relative to secret data (which specifically excludes the provided random
+        /// number generator, the `rho` value stored in the public key, and the hash-derived
+        /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
         /// # Errors
-        /// Returns an error when the random number generator fails; propagates internal errors.
+        /// Returns an error when the random number generator fails.
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -183,14 +177,14 @@ macro_rules! functionality {
         /// let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
         ///
         /// // Generate key pair and signature
-        /// let (pk1, sk) = ml_dsa_44::try_keygen_with_rng_vt(&mut rng)?;  // Generate both public and secret keys
-        /// let sig1 = sk.try_sign_ct(&message)?;  // Use the secret key to generate a message signature
+        /// let (pk1, sk) = ml_dsa_44::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
+        /// let sig1 = sk.try_sign(&message)?;  // Use the secret key to generate a message signature
         /// # Ok(())}
         /// ```
-        pub fn try_keygen_with_rng_vt(
+        pub fn try_keygen_with_rng(
             rng: &mut impl CryptoRngCore,
         ) -> Result<(PublicKey, PrivateKey), &'static str> {
-            KG::try_keygen_with_rng_vt(rng)
+            KG::try_keygen_with_rng(rng)
         }
 
 
@@ -200,21 +194,21 @@ macro_rules! functionality {
             type PrivateKey = PrivateKey;
             type PublicKey = PublicKey;
 
-            fn try_keygen_with_rng_vt(
+            fn try_keygen_with_rng(
                 rng: &mut impl CryptoRngCore,
             ) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             }
 
-            fn gen_expanded_private_vt(
+            fn gen_expanded_private(
                 sk: &PrivateKey,
             ) -> Result<Self::ExpandedPrivateKey, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
                 Ok(esk)
             }
 
-            fn gen_expanded_public_vt(
+            fn gen_expanded_public(
                 pk: &PublicKey,
             ) -> Result<Self::ExpandedPublicKey, &'static str> {
                 let epk = ml_dsa::verify_start(&pk.0)?;
@@ -226,7 +220,7 @@ macro_rules! functionality {
         impl Signer for PrivateKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_sign_with_rng_ct(
+            fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
@@ -241,7 +235,7 @@ macro_rules! functionality {
         impl Signer for ExpandedPrivateKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_sign_with_rng_ct(
+            fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
@@ -255,7 +249,7 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_verify_vt(
+            fn try_verify(
                 &self, message: &[u8], sig: &Self::Signature,
             ) -> Result<bool, &'static str> {
                 let epk = ml_dsa::verify_start(&self.0)?;
@@ -269,7 +263,7 @@ macro_rules! functionality {
         impl Verifier for ExpandedPublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_verify_vt(
+            fn try_verify(
                 &self, message: &[u8], sig: &Self::Signature,
             ) -> Result<bool, &'static str> {
                 ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
@@ -315,9 +309,7 @@ macro_rules! functionality {
         pub fn dudect_keygen_sign_with_rng(
             rng: &mut impl CryptoRngCore, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
-            //let (pk, sk) = KG::try_keygen_with_rng_vt(rng).unwrap();
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-            //Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                 rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
@@ -335,10 +327,10 @@ macro_rules! functionality {
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-44
 /// parameter set is claimed to be in security strength category 2.
 ///
-/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen_vt`] function below to
+/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen`] function below to
 /// generate both [`ml_dsa_44::PublicKey`] and [`ml_dsa_44::PrivateKey`] structs. The resulting
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
-/// functions to sign byte-array messages, such as [`traits::Signer::try_sign_ct()`].
+/// functions to sign byte-array messages, such as [`traits::Signer::try_sign()`].
 ///
 /// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
 /// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
@@ -346,7 +338,7 @@ macro_rules! functionality {
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
-/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify_vt()`] function implemented on the
+/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify()`] function implemented on the
 /// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
@@ -377,10 +369,10 @@ pub mod ml_dsa_44 {
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-65
 /// parameter set is claimed to be in security strength category 3.
 ///
-/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen_vt`] function below to
+/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen`] function below to
 /// generate both [`ml_dsa_44::PublicKey`] and [`ml_dsa_44::PrivateKey`] structs. The resulting
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
-/// functions to sign byte-array messages, such as [`traits::Signer::try_sign_ct()`].
+/// functions to sign byte-array messages, such as [`traits::Signer::try_sign()`].
 ///
 /// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
 /// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
@@ -388,7 +380,7 @@ pub mod ml_dsa_44 {
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
-/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify_vt()`] function implemented on the
+/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify()`] function implemented on the
 /// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
@@ -419,10 +411,10 @@ pub mod ml_dsa_65 {
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-87
 /// parameter set is claimed to be in security strength category 5.
 ///
-/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen_vt`] function below to
+/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen`] function below to
 /// generate both [`ml_dsa_44::PublicKey`] and [`ml_dsa_44::PrivateKey`] structs. The resulting
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
-/// functions to sign byte-array messages, such as [`traits::Signer::try_sign_ct()`].
+/// functions to sign byte-array messages, such as [`traits::Signer::try_sign()`].
 ///
 /// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
 /// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
@@ -430,7 +422,7 @@ pub mod ml_dsa_65 {
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
-/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify_vt()`] function implemented on the
+/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify()`] function implemented on the
 /// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.

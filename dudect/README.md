@@ -1,21 +1,25 @@
+An example constant-time workbench. It can be sensitive to config/defaults, so is
+not entirely definitive. A work in progress.
 
-Need to rework the rng (to return hardcoded values)
+See <https://docs.rs/dudect-bencher/latest/dudect_bencher/>
+
+> t-values greater than 5 are generally considered a good indication that the function is not constant time. t-values less than 5 does not necessarily imply that the function is constant-time, since there may be other input distributions under which the function behaves significantly differently.
 
 ~~~
-See https://docs.rs/dudect-bencher/latest/dudect_bencher/
+May 22, 2024
+Intel® Core™ i7-7700K CPU @ 4.20GHz × 8  Circa 2017  Rust 1.70
 
-$ RUSTFLAGS="-C target-cpu=native" cargo run --release
-$ RUSTFLAGS="-C target-cpu=native" cargo run --release -- --continuous sign
-running 1 benchmark continuously
-bench sign seeded with 0x9eddf0cb1f0a9394
-bench sign ... : n == +0.001M, max t = -1.74343, max tau = -0.05337, (5/tau)^2 = 8776
-bench sign ... : n == +0.004M, max t = +1.30450, max tau = +0.02111, (5/tau)^2 = 56105
-bench sign ... : n == +0.006M, max t = +2.70976, max tau = +0.03579, (5/tau)^2 = 19519
-bench sign ... : n == +0.008M, max t = +1.72776, max tau = +0.01975, (5/tau)^2 = 64091
-bench sign ... : n == +0.010M, max t = +2.67128, max tau = +0.02695, (5/tau)^2 = 34428
-bench sign ... : n == +0.012M, max t = +2.25015, max tau = +0.02098, (5/tau)^2 = 56802
-bench sign ... : n == +0.014M, max t = +2.15358, max tau = +0.01844, (5/tau)^2 = 73502
-bench sign ... : n == +0.015M, max t = +2.17601, max tau = +0.01778, (5/tau)^2 = 79081
-bench sign ... : n == +0.017M, max t = +1.73582, max tau = +0.01338, (5/tau)^2 = 139641
-bench sign ... : n == +0.019M, max t = +1.42413, max tau = +0.01041, (5/tau)^2 = 230567
+$ cd dudect  # this directory
+$ RUSTFLAGS="-C target-cpu=native" cargo run --release -- --continuous keygen_and_sign
+
+bench keygen_and_sign seeded with 0x826d7088eeda2cad
+bench keygen_and_sign ... : n == +0.102M, max t = -1.97046, max tau = -0.00616, (5/tau)^2 = 659312
+bench keygen_and_sign ... : n == +0.260M, max t = -2.25947, max tau = -0.00443, (5/tau)^2 = 1271689
+bench keygen_and_sign ... : n == +0.388M, max t = -2.81974, max tau = -0.00453, (5/tau)^2 = 1220064
+bench keygen_and_sign ... : n == +0.519M, max t = -2.66709, max tau = -0.00370, (5/tau)^2 = 1823937
+bench keygen_and_sign ... : n == +0.657M, max t = -2.92324, max tau = -0.00361, (5/tau)^2 = 1920968
+bench keygen_and_sign ... : n == +0.779M, max t = -3.22059, max tau = -0.00365, (5/tau)^2 = 1878485
+bench keygen_and_sign ... : n == +0.923M, max t = -3.54252, max tau = -0.00369, (5/tau)^2 = 1839152
+bench keygen_and_sign ... : n == +1.065M, max t = -4.01591, max tau = -0.00389, (5/tau)^2 = 1651285
+...
 ~~~

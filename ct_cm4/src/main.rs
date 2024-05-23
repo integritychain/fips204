@@ -9,7 +9,6 @@ use fips204::{ml_dsa_44::PublicKey, traits::{SerDes, Verifier}};
 use hex_literal::hex;
 use microbit::{board::Board, hal::{pac::DWT, prelude::OutputPin}};
 use rtt_target::{rprintln, rtt_init_print};
-//use panic_halt as _;
 use panic_rtt_target as _;
 
 
@@ -28,8 +27,6 @@ fn main() -> ! {
 
     let mut i = 0u32;
     let pk = PublicKey::try_from_bytes(PUBLIC_KEY).unwrap();
-    //let (_pk, _sk) = ml_dsa_44::KG::try_keygen_with_rng_vt(&mut my_rng).unwrap();
-    //let _res = sk.try_sign_with_rng_ct(&mut my_rng, &message);
 
     loop {
         if (i % 10) == 0 { board.display_pins.row1.set_high().unwrap(); };
@@ -40,7 +37,7 @@ fn main() -> ! {
         let start = DWT::cycle_count();
         asm::isb();
 
-        assert!(pk.try_verify_vt(&MESSAGE, &SIGNATURE).unwrap()); // Use the public to verify message signature
+        assert!(pk.try_verify(&MESSAGE, &SIGNATURE).unwrap()); // Use the public to verify message signature
 
         asm::isb();
         let finish = DWT::cycle_count();

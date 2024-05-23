@@ -20,10 +20,10 @@ use crate::Q;
 
 /// # Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
 /// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}` used in rejection sampling. Note
-/// that this function is only used in Algorithm 24's `rej_ntt_poly_vartime()` function, which
-/// in turn is only used in Algorithm 26's `expand_a_vartime()` function. This latter function
+/// that this function is only used in Algorithm 24's `rej_ntt_poly()` function, which
+/// in turn is only used in Algorithm 26's `expand_a()` function. This latter function
 /// operates on `rho`, which is a component of the public key passed in the clear. This
-/// complicates the constant time analysis of `ml_dsa::key_gen_vartime()` (non CT),
+/// complicates the constant time analysis of `ml_dsa::key_gen()` (non CT),
 /// `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
 ///
 /// **Input**:  A byte array of length three, representing bytes `b0`, `b1`, `b2`.<br>
@@ -33,9 +33,7 @@ use crate::Q;
 /// Returns an error `⊥` on input 3 bytes forming values between `Q=0x7F_E0_01`--`0x7F_FF_FF`,
 /// and between `0xFF_E0_01`--`0xFF_FF_FF` (latter range due to masking of bit 7 of byte 2)
 /// per spec; for rejection sampling.
-pub(crate) fn coef_from_three_bytes_vartime<const CTEST: bool>(
-    bbb: [u8; 3],
-) -> Result<i32, &'static str> {
+pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i32, &'static str> {
     // 1: if b2 > 127 then
     // 2: b2 ← b2 − 128     ▷ Set the top bit of b2 to zero
     // 3: end if
@@ -60,9 +58,9 @@ pub(crate) fn coef_from_three_bytes_vartime<const CTEST: bool>(
 
 /// # Algorithm 9: `CoefFromHalfByte(b)` on page 22.
 /// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}` used in rejection sampling. Note
-/// that this function is only used in Algorithm 25's `rej_bounded_poly_vartime()`
-/// function, which in turn is only used in Algorithm 27's `expand_s_vartime()` function,
-/// which in turn is only used in the `ml_dsa::keygen_vartime()` functionality using the
+/// that this function is only used in Algorithm 25's `rej_bounded_poly()`
+/// function, which in turn is only used in Algorithm 27's `expand_s()` function,
+/// which in turn is only used in the `ml_dsa::keygen()` functionality using the
 /// `rho_prime` private random seed. It is not involved in signature generation or
 /// verification.
 ///
@@ -73,9 +71,7 @@ pub(crate) fn coef_from_three_bytes_vartime<const CTEST: bool>(
 /// # Errors
 /// Returns an error `⊥` on when eta = 4 and b > 8 for rejection sampling. (panics on b > 15)
 #[allow(clippy::cast_possible_truncation)] // rem as u8
-pub(crate) fn coef_from_half_byte_vartime<const CTEST: bool>(
-    eta: i32, b: u8,
-) -> Result<i32, &'static str> {
+pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<i32, &'static str> {
     const M5: u32 = ((1u32 << 24) / 5) + 1;
     debug_assert!((eta == 2) | (eta == 4), "Alg 9: incorrect eta");
     debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
@@ -374,21 +370,21 @@ mod tests {
     #[test]
     fn test_coef_from_three_bytes1() {
         let bytes = [0x12u8, 0x34, 0x56];
-        let res = coef_from_three_bytes_vartime::<false>(bytes).unwrap();
+        let res = coef_from_three_bytes::<false>(bytes).unwrap();
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes2() {
         let bytes = [0x12u8, 0x34, 0x80];
-        let res = coef_from_three_bytes_vartime::<false>(bytes).unwrap();
+        let res = coef_from_three_bytes::<false>(bytes).unwrap();
         assert_eq!(res, 0x0000_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes3() {
         let bytes = [0x01u8, 0xe0, 0x80];
-        let res = coef_from_three_bytes_vartime::<false>(bytes).unwrap();
+        let res = coef_from_three_bytes::<false>(bytes).unwrap();
         assert_eq!(res, 0x0000_e001);
     }
 
@@ -396,21 +392,21 @@ mod tests {
     #[should_panic(expected = "panic: out of range")]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
-        let res = coef_from_three_bytes_vartime::<false>(bytes).expect("panic: out of range");
+        let res = coef_from_three_bytes::<false>(bytes).expect("panic: out of range");
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_half_byte1() {
         let inp = 3;
-        let res = coef_from_half_byte_vartime::<false>(2, inp).unwrap();
+        let res = coef_from_half_byte::<false>(2, inp).unwrap();
         assert_eq!(-1, res);
     }
 
     #[test]
     fn test_coef_from_half_byte2() {
         let inp = 8;
-        let res = coef_from_half_byte_vartime::<false>(4, inp).unwrap();
+        let res = coef_from_half_byte::<false>(4, inp).unwrap();
         assert_eq!(-4, res);
     }
 
@@ -419,7 +415,7 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte_validation1() {
         let inp = 22;
-        let res = coef_from_half_byte_vartime::<false>(2, inp);
+        let res = coef_from_half_byte::<false>(2, inp);
         assert!(res.is_err());
     }
 
@@ -428,14 +424,14 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte_validation2() {
         let inp = 5;
-        let res = coef_from_half_byte_vartime::<false>(1, inp);
+        let res = coef_from_half_byte::<false>(1, inp);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation3() {
         let inp = 10;
-        let res = coef_from_half_byte_vartime::<false>(4, inp);
+        let res = coef_from_half_byte::<false>(4, inp);
         assert!(res.is_err());
     }
 

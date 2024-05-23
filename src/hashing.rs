@@ -1,6 +1,6 @@
 //! This file implements functionality from FIPS 204 section 8.3 Hashing and Pseudorandom Sampling
 
-use crate::conversion::{bit_unpack, coef_from_half_byte_vartime, coef_from_three_bytes_vartime};
+use crate::conversion::{bit_unpack, coef_from_half_byte, coef_from_three_bytes};
 use crate::helpers::{bit_length, is_in_range};
 use crate::types::{R, R0, T, T0};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
@@ -86,13 +86,13 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8; 32]) -> R {
 
 /// # Algorithm 24: `RejNTTPoly(ρ)` on page 30.
 /// Samples a polynomial ∈ `Tq`. Note that this function is only used in the algorithm 26
-/// function `expand_a_vartime()`. This latter function operates on `rho` which is a component
+/// function `expand_a()`. This latter function operates on `rho` which is a component
 /// of the public key passed in the clear. This complicates the (constant) time analysis of
-/// `ml_dsa::key_gen_vartime()`, `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
+/// `ml_dsa::key_gen()`, `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
 ///
 /// **Input**: A seed `ρ ∈ {0,1}^{272}`.<br>
 /// **Output**: An element `a_hat ∈ Tq`.
-pub(crate) fn rej_ntt_poly_vartime<const CTEST: bool>(rhos: &[&[u8]]) -> T {
+pub(crate) fn rej_ntt_poly<const CTEST: bool>(rhos: &[&[u8]]) -> T {
     debug_assert_eq!(rhos.iter().map(|&i| i.len()).sum::<usize>(), 272 / 8, "Alg 24: bad rho size");
     let mut a_hat = T0;
     let mut xof = h128_xof(rhos);
@@ -108,7 +108,7 @@ pub(crate) fn rej_ntt_poly_vartime<const CTEST: bool>(rhos: &[&[u8]]) -> T {
         // 4: a_hat[j] ← CoefFromThreeBytes(H128(ρ)[[c]], H128(ρ)[[c + 1]], H128(ρ)[[c + 2]])
         let mut h128pc = [0u8; 3];
         xof.read(&mut h128pc); // implicit c += 3
-        let a_hat_j = coef_from_three_bytes_vartime::<CTEST>(h128pc); // gets a result
+        let a_hat_j = coef_from_three_bytes::<CTEST>(h128pc); // gets a result
 
         // 5: c ← c + 3  (implicit)
 
@@ -138,7 +138,7 @@ pub(crate) fn rej_ntt_poly_vartime<const CTEST: bool>(rhos: &[&[u8]]) -> T {
 ///
 /// # Panics
 /// In debug, requires correctly sized `p`.
-pub(crate) fn rej_bounded_poly_vartime<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R {
+pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R {
     debug_assert_eq!(rhos.iter().map(|&i| i.len()).sum::<usize>(), 528 / 8, "Alg25: bad rho size");
     let mut z = [0u8];
     let mut a = R0;
@@ -156,10 +156,10 @@ pub(crate) fn rej_bounded_poly_vartime<const CTEST: bool>(eta: i32, rhos: &[&[u8
         xof.read(&mut z);
 
         // 5: z0 ← CoefFromHalfByte(z mod 16, η)
-        let z0 = coef_from_half_byte_vartime::<CTEST>(eta, z[0] & 0x0f);
+        let z0 = coef_from_half_byte::<CTEST>(eta, z[0] & 0x0f);
 
         // 6: z1 ← CoefFromHalfByte(⌊z/16⌋, η)
-        let z1 = coef_from_half_byte_vartime::<CTEST>(eta, z[0] >> 4);
+        let z1 = coef_from_half_byte::<CTEST>(eta, z[0] >> 4);
 
         // 7: if z0 != ⊥ then
         if let Ok(z0) = z0 {
@@ -200,13 +200,13 @@ pub(crate) fn rej_bounded_poly_vartime<const CTEST: bool>(eta: i32, rhos: &[&[u8
 /// # Algorithm 26 ExpandA(ρ) on page 31.
 /// Samples a k × ℓ matrix `A_hat` of elements of `T_q`. This function operates solely on `rho`
 /// which is a component of the public key passed in the clear. This complicates the (constant)
-/// timing analysis of `ml_dsa::key_gen()_vartime`, `ml_dsa::sign_start()` and
+/// timing analysis of `ml_dsa::key_gen()`, `ml_dsa::sign_start()` and
 /// `ml_dsa::verify_start()`.
 ///
 /// **Input**: `ρ ∈ {0,1}^256`. <br>
 /// **Output**: Matrix `A_hat`
 #[allow(clippy::cast_possible_truncation)] // s and r
-pub(crate) fn expand_a_vartime<const CTEST: bool, const K: usize, const L: usize>(
+pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(
     rho: &[u8; 32],
 ) -> [[T; L]; K] {
     // 1: for r from 0 to k − 1 do
@@ -216,7 +216,7 @@ pub(crate) fn expand_a_vartime<const CTEST: bool, const K: usize, const L: usize
     // 5: end for
 
     let cap_a_hat: [[T; L]; K] = core::array::from_fn(|r| {
-        core::array::from_fn(|s| rej_ntt_poly_vartime::<CTEST>(&[&rho[..], &[s as u8], &[r as u8]]))
+        core::array::from_fn(|s| rej_ntt_poly::<CTEST>(&[&rho[..], &[s as u8], &[r as u8]]))
     });
     cap_a_hat
 }
@@ -224,7 +224,7 @@ pub(crate) fn expand_a_vartime<const CTEST: bool, const K: usize, const L: usize
 
 /// # Algorithm 27: `ExpandS(ρ)` on page 32.
 /// Samples vectors `s1 ∈ R^ℓ_q` and `s2 ∈ R^k_q`, each with coefficients in the interval `[−η, η]`.
-/// Note that this function is only used in the `ml_dsa::keygen_vartime()` functionality using the
+/// Note that this function is only used in the `ml_dsa::keygen()` functionality using the
 /// `rho_prime` private random seed. It is not exposed to untrusted input.
 ///
 /// **Input**: `ρ ∈ {0,1}^512` <br>
@@ -234,7 +234,7 @@ pub(crate) fn expand_a_vartime<const CTEST: bool, const K: usize, const L: usize
 /// Returns an error on out of range s1 s2 coefficients.
 /// Propagates any errors generated by called functions.
 #[allow(clippy::cast_possible_truncation)] // r and r+L
-pub(crate) fn expand_s_vartime<const CTEST: bool, const K: usize, const L: usize>(
+pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
     eta: i32, rho: &[u8; 64],
 ) -> ([R; L], [R; K]) {
     //
@@ -242,14 +242,13 @@ pub(crate) fn expand_s_vartime<const CTEST: bool, const K: usize, const L: usize
     // 2: s1[r] ← RejBoundedPoly(ρ||IntegerToBits(r, 16))
     // 3: end for
     let s1: [R; L] =
-        core::array::from_fn(|r| rej_bounded_poly_vartime::<CTEST>(eta, &[rho, &[r as u8], &[0]]));
+        core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[r as u8], &[0]]));
 
     // 4: for r from 0 to k − 1 do
     // 5: s2[r] ← RejBoundedPoly(ρ||IntegerToBits(r + ℓ, 16))
     // 6: end for
-    let s2: [R; K] = core::array::from_fn(|r| {
-        rej_bounded_poly_vartime::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]])
-    });
+    let s2: [R; K] =
+        core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]));
 
     // 7: return (s_1 , s_2)
     debug_assert!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Alg 27: s1 out of range");
