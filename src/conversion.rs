@@ -19,12 +19,12 @@ use crate::Q;
 
 
 /// # Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
-/// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}` used in rejection sampling. Note
-/// that this function is only used in Algorithm 24's `rej_ntt_poly()` function, which
-/// in turn is only used in Algorithm 26's `expand_a()` function. This latter function
-/// operates on `rho`, which is a component of the public key passed in the clear. This
-/// complicates the constant time analysis of `ml_dsa::key_gen()` (non CT),
-/// `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
+/// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}` used in rejection sampling.
+/// This function is used during keygen and signing, but only operates on the non-secret
+/// `rho` value stored in the public key, so need not be constant-time in normal
+/// operation. To support constant-time `dudect` measurements through the
+/// `dudect_keygen_sign_with_rng()` function exposed when the `dudect` feature
+/// is enabled, the CTEST value would be set to `true` to effectively bypass the rejection.
 ///
 /// **Input**:  A byte array of length three, representing bytes `b0`, `b1`, `b2`.<br>
 /// **Output**: An integer modulo `q` or `⊥` (returned as an Error).
@@ -38,7 +38,7 @@ pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i
     // 2: b2 ← b2 − 128     ▷ Set the top bit of b2 to zero
     // 3: end if
     let bbb2 = i32::from(bbb[2] & 0x7F);
-    let bbb2 = if CTEST { bbb2 & 0x0F } else { bbb2 };
+    let bbb2 = if CTEST { bbb2 & 0x0F } else { bbb2 }; // Used only for `dudect` measurements
 
     // 4: z ← 2^16·b_2 + 2^8·b1 + b0
     let z = (bbb2 << 16) | (i32::from(bbb[1]) << 8) | i32::from(bbb[0]);
@@ -57,12 +57,13 @@ pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i
 
 
 /// # Algorithm 9: `CoefFromHalfByte(b)` on page 22.
-/// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}` used in rejection sampling. Note
-/// that this function is only used in Algorithm 25's `rej_bounded_poly()`
-/// function, which in turn is only used in Algorithm 27's `expand_s()` function,
-/// which in turn is only used in the `ml_dsa::keygen()` functionality using the
-/// `rho_prime` private random seed. It is not involved in signature generation or
-/// verification.
+/// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}` used in rejection sampling.
+/// This function is used during keygen, but only operates on the hash-derived
+/// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and
+/// `s_2`, so need not be constant-time in normal operation. To support constant-time
+/// `dudect` measurements through the `dudect_keygen_sign_with_rng()` function exposed
+/// when the `dudect` feature is enabled, the CTEST value would be set to `true` to
+/// effectively bypass the rejection.
 ///
 /// **Input**:  Integer `b` ∈ {0, 1, ... , 15}.
 ///             Security parameter `η` (eta) must be either 2 or 4.<br>
@@ -134,7 +135,7 @@ pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) {
     let mut byte_index = 0; // Current output byte position
     let mut bit_index = 0; // Number of bits accumulated in temp
 
-    // For every coefficient in w... (which is known to be in range)
+    // For every coefficient in w... (which is known to be in suitably positive range)
     #[allow(clippy::cast_sign_loss)]
     for coeff in w.0 {
         // if we have a negative `a` bound, subtract from b and shift into empty/upper part of temp
@@ -226,6 +227,11 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
 
 /// # Algorithm 14: `HintBitPack(h)` on page 24.
 /// Encodes a polynomial vector `h` with binary coefficients into a byte string.
+/// This function is used during signing, but only to produce the non-secret output
+/// signature, so need not be constant-time in normal operation. To support
+/// constant-time `dudect` measurements through the `dudect_keygen_sign_with_rng()`
+/// function exposed when the `dudect` feature is enabled, the CTEST value would be
+/// set to `true` to effectively bypass some of the loop decisions.
 ///
 /// **Input**:  A polynomial vector `h ∈ R^k_2` such that at most `ω` of the coefficients in `h` are equal to `1`.
 ///             Security parameters `ω` (omega) and k must sum to be less than 256. <br>

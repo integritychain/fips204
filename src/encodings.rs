@@ -28,7 +28,7 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     // 2: for i from 0 to k − 1 do
     for i in 0..K {
         //
-        // 3: pk ← pk || SimpleBitPack (t1[i], 2^{bitlen(q−1)−d}-1)
+        // 3: pk ← pk || SimpleBitPack(t1[i], 2^{bitlen(q−1)−d}-1)
         simple_bit_pack(
             &t1[i],
             (1 << blqd) - 1,
@@ -146,7 +146,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     }
 
     // ...just make sure we really hit the end of the sk slice
-    debug_assert_eq!(start + K * step, sk.len(), "Alg 18: length miscalculation");
+    debug_assert_eq!(start + K * step, sk.len(), "Alg 18: length miscalc");
     sk
 }
 
@@ -220,7 +220,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     }
 
     // ... just make sure we hit the end of sk slice properly
-    debug_assert_eq!(start + K * step, sk.len(), "Alg 19: length miscalculation");
+    debug_assert_eq!(start + K * step, sk.len(), "Alg 19: length miscalc");
 
     Ok((rho, k, tr, s1, s2, t0))
 }
@@ -228,7 +228,8 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
 
 /// # Algorithm 20: `sigEncode(c_tilde,z,h)` on page 28.
 /// Encodes a signature into a byte string.  This is only used in `ml_dsa::sign_finish()`
-/// and is not exposed to untrusted input.
+/// and is not exposed to untrusted input. The `CTEST` generic is only passed through to
+/// the `hint_bit_pack()` leaf function such that this logic becomes constant-time.
 ///
 /// **Input**: `c_tilde ∈ {0,1}^2λ` (bits),
 ///            `z ∈ R^ℓ` with coefficients in `[−1*γ_1 + 1, γ_1]`,

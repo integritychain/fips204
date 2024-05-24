@@ -28,8 +28,13 @@ pub(crate) fn h128_xof(v: &[&[u8]]) -> impl XofReader {
 
 
 /// # Algorithm 23: `SampleInBall(ρ)` on page 30.
-/// Samples a polynomial `c ∈ Rq` with coefficients from `{−1, 0, 1}` and Hamming weight `τ`.
-/// Used in `ml_dsa:sign_finish()` and `ml_dsa::verify_finish()`. TODO: review constant-time aspects
+/// Samples a polynomial `c ∈ Rq` with coefficients from `{−1, 0, 1}` and Hamming
+/// weight `τ`. This function is used during signing, but only operates on a
+/// portion of the non-secret output `c_tilde` element within the signature, so
+/// need not be constant-time in normal operation. To support constant-time `dudect`
+/// measurements through the `dudect_keygen_sign_with_rng()` function exposed when
+/// the `dudect` feature is enabled, the CTEST value would be set to `true` to effectively
+/// bypass some of the loop decisions.
 ///
 /// **Input**: A seed `ρ ∈{0,1}^256` <br>
 /// **Output**: A polynomial `c` in `Rq`.
@@ -85,10 +90,8 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8; 32]) -> R {
 
 
 /// # Algorithm 24: `RejNTTPoly(ρ)` on page 30.
-/// Samples a polynomial ∈ `Tq`. Note that this function is only used in the algorithm 26
-/// function `expand_a()`. This latter function operates on `rho` which is a component
-/// of the public key passed in the clear. This complicates the (constant) time analysis of
-/// `ml_dsa::key_gen()`, `ml_dsa::sign_start()` and `ml_dsa::verify_start()`.
+/// Samples a polynomial ∈ `Tq`. The `CTEST` generic is only passed through to the
+/// `coef_from_three_bytes()` leaf function such that this logic becomes constant-time.
 ///
 /// **Input**: A seed `ρ ∈ {0,1}^{272}`.<br>
 /// **Output**: An element `a_hat ∈ Tq`.
@@ -131,7 +134,9 @@ pub(crate) fn rej_ntt_poly<const CTEST: bool>(rhos: &[&[u8]]) -> T {
 
 
 /// # Algorithm 25 RejBoundedPoly(ρ) on page 31.
-/// Samples an element `a ∈ Rq` with coefficients in `[−η, η]` computed via rejection sampling from `ρ`.
+/// Samples an element `a ∈ Rq` with coefficients in `[−η, η]` computed via rejection
+/// sampling from `ρ`. The `CTEST` generic is only passed through to the
+/// `coef_from_half_byte()` leaf function such that this logic becomes constant-time.
 ///
 /// **Input**: A seed `ρ ∈{0,1}^528`. <br>
 /// **Output**: A polynomial `a ∈ Rq`.
@@ -198,10 +203,9 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
 
 
 /// # Algorithm 26 ExpandA(ρ) on page 31.
-/// Samples a k × ℓ matrix `A_hat` of elements of `T_q`. This function operates solely on `rho`
-/// which is a component of the public key passed in the clear. This complicates the (constant)
-/// timing analysis of `ml_dsa::key_gen()`, `ml_dsa::sign_start()` and
-/// `ml_dsa::verify_start()`.
+/// Samples a k × ℓ matrix `A_hat` of elements of `T_q`. The `CTEST` generic is
+/// only passed through to the `rej_ntt_poly()` leaf function such that this logic
+/// becomes constant-time.
 ///
 /// **Input**: `ρ ∈ {0,1}^256`. <br>
 /// **Output**: Matrix `A_hat`
@@ -223,9 +227,9 @@ pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(
 
 
 /// # Algorithm 27: `ExpandS(ρ)` on page 32.
-/// Samples vectors `s1 ∈ R^ℓ_q` and `s2 ∈ R^k_q`, each with coefficients in the interval `[−η, η]`.
-/// Note that this function is only used in the `ml_dsa::keygen()` functionality using the
-/// `rho_prime` private random seed. It is not exposed to untrusted input.
+/// Samples vectors `s1 ∈ R^ℓ_q` and `s2 ∈ R^k_q`, each with coefficients in
+/// the interval `[−η, η]`. The `CTEST` generic is only passed through to the
+/// `rej_bounded_poly()` leaf function such that this logic becomes constant-time.
 ///
 /// **Input**: `ρ ∈ {0,1}^512` <br>
 /// **Output**: Vectors `s1`, `s2` of polynomials in `Rq`.
@@ -275,7 +279,7 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
     for r in 0..u16::try_from(L).unwrap() {
         //
         // 3: n ← IntegerToBits(µ + r, 16)
-        debug_assert!((mu + r < 512), "Alg 28: mu + r out of range");
+        debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range");  // TODO revisit
         let n = mu + r;
 
         // 4: v ← (H(ρ||n)[[32rc]], H(ρ||n)[[32rc+1]], ... , H(ρ||n)[[32rc+32c − 1]])

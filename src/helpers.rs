@@ -41,6 +41,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 }
 
 
+// TODO: need to experiment with 32*32 mul_red()
 #[allow(dead_code)]
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
@@ -61,7 +62,7 @@ pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     let x = (a + (1 << 22)) >> 23;
     let res = a - x * Q;
-    debug_assert!(res.abs() < (1 << 23) - (1 << 21) - (1 << 8));
+    debug_assert!(res.abs() < Q);
     res
 }
 

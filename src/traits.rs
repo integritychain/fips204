@@ -5,20 +5,24 @@ use rand_core::OsRng;
 
 /// The `KeyGen` trait is defined to allow trait objects.
 pub trait KeyGen {
-    /// A public key specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
+    /// A public key specific to the chosen security parameter set, e.g., ml-dsa-44,
+    /// ml-dsa-65 or ml-dsa-87
     type PublicKey;
-    /// A private (secret) key specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
+    /// A private (secret) key specific to the chosen security parameter set, e.g.,
+    /// ml-dsa-44, ml-dsa-65 or ml-dsa-87
     type PrivateKey;
-    /// An expanded private key containing precomputed elements to increase (repeated) signing performance.
+    /// An expanded private key containing precomputed elements to increase (repeated)
+    /// signing performance. Derived from the private key.
     type ExpandedPrivateKey;
-    /// An expanded public key containing precomputed elements to increase (repeated) verify performance.
+    /// An expanded public key containing precomputed elements to increase (repeated)
+    /// verify performance. Derived from the public key.
     type ExpandedPublicKey;
 
     /// Generates a public and private key pair specific to this security parameter set. <br>
     /// This function utilizes the **OS default** random number generator. This function operates
     /// in constant-time relative to secret data (which specifically excludes the OS random
-    /// number generator, the `rho` value stored in the public key, and the hash-derived
-    /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
+    /// number generator internals, the `rho` value stored in the public key, and the hash-derived
+    /// `rho_prime` values that is rejection-sampled/expanded into the internal `s_1` and `s_2`).
     /// # Errors
     /// Returns an error when the random number generator fails.
     /// # Examples
@@ -43,8 +47,8 @@ pub trait KeyGen {
     /// Generates a public and private key pair specific to this security parameter set. <br>
     /// This function utilizes the **provided** random number generator. This function operates
     /// in constant-time relative to secret data (which specifically excludes the provided random
-    /// number generator, the `rho` value stored in the public key, and the hash-derived
-    /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
+    /// number generator internals, the `rho` value stored in the public key, and the hash-derived
+    /// `rho_prime` values that is rejection-sampled/expanded into the internal `s_1` and `s_2`).
     /// # Errors
     /// Returns an error when the random number generator fails.
     /// # Examples
@@ -68,17 +72,24 @@ pub trait KeyGen {
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
     /// Generates an expanded private key from the normal/compressed private key.
-    ///
+    /// This supports improved signing performance. This function operates in constant-time
+    /// relative to secret data (which specifically excludes the provided random the `rho`
+    /// value (also) stored in the public key).
     /// # Errors
-    /// Propagates internal errors; potential for additional validation as FIPS 204 evolves.
+    /// This function operates on trusted data - either a private key directly from `keygen()`
+    /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
+    /// symmetry which can propagates internal errors.
     fn gen_expanded_private(
         sk: &Self::PrivateKey,
     ) -> Result<Self::ExpandedPrivateKey, &'static str>;
 
     /// Generates an expanded public key from the normal/compressed public key.
-    ///
+    /// This supports improved verification performance. As this function operates on purely
+    /// public data, it need not provide constant-time assurances.
     /// # Errors
-    /// Propagates internal errors; potential for additional validation as FIPS 204 evolves.
+    /// This function operates on trusted data - either a public key directly from `keygen()`
+    /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
+    /// symmetry which can propagates internal errors.
     fn gen_expanded_public(pk: &Self::PublicKey) -> Result<Self::ExpandedPublicKey, &'static str>;
 }
 
@@ -89,9 +100,12 @@ pub trait Signer {
     type Signature;
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
-    /// something went wrong. This function utilizes the default OS RNG and operates in constant time
-    /// with respect to the `PrivateKey` only (not including rejection loop; work in progress).
-    ///
+    /// something went wrong. This function utilizes the **OS default** random number generator.
+    /// This function operates in constant-time relative to secret data (which specifically excludes
+    /// the provided random number generator internals, the `rho` value (also) stored in the public
+    /// key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the internal
+    /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     /// # Errors
     /// Returns an error when the random number generator fails; propagates internal errors.
     /// # Examples
@@ -114,9 +128,12 @@ pub trait Signer {
     }
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
-    /// something went wrong. This function utilizes a supplied RNG and operates in constant time
-    /// with respect to the `PrivateKey` only (not including rejection loop; work in progress).
-    ///
+    /// something went wrong. This function utilizes the **provided** random number generator.
+    /// This function operates in constant-time relative to secret data (which specifically excludes
+    /// the provided random number generator internals, the `rho` value (also) stored in the public
+    /// key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the internal
+    /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     /// # Errors
     /// Returns an error when the random number generator fails; propagates internal errors.
     /// # Examples
@@ -147,9 +164,8 @@ pub trait Verifier {
     /// or ml-dsa-87
     type Signature;
 
-    /// Verifies a digital signature with respect to a `PublicKey`. This function operates in
-    /// variable time.
-    ///
+    /// Verifies a digital signature with respect to a `PublicKey`. As this function operates on
+    /// purely public data, it need not proved constant-time assurances.
     /// # Errors
     /// Returns an error on a malformed signature; propagates internal errors.
     /// # Examples
@@ -174,7 +190,8 @@ pub trait Verifier {
 /// The `SerDes` trait provides for validated serialization and deserialization of fixed- and correctly-size elements.
 /// Note that FIPS 204 currently states that outside of exact length checks "ML-DSA is not designed to require any
 /// additional public-key validity checks". Nonetheless, a `Result()` is returned during all deserialization operations
-/// to preserve the ability to add future checks (and for symmetry across structures).
+/// to preserve the ability to add future checks (and for symmetry across structures). Both of the private and public
+/// key deserialization routines invoke an internal decode that catches over-sized coefficients.
 pub trait SerDes {
     /// The fixed-size byte array to be serialized or deserialized
     type ByteArray;

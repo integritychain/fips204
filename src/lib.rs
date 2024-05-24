@@ -65,7 +65,7 @@
 
 // Note that the `CTEST` generic parameter supports constant-time measurements by dudect. This
 // is done by carefully removing timing variability of non-secret data (such as the rejection
-// sampling of hash derived from rho). All (normal) crate functionality has this set to `false`
+// sampling of hash derived from rho). All normal crate functionality has this set to `false`
 // except for the single function (per namespace) `dudect_keygen_sign_with_rng()` which is only
 // exposed when the non-default `dudect` feature is enabled.
 
@@ -111,20 +111,17 @@ macro_rules! functionality {
 
         /// Expanded private key, specific to the target security parameter set, that contains <br>
         /// precomputed elements which increase (repeated) signature performance. Implements only
-        /// the [`crate::traits::Signer`] trait.
+        /// the [`crate::traits::Signer`] trait. Derived from the `PrivateKey`.
         pub type ExpandedPrivateKey = crate::types::ExpandedPrivateKey<K, L>;
-
 
         /// Correctly sized public key specific to the target security parameter set. <br>
         /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
         pub type PublicKey = crate::types::PublicKey<PK_LEN>;
 
-
         /// Expanded public key, specific to the target security parameter set, that contains <br>
         /// precomputed elements which increase (repeated) verification performance. Implements only
-        /// the [`crate::traits::Verifier`] traits.
+        /// the [`crate::traits::Verifier`] traits. Derived from the `PublicKey`.
         pub type ExpandedPublicKey = crate::types::ExpandedPublicKey<K, L>;
-
 
         /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>
         /// Implements the [`crate::traits::KeyGen`] trait.
@@ -136,8 +133,8 @@ macro_rules! functionality {
         /// Generates a public and private key pair specific to this security parameter set. <br>
         /// This function utilizes the **OS default** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the OS random
-        /// number generator, the `rho` value stored in the public key, and the hash-derived
-        /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
+        /// number generator internals, the `rho` value stored in the public key, and the hash-derived
+        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2`).
         /// # Errors
         /// Returns an error when the random number generator fails.
         /// # Examples
@@ -161,8 +158,8 @@ macro_rules! functionality {
         /// Generates a public and private key pair specific to this security parameter set. <br>
         /// This function utilizes the **provided** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the provided random
-        /// number generator, the `rho` value stored in the public key, and the hash-derived
-        /// `rho_prime` values which is rejection-sampled/expanded into `s_1` and `s_2`).
+        /// number generator internals, the `rho` value stored in the public key, and the hash-derived
+        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2`).
         /// # Errors
         /// Returns an error when the random number generator fails.
         /// # Examples
@@ -301,8 +298,9 @@ macro_rules! functionality {
         }
 
         // ----- SUPPORT FOR DUDECT CONSTANT TIME MEASUREMENTS ---
-        /// This function supports the dudect constant-time measurement framework.
-        ///
+
+        /// This function supports the dudect constant-time measurement framework, and
+        /// is only exposed with the `dudect` feature is enabled.
         /// # Errors
         /// Returns an error when the random number generator fails; propagates internal errors.
         #[cfg(feature = "dudect")]
@@ -318,7 +316,6 @@ macro_rules! functionality {
         }
     };
 }
-
 
 // Regarding private key sizes, see https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/EKoI0u_PuOw/m/b02zPvomBAAJ
 
