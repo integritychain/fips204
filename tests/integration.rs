@@ -1,7 +1,7 @@
 use fips204::traits::{KeyGen, Signer, Verifier};
 
 #[cfg(feature = "ml-dsa-44")]
-use fips204:: ml_dsa_44;
+use fips204::ml_dsa_44;
 
 #[cfg(feature = "ml-dsa-44")]
 use fips204::traits::SerDes;
@@ -10,10 +10,10 @@ use fips204::traits::SerDes;
 use rand_core::RngCore;
 
 #[cfg(feature = "ml-dsa-65")]
-use fips204:: ml_dsa_65;
+use fips204::ml_dsa_65;
 
 #[cfg(feature = "ml-dsa-87")]
-use fips204:: ml_dsa_87;
+use fips204::ml_dsa_87;
 
 use rand_chacha::rand_core::SeedableRng;
 

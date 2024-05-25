@@ -1,9 +1,10 @@
 [package]
 name = "fips204-fuzz"
-version = "0.1.2"
+version = "0.2.0"
 publish = false
 edition = "2021"
 license = "MIT OR Apache-2.0"
+rust-version = "1.70"
 
 
 [package.metadata]
@@ -24,7 +25,10 @@ members = ["."]
 
 
 [profile.release]
-debug = 1
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
 
 
 [[bin]]

@@ -4,13 +4,13 @@
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 
 #[cfg(feature = "ml-dsa-44")]
-use fips204:: ml_dsa_44;
+use fips204::ml_dsa_44;
 
 #[cfg(feature = "ml-dsa-65")]
-use fips204:: ml_dsa_65;
+use fips204::ml_dsa_65;
 
 #[cfg(feature = "ml-dsa-87")]
-use fips204:: ml_dsa_87;
+use fips204::ml_dsa_87;
 
 use hex::decode;
 use rand_core::{CryptoRng, RngCore};
@@ -94,7 +94,6 @@ fn get_verify_vec(filename: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
 
 #[test]
 fn test_keygen() {
-
     #[cfg(feature = "ml-dsa-44")]
     {
         let (seed, pk_exp, sk_exp) =

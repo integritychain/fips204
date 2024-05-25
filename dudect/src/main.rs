@@ -15,7 +15,7 @@ impl RngCore for TestRng {
 
     fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
         out.iter_mut().for_each(|b| *b = self.value.to_le_bytes()[0]);
-        out[0..4].copy_from_slice(&self.value.to_le_bytes());
+        out[0..4].copy_from_slice(&self.value.to_be_bytes());
         self.value = self.value.wrapping_add(1);
         Ok(())
     }
@@ -27,20 +27,20 @@ impl CryptoRng for TestRng {}
 
 fn keygen_and_sign(runner: &mut CtRunner, mut _rng: &mut BenchRng) {
     const ITERATIONS_INNER: usize = 5;
-    const ITERATIONS_OUTER: usize = 200 * 1024;
+    const ITERATIONS_OUTER: usize = 200_000;
 
     let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
 
     let mut classes = [Class::Right; ITERATIONS_OUTER];
-    let mut refs: [TestRng; ITERATIONS_OUTER] = core::array::from_fn(|_| TestRng {value: 12});
+    let mut rngs: [TestRng; ITERATIONS_OUTER] = core::array::from_fn(|_| TestRng {value: 12});
 
     // Interleave left and right
     for i in (0..ITERATIONS_OUTER).step_by(2) {
         classes[i] = Class::Left;
-        refs[i] = TestRng {value: 56};
+        rngs[i] = TestRng {value: 56}; // <--- different seed value
     }
 
-    for (class, rng) in classes.into_iter().zip(refs.into_iter()) {
+    for (class, rng) in classes.into_iter().zip(rngs.into_iter()) {
         runner.run_one(class, || {
             let mut rng = rng.clone();
             for _ in 0..ITERATIONS_INNER {

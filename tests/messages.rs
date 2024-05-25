@@ -1,5 +1,5 @@
 #[cfg(feature = "ml-dsa-44")]
-use fips204:: ml_dsa_44;
+use fips204::ml_dsa_44;
 #[cfg(feature = "ml-dsa-44")]
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 #[cfg(feature = "ml-dsa-44")]

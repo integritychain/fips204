@@ -1,6 +1,8 @@
+workspace = { exclude = ["ct_cm4", "dudect", "fuzz", "wasm"] }
+
 [package]
 name = "fips204"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
@@ -8,7 +10,7 @@ authors = ["Eric Schorn <eschorn@integritychain.com>"]
 documentation = "https://docs.rs/fips204"
 categories = ["cryptography", "no-std"]
 repository = "https://github.com/integritychain/fips204"
-keywords = ["FIPS204", "lattice", "signature"]
+keywords = ["FIPS204", "lattice", "dilithium", "signature"]
 # MSRV set at 1.70 for debian testing, e.g. https://packages.debian.org/search?keywords=rustc
 # This requires several marginally outdated dependencies, see below
 rust-version = "1.70"
@@ -23,18 +25,18 @@ ml-dsa-87 = []
 dudect = []
 
 
-[dependencies]
+[dependencies]  # Some are marginally held-back to retain MSRV 1.70
 rand_core = { version = "0.6.4", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
 zeroize = { version = "1.6.0", default-features = false, features = ["zeroize_derive"] }
 
 
-[dev-dependencies]
+[dev-dependencies]  # Some are marginally held-back to retain MSRV 1.70
 rand = "0.8.5"
 regex = "1.10.2"
 hex = "0.4.3"
 rand_chacha = "0.3.1"
-criterion = "0.4.0" # 0.4.0 needed to keep MSRV back at 1.70, newer: "0.5.1"
+criterion = "0.4.0"
 
 
 [[bench]]
