@@ -130,11 +130,11 @@ macro_rules! functionality {
 
         // ----- PRIMARY FUNCTIONS ---
 
-        /// Generates a public and private key pair specific to this security parameter set. <br>
+        /// Generates a public and private key pair specific to this security parameter set.
         /// This function utilizes the **OS default** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the OS random
         /// number generator internals, the `rho` value stored in the public key, and the hash-derived
-        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2`).
+        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values).
         /// # Errors
         /// Returns an error when the random number generator fails.
         /// # Examples
@@ -157,11 +157,11 @@ macro_rules! functionality {
         pub fn try_keygen() -> Result<(PublicKey, PrivateKey), &'static str> { KG::try_keygen() }
 
 
-        /// Generates a public and private key pair specific to this security parameter set. <br>
+        /// Generates a public and private key pair specific to this security parameter set.
         /// This function utilizes the **provided** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the provided random
         /// number generator internals, the `rho` value stored in the public key, and the hash-derived
-        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2`).
+        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values).
         /// # Errors
         /// Returns an error when the random number generator fails.
         /// # Examples
