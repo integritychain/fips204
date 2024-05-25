@@ -5,8 +5,7 @@ use crate::{Q, ZETA};
 
 
 /// # Macro ensure!()
-/// If the condition is not met, return an error message. Borrowed from the `anyhow` crate.
-/// Pervasive use of this macro hits performance around 3%
+/// If the condition is not met, return an error Result. Borrowed from the `anyhow` crate.
 macro_rules! ensure {
     ($cond:expr, $msg:literal $(,)?) => {
         if !$cond {
@@ -19,6 +18,7 @@ pub(crate) use ensure; // make available throughout crate
 
 
 /// Ensure all coefficients of polynomial `w` are within -lo to +hi (inclusive)
+/// Note, while both range parameters are i32, they should be both non-negative
 pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
     w.0.iter().all(|&e| (e >= -lo) && (e <= hi)) // success is CT, failure vartime
 }
@@ -29,27 +29,27 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     const M: i64 = (1 << 48) / (Q as i64);
-    debug_assert!(a < (i64::MAX / 64));
+    debug_assert!(a < (i64::MAX / 64), "partial_reduce64 input"); // bit of headroom
     let x = a >> 23;
     let a = a - x * (Q as i64);
     let x = a >> 23;
     let a = a - x * (Q as i64);
     let q = (a * M) >> 48;
     let res = a - q * (Q as i64);
-    debug_assert!(res < 2 * Q as i64);
+    debug_assert!(res < 2 * Q as i64, "partial_reduce64 output");
     res as i32
 }
 
 
-// TODO: need to experiment with 32*32 mul_red()
+// TODO: need to experiment a little with `mul_red(32, 32)`
 #[allow(dead_code)]
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
     const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
-    debug_assert!(a < (i64::MAX / 64));
+    debug_assert!(a < (i64::MAX / 64), "partial_reduce64b input"); // bit of headroom
     let q = (a as i128 * MM as i128) >> 64; // only top half is relevant
     let res = a - (q as i64 * Q as i64);
-    debug_assert!(res < 2 * Q as i64);
+    debug_assert!(res < 2 * Q as i64, "partial_reduce64b output");
     res as i32
 }
 
@@ -62,7 +62,7 @@ pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
     let x = (a + (1 << 22)) >> 23;
     let res = a - x * Q;
-    debug_assert!(res.abs() < Q);
+    debug_assert!(res.abs() < Q, "partial_reduce32 output");
     res
 }
 
@@ -70,9 +70,10 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
     let x = partial_reduce32(a); // puts us within better than -Q to +Q
     let x = x + ((x >> 31) & Q); // add Q if negative
-    debug_assert!(x < Q);
+    debug_assert!(x < Q, "full_reduce32 output");
     x
 }
+
 
 // Note: this is only used on 'fixed' security parameters (not secret values), so as not to impact CT
 /// Bit length required to express `a` in bits
@@ -86,7 +87,9 @@ pub(crate) const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 pub(crate) fn center_mod(m: i32) -> i32 {
     let t = partial_reduce32(m);
     let over2 = (Q / 2) - t; // check if t is larger than Q/2
-    t - ((over2 >> 31) & Q) // sub Q if over2 is negative
+    let res = t - ((over2 >> 31) & Q); // sub Q if over2 is negative
+    debug_assert_eq!(m.rem_euclid(Q), res.rem_euclid(Q), "center_mod output");
+    res
 }
 
 
@@ -132,10 +135,23 @@ pub(crate) fn infinity_norm<const ROW: usize>(w: &[R; ROW]) -> i32 {
     for row in w {
         for element in row.0 {
             let z_q = center_mod(element).abs();
-            result = if z_q > result { z_q } else { result }; // TODO: check CT
+            result = if z_q > result { z_q } else { result }; // outside of CT assurance
         }
     }
     result
+}
+
+
+const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
+
+
+#[allow(clippy::cast_possible_truncation)] // t as i32
+pub(crate) const fn mont_reduce(a: i64) -> i32 {
+    let t = a.wrapping_mul(QINV) as i32;
+    let t = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
+    debug_assert!(t < (Q as i64), "mont_reduce output 1");
+    debug_assert!(-(Q as i64) < t, "mont_reduce output 2");
+    t as i32
 }
 
 
@@ -160,21 +176,8 @@ const fn pow_mod_q(g: i32, e: u8) -> i32 {
 }
 
 
-///////////////////////
-
-#[allow(dead_code)]
-const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
-
-#[allow(clippy::cast_possible_truncation)] // as i32
-pub(crate) const fn mont_reduce(a: i64) -> i32 {
-    let t = a.wrapping_mul(QINV) as i32;
-    let t = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
-    debug_assert!(t < (Q as i64));
-    debug_assert!(-(Q as i64) < t);
-    t as i32
-}
-
 pub(crate) static ZETA_TABLE_MONT: [i32; 256] = gen_zeta_table_mont();
+
 
 #[allow(clippy::cast_possible_truncation)]
 const fn gen_zeta_table_mont() -> [i32; 256] {

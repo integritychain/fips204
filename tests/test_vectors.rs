@@ -2,7 +2,16 @@
 // round trips, and (soon) fails.
 
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
+
+#[cfg(feature = "ml-dsa-44")]
+use fips204:: ml_dsa_44;
+
+#[cfg(feature = "ml-dsa-65")]
+use fips204:: ml_dsa_65;
+
+#[cfg(feature = "ml-dsa-87")]
+use fips204:: ml_dsa_87;
+
 use hex::decode;
 use rand_core::{CryptoRng, RngCore};
 use regex::Regex;
@@ -85,77 +94,104 @@ fn get_verify_vec(filename: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
 
 #[test]
 fn test_keygen() {
-    let (seed, pk_exp, sk_exp) =
-        get_keygen_vec("./tests/test_vectors/Key Generation -- ML-DSA-44.txt");
-    let mut rnd = MyRng::new();
-    rnd.push(&seed);
-    let (pk_act, sk_act) = ml_dsa_44::KG::try_keygen_with_rng(&mut rnd).unwrap();
-    assert_eq!(pk_exp, pk_act.into_bytes());
-    assert_eq!(sk_exp, sk_act.into_bytes());
 
-    let (seed, pk_exp, sk_exp) =
-        get_keygen_vec("./tests/test_vectors/Key Generation -- ML-DSA-65.txt");
-    let mut rnd = MyRng::new();
-    rnd.push(&seed);
-    let (pk_act, sk_act) = ml_dsa_65::KG::try_keygen_with_rng(&mut rnd).unwrap();
-    assert_eq!(pk_exp, pk_act.into_bytes());
-    assert_eq!(sk_exp, sk_act.into_bytes());
+    #[cfg(feature = "ml-dsa-44")]
+    {
+        let (seed, pk_exp, sk_exp) =
+            get_keygen_vec("./tests/test_vectors/Key Generation -- ML-DSA-44.txt");
+        let mut rnd = MyRng::new();
+        rnd.push(&seed);
+        let (pk_act, sk_act) = ml_dsa_44::KG::try_keygen_with_rng(&mut rnd).unwrap();
+        assert_eq!(pk_exp, pk_act.into_bytes());
+        assert_eq!(sk_exp, sk_act.into_bytes());
+    }
 
-    let (seed, pk_exp, sk_exp) =
-        get_keygen_vec("./tests/test_vectors/Key Generation -- ML-DSA-87.txt");
-    let mut rnd = MyRng::new();
-    rnd.push(&seed);
-    let (pk_act, sk_act) = ml_dsa_87::KG::try_keygen_with_rng(&mut rnd).unwrap();
-    assert_eq!(pk_exp, pk_act.into_bytes());
-    assert_eq!(sk_exp, sk_act.into_bytes());
+    #[cfg(feature = "ml-dsa-65")]
+    {
+        let (seed, pk_exp, sk_exp) =
+            get_keygen_vec("./tests/test_vectors/Key Generation -- ML-DSA-65.txt");
+        let mut rnd = MyRng::new();
+        rnd.push(&seed);
+        let (pk_act, sk_act) = ml_dsa_65::KG::try_keygen_with_rng(&mut rnd).unwrap();
+        assert_eq!(pk_exp, pk_act.into_bytes());
+        assert_eq!(sk_exp, sk_act.into_bytes());
+    }
+    #[cfg(feature = "ml-dsa-87")]
+    {
+        let (seed, pk_exp, sk_exp) =
+            get_keygen_vec("./tests/test_vectors/Key Generation -- ML-DSA-87.txt");
+        let mut rnd = MyRng::new();
+        rnd.push(&seed);
+        let (pk_act, sk_act) = ml_dsa_87::KG::try_keygen_with_rng(&mut rnd).unwrap();
+        assert_eq!(pk_exp, pk_act.into_bytes());
+        assert_eq!(sk_exp, sk_act.into_bytes());
+    }
 }
 
 
 #[test]
 fn test_sign() {
-    let (msg, sk, seed, sig_exp) =
-        get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-44.txt");
-    let sk = ml_dsa_44::PrivateKey::try_from_bytes(sk.try_into().unwrap()).unwrap();
-    let mut rnd = MyRng::new();
-    rnd.push(&seed);
-    let sig_act = sk.try_sign_with_rng(&mut rnd, &msg);
-    assert_eq!(sig_exp, sig_act.unwrap());
+    #[cfg(feature = "ml-dsa-44")]
+    {
+        let (msg, sk, seed, sig_exp) =
+            get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-44.txt");
+        let sk = ml_dsa_44::PrivateKey::try_from_bytes(sk.try_into().unwrap()).unwrap();
+        let mut rnd = MyRng::new();
+        rnd.push(&seed);
+        let sig_act = sk.try_sign_with_rng(&mut rnd, &msg);
+        assert_eq!(sig_exp, sig_act.unwrap());
+    }
 
-    let (msg, sk, seed, sig_exp) =
-        get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-65.txt");
-    let sk = ml_dsa_65::PrivateKey::try_from_bytes(sk.try_into().unwrap()).unwrap();
-    let mut rnd = MyRng::new();
-    rnd.push(&seed);
-    let sig_act = sk.try_sign_with_rng(&mut rnd, &msg);
-    assert_eq!(sig_exp, sig_act.unwrap());
+    #[cfg(feature = "ml-dsa-65")]
+    {
+        let (msg, sk, seed, sig_exp) =
+            get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-65.txt");
+        let sk = ml_dsa_65::PrivateKey::try_from_bytes(sk.try_into().unwrap()).unwrap();
+        let mut rnd = MyRng::new();
+        rnd.push(&seed);
+        let sig_act = sk.try_sign_with_rng(&mut rnd, &msg);
+        assert_eq!(sig_exp, sig_act.unwrap());
+    }
 
-    let (msg, sk, seed, sig_exp) =
-        get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-87.txt");
-    let sk = ml_dsa_87::PrivateKey::try_from_bytes(sk.try_into().unwrap()).unwrap();
-    let mut rnd = MyRng::new();
-    rnd.push(&seed);
-    let sig_act = sk.try_sign_with_rng(&mut rnd, &msg);
-    assert_eq!(sig_exp, sig_act.unwrap());
+    #[cfg(feature = "ml-dsa-87")]
+    {
+        let (msg, sk, seed, sig_exp) =
+            get_sign_vec("./tests/test_vectors/Signature Generation -- ML-DSA-87.txt");
+        let sk = ml_dsa_87::PrivateKey::try_from_bytes(sk.try_into().unwrap()).unwrap();
+        let mut rnd = MyRng::new();
+        rnd.push(&seed);
+        let sig_act = sk.try_sign_with_rng(&mut rnd, &msg);
+        assert_eq!(sig_exp, sig_act.unwrap());
+    }
 }
 
 
 #[test]
 fn test_verify() {
-    let (pk, msg, sig) =
-        get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-44.txt");
-    let pk = ml_dsa_44::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-    let pass = pk.try_verify(&msg, &sig.try_into().unwrap());
-    assert!(pass.unwrap());
+    #[cfg(feature = "ml-dsa-44")]
+    {
+        let (pk, msg, sig) =
+            get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-44.txt");
+        let pk = ml_dsa_44::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
+        let pass = pk.try_verify(&msg, &sig.try_into().unwrap());
+        assert!(pass.unwrap());
+    }
 
-    let (pk, message, sig) =
-        get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-65.txt");
-    let pk = ml_dsa_65::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-    let pass = pk.try_verify(&message, &sig.try_into().unwrap());
-    assert!(pass.unwrap());
+    #[cfg(feature = "ml-dsa-65")]
+    {
+        let (pk, message, sig) =
+            get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-65.txt");
+        let pk = ml_dsa_65::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
+        let pass = pk.try_verify(&message, &sig.try_into().unwrap());
+        assert!(pass.unwrap());
+    }
 
-    let (pk, message, sig) =
-        get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-87.txt");
-    let pk = ml_dsa_87::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-    let pass = pk.try_verify(&message, &sig.try_into().unwrap());
-    assert!(pass.unwrap());
+    #[cfg(feature = "ml-dsa-87")]
+    {
+        let (pk, message, sig) =
+            get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-87.txt");
+        let pk = ml_dsa_87::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
+        let pass = pk.try_verify(&message, &sig.try_into().unwrap());
+        assert!(pass.unwrap());
+    }
 }

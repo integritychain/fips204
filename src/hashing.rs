@@ -1,4 +1,4 @@
-//! This file implements functionality from FIPS 204 section 8.3 Hashing and Pseudorandom Sampling
+// This file implements functionality from FIPS 204 section 8.3 Hashing and Pseudorandom Sampling
 
 use crate::conversion::{bit_unpack, coef_from_half_byte, coef_from_three_bytes};
 use crate::helpers::{bit_length, is_in_range};
@@ -33,8 +33,8 @@ pub(crate) fn h128_xof(v: &[&[u8]]) -> impl XofReader {
 /// portion of the non-secret output `c_tilde` element within the signature, so
 /// need not be constant-time in normal operation. To support constant-time `dudect`
 /// measurements through the `dudect_keygen_sign_with_rng()` function exposed when
-/// the `dudect` feature is enabled, the CTEST value would be set to `true` to effectively
-/// bypass some of the loop decisions.
+/// the `dudect` feature is enabled, the CTEST value would be set to `true` to
+/// effectively bypass some of the loop decisions.
 ///
 /// **Input**: A seed `ρ ∈{0,1}^256` <br>
 /// **Output**: A polynomial `c` in `Rq`.
@@ -46,6 +46,7 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8; 32]) -> R {
 
     // 1: c ← 0
     let mut c = R0;
+
     // 2: k ← 8; k implicitly advances with each sample
     let mut hpk = [0u8];
 
@@ -203,19 +204,19 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
 
 
 /// # Algorithm 26 ExpandA(ρ) on page 31.
-/// Samples a k × ℓ matrix `A_hat` of elements of `T_q`. The `CTEST` generic is
+/// Samples a k × ℓ matrix `cap_a_hat` of elements of `T_q`. The `CTEST` generic is
 /// only passed through to the `rej_ntt_poly()` leaf function such that this logic
 /// becomes constant-time.
 ///
 /// **Input**: `ρ ∈ {0,1}^256`. <br>
-/// **Output**: Matrix `A_hat`
-#[allow(clippy::cast_possible_truncation)] // s and r
+/// **Output**: Matrix `cap_a_hat`
+#[allow(clippy::cast_possible_truncation)] // s and r as u8
 pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(
     rho: &[u8; 32],
 ) -> [[T; L]; K] {
     // 1: for r from 0 to k − 1 do
     // 2:   for s from 0 to ℓ − 1 do
-    // 3:     A_hat[r, s] ← RejNTTPoly(ρ||IntegerToBits(s, 8)||IntegerToBits(r, 8))
+    // 3:     A_hat[r, s] ← RejNTTPoly(ρ||IntegerToBits(s, 8) || IntegerToBits(r, 8))
     // 4:   end for
     // 5: end for
 
@@ -243,13 +244,13 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
 ) -> ([R; L], [R; K]) {
     //
     // 1: for r from 0 to ℓ − 1 do
-    // 2: s1[r] ← RejBoundedPoly(ρ||IntegerToBits(r, 16))
+    // 2: s1[r] ← RejBoundedPoly(ρ || IntegerToBits(r, 16))
     // 3: end for
     let s1: [R; L] =
         core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[r as u8], &[0]]));
 
     // 4: for r from 0 to k − 1 do
-    // 5: s2[r] ← RejBoundedPoly(ρ||IntegerToBits(r + ℓ, 16))
+    // 5: s2[r] ← RejBoundedPoly(ρ || IntegerToBits(r + ℓ, 16))
     // 6: end for
     let s2: [R; K] =
         core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]));
@@ -262,31 +263,31 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
 
 
 /// # Algorithm 28: `ExpandMask(ρ,µ)` from page 32.
-/// Samples a vector `s ∈ R^ℓ_q` such that each polynomial `s_j` has coefficients between −γ1 + 1 and γ1.
-/// This function is not exposed to untrusted input.
+/// Samples a vector `s ∈ R^ℓ_q` such that each polynomial `s_j` has coefficients
+/// between `−γ_1 + 1` and `γ_1`. This function is not exposed to untrusted input.
 ///
 /// **Input**: A bit string `ρ ∈ {0,1}^512` and a non-negative integer `µ`. <br>
 /// **Output**: Vector `s ∈ R^ℓ_q`.
 pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) -> [R; L] {
     let mut s = [R0; L];
-    let mut v = [0u8; 32 * 20];
+    let mut v = [0u8; 32 * 20]; // leaving a few bytes on the table
 
-    // 1: c ← 1 + bitlen (γ1 − 1) ▷ γ1 is always a power of 2
+    // 1: c ← 1 + bitlen (γ_1 − 1)    ▷ γ_1 is always a power of 2
     let c = 1 + bit_length(gamma1 - 1); // c will either be 18 or 20
     debug_assert!((c == 18) | (c == 20), "Alg 28: illegal c");
 
     // 2: for r from 0 to ℓ − 1 do
-    for r in 0..u16::try_from(L).unwrap() {
+    for r in 0..u16::try_from(L).expect("cannot fail") {
         //
         // 3: n ← IntegerToBits(µ + r, 16)
-        debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range");  // TODO revisit
+        debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range"); // TODO revisit/resize limit
         let n = mu + r;
 
-        // 4: v ← (H(ρ||n)[[32rc]], H(ρ||n)[[32rc+1]], ... , H(ρ||n)[[32rc+32c − 1]])
+        // 4: v ← (H(ρ || n)[[32rc]], H(ρ || n)[[32rc+1]], ..., H(ρ || n)[[32rc+32c − 1]])
         let mut xof = h_xof(&[rho, &n.to_le_bytes()]);
         xof.read(&mut v);
 
-        // 5: s[r] ← BitUnpack(v, γ1 − 1, γ1)
+        // 5: s[r] ← BitUnpack(v, γ_1 − 1, γ_1)
         s[r as usize] = bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1).expect("cannot fail");
         debug_assert!(
             s.iter().all(|r| is_in_range(r, gamma1, gamma1)),

@@ -1,4 +1,4 @@
-//! This file implements functionality from FIPS 204 section 8.1 Conversion Between Data Types
+// This file implements functionality from FIPS 204 section 8.1 Conversion Between Data Types
 
 use crate::helpers::{bit_length, ensure, is_in_range};
 use crate::types::{R, R0};
@@ -38,7 +38,7 @@ pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i
     // 2: b2 ← b2 − 128     ▷ Set the top bit of b2 to zero
     // 3: end if
     let bbb2 = i32::from(bbb[2] & 0x7F);
-    let bbb2 = if CTEST { bbb2 & 0x0F } else { bbb2 }; // Used only for `dudect` measurements
+    let bbb2 = if CTEST { bbb2 & 0x3F } else { bbb2 }; // Used only for `dudect` measurements
 
     // 4: z ← 2^16·b_2 + 2^8·b1 + b0
     let z = (bbb2 << 16) | (i32::from(bbb[1]) << 8) | i32::from(bbb[0]);
@@ -80,6 +80,7 @@ pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<
     let b = if CTEST { b & 0x07 } else { b };
     // 1: if η = 2 and b < 15 then return 2 − (b mod 5)
     if (eta == 2) & (b < 15) {
+        // note 15, not 16
         let quot = (u32::from(b) * M5) >> 24;
         let rem = u32::from(b) - quot * 5;
         Ok(2 - i32::from(rem as u8))
@@ -97,6 +98,7 @@ pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<
 
             // 5: end if
         }
+
         // 6: end if
     }
 }
@@ -239,7 +241,7 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
 pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
     omega: i32, h: &[R; K], y_bytes: &mut [u8],
 ) {
-    let omega_u = usize::try_from(omega).expect("Alg 14: omega try_into fail");
+    let omega_u = usize::try_from(omega).expect("cannot fail");
     debug_assert!((1..255).contains(&(omega_u + K)), "Alg 14: omega+K out of range");
     debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 14: bad output size");
     debug_assert!(h.iter().all(|r| is_in_range(r, 0, 1)), "Alg 14: h not 0/1");

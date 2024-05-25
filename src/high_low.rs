@@ -1,4 +1,4 @@
-//! This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
+// This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
 
 use crate::helpers::full_reduce32;
 use crate::types::{Zq, R};
@@ -12,15 +12,28 @@ use crate::{D, Q};
 ///
 /// **Input**: `r ∈ Zq`. <br>
 /// **Output**: Integers `(r1, r0)`.
-pub(crate) fn power2round<const K: usize>(t: &[R; K]) -> ([R; K], [R; K]) {
+pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
     // 1: r+ ← r mod q
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
     let r_1: [R; K] = core::array::from_fn(|k| {
-        R(core::array::from_fn(|n| (t[k].0[n] + (1 << (D - 1)) - 1) >> D))
+        R(core::array::from_fn(|n| (r[k].0[n] + (1 << (D - 1)) - 1) >> D))
     });
     let r_0: [R; K] =
-        core::array::from_fn(|k| R(core::array::from_fn(|n| t[k].0[n] - (r_1[k].0[n] << D))));
+        core::array::from_fn(|k| R(core::array::from_fn(|n| r[k].0[n] - (r_1[k].0[n] << D))));
+
+    debug_assert!(
+        {
+            let mut result = true;
+            for k in 0..K {
+                for n in 0..256 {
+                    result &= r[k].0[n] == ((r_1[k].0[n] << D) + r_0[k].0[n]);
+                }
+            }
+            result
+        },
+        "Alg 29: fail"
+    );
 
     (r_1, r_0)
 }
@@ -58,6 +71,8 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
 
     let xr0 = rp - xr1 * 2 * gamma2;
     let xr0 = xr0 - ((((Q - 1) / 2 - xr0) >> 31) & Q);
+
+    debug_assert_eq!(r.rem_euclid(Q), (xr1 * 2 * gamma2 + xr0).rem_euclid(Q), "Alg 30: fail");
 
     (xr1, xr0)
 }
@@ -116,7 +131,7 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 /// This function uses public data from the signature; thus does not need to be constant time
 ///
 /// **Input**: boolean `h`, `r` ∈ `Zq` <br>
-/// **Output**: `r1` ∈ `Z` with `0 ≤ r1 ≤ (q − 1)/(2·γ_2)`
+/// **Output**: `r1 ∈ Z` with `0 ≤ r1 ≤ (q − 1)/(2·γ_2)`
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
     // 1: m ← (q− 1)/(2*γ_2)
@@ -152,5 +167,5 @@ pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     }
 
     // 5: return r1
-    // r1  see logic
+    // r1 see 'if' above
 }

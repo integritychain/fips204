@@ -24,12 +24,12 @@ The functionality is extremely simple to use, as demonstrated by the following e
 
 ~~~rust
 // Use the desired target parameter set.
-use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87. 
-use fips204::traits::{SerDes, Signer, Verifier};
 # use std::error::Error;
 #
-# fn main() -> Result<(), Box<dyn Error>> {
-
+# fn main() -> Result<(), Box<dyn Error>> { 
+# #[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))] { 
+use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87. 
+use fips204::traits::{SerDes, Signer, Verifier};
 let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
 
 // Generate key pair and signature
@@ -43,7 +43,8 @@ let (pk_recv, msg_recv, sig_recv) = (pk_send, msg_send, sig_send);
 // Deserialize the public key and signature, then verify the message
 let pk2 = ml_dsa_44::PublicKey::try_from_bytes(pk_recv)?;
 let v = pk2.try_verify(&msg_recv, &sig_recv)?; // Use the public to verify message signature
-assert!(v); 
+assert!(v);
+# }
 # Ok(())
 # }
 ~~~

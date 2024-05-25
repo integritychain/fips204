@@ -7,7 +7,7 @@ $ mkdir -p corpus/fuzz_all
 $ dd if=/dev/zero bs=1 count=6292 > corpus/fuzz_all/seed0
 $ for i in $(seq 1 2); do head -c 6292 </dev/urandom > corpus/fuzz_all/seed$i; done
 $ dd if=/dev/zero bs=1 count=6292 | tr '\0x00' '\377' > corpus/fuzz_all/seed3
-$ cargo fuzz run fuzz_all -j 4 -- -max_total_time=300
+$ cargo fuzz run fuzz_all -j 4 -- -max_total_time=3600
 
 #3086784: cov: 6098 ft: 4465 corp: 256 exec/s 23 oom/timeout/crash: 0/0/0 time: 32989s job: 584 dft_time: 0
 #3093638: cov: 6098 ft: 4465 corp: 256 exec/s 22 oom/timeout/crash: 0/0/0 time: 33064s job: 585 dft_time: 0

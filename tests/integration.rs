@@ -1,11 +1,26 @@
-use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
-use rand_chacha::rand_core::SeedableRng;
+use fips204::traits::{KeyGen, Signer, Verifier};
+
+#[cfg(feature = "ml-dsa-44")]
+use fips204:: ml_dsa_44;
+
+#[cfg(feature = "ml-dsa-44")]
+use fips204::traits::SerDes;
+
+#[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))]
 use rand_core::RngCore;
+
+#[cfg(feature = "ml-dsa-65")]
+use fips204:: ml_dsa_65;
+
+#[cfg(feature = "ml-dsa-87")]
+use fips204:: ml_dsa_87;
+
+use rand_chacha::rand_core::SeedableRng;
 
 // cargo flamegraph --test integration
 
 // $ cargo test --package fips204 --test integration forever -- --ignored --nocapture
+#[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))]
 #[ignore]
 #[test]
 fn forever() {
@@ -44,6 +59,7 @@ fn forever() {
 // This test demonstrates that two different signatures can be verified for the same pk/sig
 // Spec error, see https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/TQo-qFbBO1A/m/YcYKjMblAAAJ
 // Ref https://github.com/pq-crystals/dilithium/blob/master/ref/packing.c
+#[cfg(feature = "ml-dsa-44")]
 #[ignore]
 #[test]
 fn bad_sig() {
@@ -59,7 +75,7 @@ fn bad_sig() {
     assert!(pk.try_verify(&msg, &bad_sig).unwrap());
 }
 
-
+#[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))]
 #[test]
 fn test_44_rounds() {
     let mut msg = [0u8, 1, 2, 3, 4, 5, 6, 7];
@@ -73,6 +89,7 @@ fn test_44_rounds() {
     }
 }
 
+#[cfg(feature = "ml-dsa-65")]
 #[test]
 fn test_65_rounds() {
     let mut msg = [0u8, 1, 2, 3, 4, 5, 6, 7];
@@ -80,12 +97,13 @@ fn test_65_rounds() {
     for i in 0..128 {
         msg[0] = i as u8;
         let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng).unwrap();
-        let sig = sk.try_sign(&msg).unwrap();
+        let sig = sk.try_sign_with_rng(&mut rng, &msg).unwrap();
         let ver = pk.try_verify(&msg, &sig);
         assert!(ver.unwrap())
     }
 }
 
+#[cfg(feature = "ml-dsa-87")]
 #[test]
 fn test_87_rounds() {
     let mut msg = [0u8, 1, 2, 3, 4, 5, 6, 7];
@@ -93,17 +111,19 @@ fn test_87_rounds() {
     for i in 0..128 {
         msg[0] = i as u8;
         let (pk, sk) = ml_dsa_87::KG::try_keygen_with_rng(&mut rng).unwrap();
-        let sig = sk.try_sign(&msg).unwrap();
+        let sig = sk.try_sign_with_rng(&mut rng, &msg).unwrap();
         let ver = pk.try_verify(&msg, &sig);
         assert!(ver.unwrap())
     }
 }
+
+#[cfg(feature = "ml-dsa-44")]
 #[test]
 fn test_44_no_verif() {
     let msg = [0u8, 1, 2, 3, 4, 5, 6, 7];
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
     let (pk, sk) = ml_dsa_44::KG::try_keygen_with_rng(&mut rng).unwrap();
-    let sig = sk.try_sign(&msg).unwrap();
+    let sig = sk.try_sign_with_rng(&mut rng, &msg).unwrap();
 
     // Bad messages
     for i in 0..8 {
@@ -118,11 +138,10 @@ fn test_44_no_verif() {
         let mut sk_bad = sk.clone().into_bytes();
         sk_bad[70 + i * 10] ^= 0x08;
         let sk_bad = ml_dsa_44::PrivateKey::try_from_bytes(sk_bad).unwrap();
-        let sig = sk_bad.try_sign(&msg).unwrap();
+        let sig = sk_bad.try_sign_with_rng(&mut rng, &msg).unwrap();
         let ver = pk.try_verify(&msg, &sig).unwrap();
         assert!(!ver)
     }
-
 
     // Bad public key
     for i in 0..8 {

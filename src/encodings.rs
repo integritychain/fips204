@@ -1,4 +1,4 @@
-//! This file implements functionality from FIPS 204 section 8.2 Encodings of ML-DSA Keys and Signatures
+// This file implements functionality from FIPS 204 section 8.2 Encodings of ML-DSA Keys and Signatures
 
 use crate::conversion::{
     bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
@@ -12,7 +12,7 @@ use crate::{D, Q};
 /// Encodes a public key for ML-DSA into a byte string. This is only used in `ml_dsa::key_gen()`
 /// and does not involve untrusted input.
 ///
-/// **Input**:  `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d} - 1]`. <br>
+/// **Input**:  `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}-1]`. <br>
 /// **Output**: Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`.
 pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     rho: &[u8; 32], t1: &[R; K],
@@ -48,7 +48,7 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 /// untrusted input.
 ///
 /// **Input**:  Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`. <br>
-/// **Output**: `ρ ∈ {0, 1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d} − 1]`).
+/// **Output**: `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}−1]`).
 ///
 /// # Errors
 /// Returns an error when the internal `simple_bit_unpack()` invocation finds an element of
@@ -69,15 +69,16 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     let mut t1: [R; K] = [R0; K]; // tricky to get `?` inside a closure
     for i in 0..K {
         //
-        // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1)) ▷ This is always in the correct range
+        // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1))    ▷ This is always in the correct range
         t1[i] =
             simple_bit_unpack(&pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd], (1 << blqd) - 1)?;
         //
         // 5: end for
     }
 
-    // 6: return (ρ, t1)
     debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 17: t1 out of range");
+
+    // 6: return (ρ, t1)
     Ok((rho, t1))
 }
 
@@ -87,19 +88,19 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 /// and does not involve untrusted input.
 ///
 /// **Input**: `ρ ∈ {0,1}^256`, `K ∈ {0,1}^256`, `tr ∈ {0,1}^512`,
-///            `s1 ∈ R^l` with coefficients in `[−η, η]`,
-///            `s2 ∈ R^k` with coefficients in `[−η, η]`,
-///            `t0 ∈ R^k` with coefficients in `[−2^{d-1} + 1, 2^{d-1}]`.
+///            `s_1 ∈ R^l` with coefficients in `[−η, η]`,
+///            `s_2 ∈ R^k` with coefficients in `[−η, η]`,
+///            `t_0 ∈ R^k` with coefficients in `[−2^{d-1}+1, 2^{d-1}]`.
 ///             Security parameter `η` (eta) must be either 2 or 4.<br>
 /// **Output**: Private key, `sk ∈ B^{32+32+64+32·((k+ℓ)·bitlen(2·η)+d·k)}`
 pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
-    eta: i32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s1: &[R; L], s2: &[R; K], t0: &[R; K],
+    eta: i32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s_1: &[R; L], s_2: &[R; K], t_0: &[R; K],
 ) -> [u8; SK_LEN] {
     let top = 1 << (D - 1);
     debug_assert!((eta == 2) | (eta == 4), "Alg 18: incorrect eta");
-    debug_assert!(s1.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s1 out of range");
-    debug_assert!(s2.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s2 out of range");
-    debug_assert!(t0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg 18: t0 out of range");
+    debug_assert!(s_1.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s1 out of range");
+    debug_assert!(s_2.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s2 out of range");
+    debug_assert!(t_0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg 18: t0 out of range");
     debug_assert_eq!(
         SK_LEN,
         128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
@@ -119,7 +120,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..L {
         //
         // 3: sk ← sk || BitPack (s1[i], η, η)
-        bit_pack(&s1[i], eta, eta, &mut sk[start + i * step..start + (i + 1) * step]);
+        bit_pack(&s_1[i], eta, eta, &mut sk[start + i * step..start + (i + 1) * step]);
 
         // 4: end for
     }
@@ -129,7 +130,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..K {
         //
         // 6: sk ← sk || BitPack (s2[i], η, η)
-        bit_pack(&s2[i], eta, eta, &mut sk[start + i * step..start + (i + 1) * step]);
+        bit_pack(&s_2[i], eta, eta, &mut sk[start + i * step..start + (i + 1) * step]);
 
         // 7: end for
     }
@@ -140,7 +141,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..K {
         //
         // 9: sk ← sk || BitPack (t0[i], [−2^{d-1} + 1, 2^{d-1}] )
-        bit_pack(&t0[i], top - 1, top, &mut sk[start + i * step..start + (i + 1) * step]);
+        bit_pack(&t_0[i], top - 1, top, &mut sk[start + i * step..start + (i + 1) * step]);
 
         // 10: end for
     }
@@ -158,7 +159,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
 /// **Input**:  Private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2η)+d·k)}`
 ///             Security parameter `η` (eta) must be either 2 or 4.<br>
 /// **Output**: `ρ ∈ {0,1}^256`, `K ∈ {0,1}^256`, `tr ∈ {0,1}^512`,
-///             `s1 ∈ R^ℓ`, `s2 ∈ R^k`, `t0 ∈ R^k` with coefficients in `[−2^{d−1} + 1, 2^{d−1}]`.
+///             `s_1 ∈ R^ℓ`, `s_2 ∈ R^k`, `t_0 ∈ R^k` with coefficients in `[−2^{d−1}+1, 2^{d−1}]`.
 ///
 /// # Errors
 /// Returns an error when any of the output coefficients are out of range. <br>
@@ -173,7 +174,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
         "Alg 19: bad sk/config size"
     );
     let top = 1 << (D - 1);
-    let (mut s1, mut s2, mut t0) = ([R0; L], [R0; K], [R0; K]);
+    let (mut s_1, mut s_2, mut t_0) = ([R0; L], [R0; K], [R0; K]);
 
     // 1: (f, g, h, y_0, . . . , y_{ℓ−1}, z_0, . . . , z_{k−1}, w_0, . . . , w_{k−1)}) ∈
     //    B^32 × B^32 × B^64 × B^{32·bitlen(2η)}^l × B^{32·bitlen(2η)}^k × B^{32d}^k ← sk
@@ -193,7 +194,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..L {
         //
         // 6: s1[i] ← BitUnpack(yi, η, η)   ▷ This may lie outside [−η, η], if input is malformed
-        s1[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
+        s_1[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
 
         // 7: end for
     }
@@ -203,7 +204,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..K {
         //
         // 9: s2[i] ← BitUnpack(zi, η, η) ▷ This may lie outside [−η, η], if input is malformed
-        s2[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
+        s_2[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
 
         // 10: end for
     }
@@ -214,7 +215,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..K {
         //
         // 12: t0[i] ← BitUnpack(wi, −2^{d−1} - 1, 2^{d−1})   ▷ This is always in the correct range
-        t0[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], top - 1, top)?;
+        t_0[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], top - 1, top)?;
 
         // 13: end for
     }
@@ -222,7 +223,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     // ... just make sure we hit the end of sk slice properly
     debug_assert_eq!(start + K * step, sk.len(), "Alg 19: length miscalc");
 
-    Ok((rho, k, tr, s1, s2, t0))
+    Ok((rho, k, tr, s_1, s_2, t_0))
 }
 
 
@@ -314,7 +315,7 @@ pub(crate) fn sig_decode<
     let step = 32 * (bit_length(gamma1 - 1) + 1);
     for i in 0..L {
         //
-        // 4: z[i] ← BitUnpack(xi, γ1 − 1, γ1) ▷ This is always in the correct range, as γ1 is a power of 2
+        // 4: z[i] ← BitUnpack(xi, γ1 − 1, γ1)    ▷ This is always in the correct range, as γ1 is a power of 2
         z[i] = bit_unpack(&sigma[start + i * step..start + (i + 1) * step], gamma1 - 1, gamma1)?;
 
         // 5: end for
@@ -437,9 +438,9 @@ mod tests {
             (rho == *rho_test)
                 & (k == *k_test)
                 & (tr == *tr_test)
-                & (s1 == s1_test)
-                & (s2 == s2_test)
-                & (t0 == t0_test)
+                & (s1.iter().zip(s1_test.iter()).all(|(a, b)| a.0 == b.0))
+                & (s2.iter().zip(s2_test.iter()).all(|(a, b)| a.0 == b.0))
+                & (t0.iter().zip(t0_test.iter()).all(|(a, b)| a.0 == b.0))
         );
     }
 
@@ -455,7 +456,7 @@ mod tests {
         let (c_test, z_test, h_test) =
             sig_decode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &sigma).unwrap();
         assert_eq!(c_tilde[0..8], c_test[0..8]);
-        assert_eq!(z, z_test);
-        assert_eq!(h, h_test.unwrap());
+        assert!(z.iter().zip(z_test.iter()).all(|(a, b)| a.0 == b.0));
+        assert!(h.iter().zip(h_test.unwrap().iter()).all(|(a, b)| a.0 == b.0));
     }
 }

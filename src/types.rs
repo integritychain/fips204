@@ -41,14 +41,20 @@ pub struct ExpandedPublicKey<const K: usize, const L: usize> {
     pub(crate) t1_d2_hat_mont: [T; K],
 }
 
-#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
+
+/// Polynomial coefficients in R, with default R0
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub(crate) struct R(pub(crate) [i32; 256]);
 pub(crate) const R0: R = R([0i32; 256]);
 
-#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
+
+/// Polynomial coefficients inT, with default T0
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub(crate) struct T(pub(crate) [i32; 256]);
 pub(crate) const T0: T = T([0i32; 256]);
 
+
+/// Individual Zq element
 pub(crate) type Zq = i32;

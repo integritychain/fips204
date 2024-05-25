@@ -1,8 +1,11 @@
-use fips204::ml_dsa_44;
+#[cfg(feature = "ml-dsa-44")]
+use fips204:: ml_dsa_44;
+#[cfg(feature = "ml-dsa-44")]
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+#[cfg(feature = "ml-dsa-44")]
 use rand_chacha::rand_core::SeedableRng;
 
-
+#[cfg(feature = "ml-dsa-44")]
 #[test]
 fn test_browser_message() {
     let msg = b"asdf";

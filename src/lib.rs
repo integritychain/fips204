@@ -141,6 +141,7 @@ macro_rules! functionality {
         /// ```rust
         /// # use std::error::Error;
         /// # fn main() -> Result<(), Box<dyn Error>> {
+        /// # #[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))] {
         /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
         /// use fips204::traits::{SerDes, Signer, Verifier};
         ///
@@ -149,6 +150,7 @@ macro_rules! functionality {
         /// // Generate key pair and signature
         /// let (pk1, sk) = ml_dsa_44::try_keygen()?; // Generate both public and secret keys
         /// let sig1 = sk.try_sign(&message)?; // Use the secret key to generate a message signature
+        /// # }
         /// # Ok(())}
         /// ```
         #[cfg(feature = "default-rng")]
@@ -166,6 +168,7 @@ macro_rules! functionality {
         /// ```rust
         /// # use std::error::Error;
         /// # fn main() -> Result<(), Box<dyn Error>> {
+        /// # #[cfg(feature = "ml-dsa-44")] {
         /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
         /// use fips204::traits::{SerDes, Signer, Verifier};
         /// use rand_chacha::rand_core::SeedableRng;
@@ -175,7 +178,8 @@ macro_rules! functionality {
         ///
         /// // Generate key pair and signature
         /// let (pk1, sk) = ml_dsa_44::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
-        /// let sig1 = sk.try_sign(&message)?;  // Use the secret key to generate a message signature
+        /// let sig1 = sk.try_sign_with_rng(&mut rng, &message)?;  // Use the secret key to generate a message signature
+        /// # }
         /// # Ok(())}
         /// ```
         pub fn try_keygen_with_rng(
