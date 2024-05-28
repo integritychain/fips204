@@ -22,6 +22,8 @@ jobs:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
       - run: cargo build --target ${{ matrix.target }} --release --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
+      - run: pwd
+      - run: ls
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
