@@ -30,6 +30,9 @@ jobs:
       - run: echo $GITHUB_ENV
       - run: ls $GITHUB_ENV
       - run: echo $GITHUB_PATH
+      - run: ls $GITHUB_PATH
+      - run: echo $GITHUB_OUTPUT
+      - run: ls $GITHUB_OUTPUT
       - run: ls ..
       - name: Attest
         uses: actions/attest-build-provenance@v1
