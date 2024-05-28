@@ -27,6 +27,9 @@ jobs:
       - run: ls target
       - run: ls target/release
       - run: ls target/release/deps
+      - run: echo $GITHUB_ENV
+      - run: echo $GITHUB_PATH
+      - run: ls ..
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
