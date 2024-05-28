@@ -26,7 +26,8 @@ jobs:
       - run: ls
       - run: ls target
       - run: ls target/release
+      - run: ls target/release/deps
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: '${{ github.workspace }}/target/release/lib*'
+          subject-path: '${{ github.workspace }}/target/release/deps/libfips*'
