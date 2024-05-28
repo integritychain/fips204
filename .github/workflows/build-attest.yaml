@@ -26,4 +26,10 @@ jobs:
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: '${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/libfips*'
+      - name: 'Upload Artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libfips204.rlib
+          path: '${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/libfips204.rlib'
+          retention-days: 25
 
