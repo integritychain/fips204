@@ -1,0 +1,28 @@
+name: build-attest
+
+on: [ push ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+    strategy:
+      matrix:
+        rust:
+          - 1.72
+        target:
+          - x86_64-pc-windows-gnu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: ${{ matrix.target }}
+      - run: cargo build --target ${{ matrix.target }} --release --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
+      - name: Attest
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: '${{ github.workspace }}/target'
