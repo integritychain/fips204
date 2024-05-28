@@ -25,7 +25,7 @@ jobs:
       - run: pwd
       - run: ls
       - run: ls target
-      - run: ls target/release
+      - run: ls target/x86_64-pc-windows-gnu/release
       - run: ls target/release/deps
       - run: echo $GITHUB_ENV
       - run: ls $GITHUB_ENV
@@ -37,5 +37,6 @@ jobs:
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: '$GITHUB_ENV/target/release/deps/libfip*'
-      #    subject-path: '${{ github.workspace }}/target/release/deps/libfips*'
+          subject-path: '${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/libfips*'
+#          subject-path: '$GITHUB_ENV/target/release/deps/libfip*'
+
