@@ -24,6 +24,8 @@ jobs:
       - run: cargo build --target ${{ matrix.target }} --release --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
       - run: pwd
       - run: ls
+      - run: ls target
+      - run: ls target/release
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
