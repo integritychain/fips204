@@ -74,12 +74,12 @@ pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i
 #[allow(clippy::cast_possible_truncation)] // rem as u8
 pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<i32, &'static str> {
     const M5: u32 = ((1u32 << 24) / 5) + 1;
-    debug_assert!((eta == 2) | (eta == 4), "Alg 9: incorrect eta");
+    debug_assert!((eta == 2) || (eta == 4), "Alg 9: incorrect eta");
     debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
 
     let b = if CTEST { b & 0x07 } else { b };
     // 1: if η = 2 and b < 15 then return 2 − (b mod 5)
-    if (eta == 2) & (b < 15) {
+    if (eta == 2) && (b < 15) {
         // note 15, not 16
         let quot = (u32::from(b) * M5) >> 24;
         let rem = u32::from(b) - quot * 5;
@@ -89,12 +89,12 @@ pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<
     } else {
         //
         // 3: if η = 4 and b < 9 then return 4 − b
-        if (eta == 4) & (b < 9) {
+        if (eta == 4) && (b < 9) {
             Ok(4 - i32::from(b))
 
             // 4: else return ⊥
         } else {
-            Err("Alg 9: returns ⊥") // not necessarily an error per se, but rather "try again" (we can have eta==2 & b == 15)
+            Err("Alg 9: returns ⊥") // not necessarily an error per se, but rather "try again" (we can have eta==2 && b == 15)
 
             // 5: end if
         }
@@ -111,7 +111,7 @@ pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<
 ///             Security parameter `b` must be positive and have a bit length of less than 20.<br>
 /// **Output**: A byte string of length `32·bitlen(b)`.
 pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) {
-    debug_assert!((1..1024 * 1024).contains(&b), "Alg 10: b out of range"); // plenty of headroom
+    debug_assert!((1..(1024 * 1024)).contains(&b), "Alg 10: b out of range"); // plenty of headroom
     debug_assert!(is_in_range(w, 0, b), "Alg 10: w out of range"); // early detect; repeated within bit_pack
     debug_assert_eq!(bytes_out.len(), 32 * bit_length(b), "Alg 10: incorrect size of output bytes");
 
@@ -127,8 +127,8 @@ pub(crate) fn simple_bit_pack(w: &R, b: i32, bytes_out: &mut [u8]) {
 ///             Security parameter `b` must be positive and have a bit length of less than 20.<br>
 /// **Output**: A byte string of length `32·bitlen(a + b)`.
 pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) {
-    debug_assert!((0..1024 * 1024).contains(&a), "Alg 11: a out of range");
-    debug_assert!((1..1024 * 1024).contains(&b), "Alg 11: b out of range");
+    debug_assert!((0..(1024 * 1024)).contains(&a), "Alg 11: a out of range");
+    debug_assert!((1..(1024 * 1024)).contains(&b), "Alg 11: b out of range");
     debug_assert!(is_in_range(w, a, b), "Alg 11: w out of range");
     debug_assert_eq!(w.0.len() * bit_length(a + b), bytes_out.len() * 8, "Alg 11: bad output size");
 
@@ -174,7 +174,7 @@ pub(crate) fn bit_pack(w: &R, a: i32, b: i32, bytes_out: &mut [u8]) {
 /// # Errors
 /// Returns an error on `w` out of range.
 pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
-    debug_assert!((1..1024 * 1024).contains(&b), "Alg 12: b out of range");
+    debug_assert!((1..(1024 * 1024)).contains(&b), "Alg 12: b out of range");
     debug_assert_eq!(v.len(), 32 * bit_length(b), "Alg 12: bad output size");
 
     // Note that `w_out` is correctly range checked (via ensure!) in `bit_unpack()`
@@ -198,8 +198,8 @@ pub(crate) fn simple_bit_unpack(v: &[u8], b: i32) -> Result<R, &'static str> {
 /// # Errors
 /// Returns an error on `w` out of range.
 pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
-    debug_assert!((0..1024 * 1024).contains(&a), "Alg 13: a out of range");
-    debug_assert!((1..1024 * 1024).contains(&b), "Alg 13: b out of range");
+    debug_assert!((0..(1024 * 1024)).contains(&a), "Alg 13: a out of range");
+    debug_assert!((1..(1024 * 1024)).contains(&b), "Alg 13: b out of range");
     debug_assert_eq!(v.len(), 32 * bit_length(a + b), "Alg 13: bad output size");
 
     let bitlen = bit_length(a + b).try_into().expect("Alg 13: try_into fail");
@@ -242,7 +242,7 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
     omega: i32, h: &[R; K], y_bytes: &mut [u8],
 ) {
     let omega_u = usize::try_from(omega).expect("cannot fail");
-    debug_assert!((1..255).contains(&(omega_u + K)), "Alg 14: omega+K out of range");
+    debug_assert!((1..256).contains(&(omega_u + K)), "Alg 14: omega+K out of range");
     debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 14: bad output size");
     debug_assert!(h.iter().all(|r| is_in_range(r, 0, 1)), "Alg 14: h not 0/1");
     debug_assert!(
@@ -263,10 +263,10 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
         for j in 0..256 {
             //
             // 5: if h[i]_j != 0 then
-            if CTEST & (index > (y_bytes.len() - 1)) {
+            if CTEST && (index > (y_bytes.len() - 1)) {
                 continue;
             };
-            if CTEST | (h[i].0[j] != 0) {
+            if CTEST || (h[i].0[j] != 0) {
                 //
                 // 6: y[Index] ← j      ▷ Store the locations of the nonzero coefficients in h[i]
                 y_bytes[index] = j.to_le_bytes()[0];
@@ -303,7 +303,7 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
     omega: i32, y_bytes: &[u8],
 ) -> Result<[R; K], &'static str> {
     let omega_u = usize::try_from(omega).expect("Alg 15: omega try_into fail");
-    debug_assert!((K + 1..255).contains(&(omega_u + K)), "Alg 15: omega+K too large");
+    debug_assert!((1..256).contains(&(omega_u + K)), "Alg 15: omega+K too large");
     debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 15: bad output size");
 
     // 1: h ∈ R^k_2 ∈ ← 0^k
@@ -316,7 +316,7 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
     for i in 0..K {
         //
         // 4: if y[ω + i] < Index or y[ω + i] > ω then return ⊥
-        if (y_bytes[omega_u + i] < index) | (y_bytes[omega_u + i] > omega.to_le_bytes()[0]) {
+        if (y_bytes[omega_u + i] < index) || (y_bytes[omega_u + i] > omega.to_le_bytes()[0]) {
             return Err("Alg 15a: returns ⊥");
 
             // 5: end if

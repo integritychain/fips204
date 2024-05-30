@@ -97,7 +97,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s_1: &[R; L], s_2: &[R; K], t_0: &[R; K],
 ) -> [u8; SK_LEN] {
     let top = 1 << (D - 1);
-    debug_assert!((eta == 2) | (eta == 4), "Alg 18: incorrect eta");
+    debug_assert!((eta == 2) || (eta == 4), "Alg 18: incorrect eta");
     debug_assert!(s_1.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s1 out of range");
     debug_assert!(s_2.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s2 out of range");
     debug_assert!(t_0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg 18: t0 out of range");
@@ -167,7 +167,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
 pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<(&[u8; 32], &[u8; 32], &[u8; 64], [R; L], [R; K], [R; K]), &'static str> {
-    debug_assert!((eta == 2) | (eta == 4), "Alg 19: incorrect eta");
+    debug_assert!((eta == 2) || (eta == 4), "Alg 19: incorrect eta");
     debug_assert_eq!(
         SK_LEN,
         128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
@@ -436,11 +436,11 @@ mod tests {
 
         assert!(
             (rho == *rho_test)
-                & (k == *k_test)
-                & (tr == *tr_test)
-                & (s1.iter().zip(s1_test.iter()).all(|(a, b)| a.0 == b.0))
-                & (s2.iter().zip(s2_test.iter()).all(|(a, b)| a.0 == b.0))
-                & (t0.iter().zip(t0_test.iter()).all(|(a, b)| a.0 == b.0))
+                && (k == *k_test)
+                && (tr == *tr_test)
+                && (s1.iter().zip(s1_test.iter()).all(|(a, b)| a.0 == b.0))
+                && (s2.iter().zip(s2_test.iter()).all(|(a, b)| a.0 == b.0))
+                && (t0.iter().zip(t0_test.iter()).all(|(a, b)| a.0 == b.0))
         );
     }
 

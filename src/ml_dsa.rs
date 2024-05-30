@@ -196,8 +196,8 @@ pub(crate) fn sign_finish<
             core::array::from_fn(|k| R(core::array::from_fn(|n| high_bits(gamma2, w[k].0[n]))));
 
         // 15: c_tilde ∈ {0,1}^{2·Lambda} ← H(µ || w1Encode(w_1), 2·Lambda)     ▷ Commitment hash
-        let w1e_len = 32 * K * bit_length((Q - 1) / (2 * gamma2) - 1); // Use pre-calc generic
-        let mut w1_tilde = [0u8; 1024]; // Note potential waste of 256 bytes; fix with pre-calc generic
+        let w1e_len = 32 * K * bit_length((Q - 1) / (2 * gamma2) - 1);
+        let mut w1_tilde = [0u8; 1024]; // TODO: tighten size with pre-calc generic
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len]);
         let mut h15 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
         h15.read(&mut c_tilde);
@@ -248,7 +248,7 @@ pub(crate) fn sign_finish<
         let z_norm = infinity_norm(&z);
         let r0_norm = infinity_norm(&r0);
         // CTEST is used only for constant-time measurements via `dudect`
-        if !CTEST & ((z_norm >= (gamma1 - beta)) | (r0_norm >= (gamma2 - beta))) {
+        if !CTEST && ((z_norm >= (gamma1 - beta)) || (r0_norm >= (gamma2 - beta))) {
             k_ctr += u16::try_from(L).expect("cannot fail");
             continue;
             // 24: else  ... not needed with 'continue'
@@ -277,8 +277,8 @@ pub(crate) fn sign_finish<
 
         // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
         // CTEST is used only for constant-time measurements via `dudect`
-        if !CTEST & (infinity_norm(&c_t_0) >= gamma2)
-            | (h.iter().map(|h_i| h_i.0.iter().sum::<i32>()).sum::<i32>() > omega)
+        if !CTEST && (infinity_norm(&c_t_0) >= gamma2)
+            || (h.iter().map(|h_i| h_i.0.iter().sum::<i32>()).sum::<i32>() > omega)
         {
             k_ctr += u16::try_from(L).expect("cannot fail");
             continue;
@@ -370,7 +370,7 @@ pub(crate) fn verify_finish<
         // 4: end if
     };
     let h = h.unwrap();
-    debug_assert!(infinity_norm(&z) <= gamma1, "Alg 3: i_norm out of range"); // TODO: ensure!? delete?!
+    debug_assert!(infinity_norm(&z) <= gamma1, "Alg 3: i_norm out of range"); // TODO: consider revising
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
     // --> calculated in verify_start()
@@ -412,8 +412,8 @@ pub(crate) fn verify_finish<
     // 12: c_tilde_′ ← H(µ || w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
     let qm12gm1 = (Q - 1) / (2 * gamma2) - 1;
     let bl = bit_length(qm12gm1);
-    let t_max = 32 * K * bl; // similar to sign step 15; use pre-calc generic here
-    let mut tmp = [0u8; 1024]; // potential waste of 256 bytes, saved with pre-calc generic
+    let t_max = 32 * K * bl;
+    let mut tmp = [0u8; 1024]; // TODO: tighten size with pre-calc generic (similar to sign step 15)
     w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max]);
     let mut h12 = h_xof(&[&mu, &tmp[..t_max]]);
     let mut c_tilde_p = [0u8; 64];
@@ -423,5 +423,5 @@ pub(crate) fn verify_finish<
     let left = infinity_norm(&z) < (gamma1 - beta);
     let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4];
     let right = h.iter().all(|r| r.0.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
-    Ok(left & center & right)
+    Ok(left && center && right)
 }

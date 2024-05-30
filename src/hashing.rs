@@ -274,13 +274,13 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
 
     // 1: c ← 1 + bitlen (γ_1 − 1)    ▷ γ_1 is always a power of 2
     let c = 1 + bit_length(gamma1 - 1); // c will either be 18 or 20
-    debug_assert!((c == 18) | (c == 20), "Alg 28: illegal c");
+    debug_assert!((c == 18) || (c == 20), "Alg 28: illegal c");
 
     // 2: for r from 0 to ℓ − 1 do
     for r in 0..u16::try_from(L).expect("cannot fail") {
         //
         // 3: n ← IntegerToBits(µ + r, 16)
-        debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range"); // TODO revisit/resize limit
+        debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range"); // TODO consider revising
         let n = mu + r;
 
         // 4: v ← (H(ρ || n)[[32rc]], H(ρ || n)[[32rc+1]], ..., H(ρ || n)[[32rc+32c − 1]])

@@ -56,7 +56,6 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
 
     let rp = full_reduce32(r);
     let mut xr1;
-    // Brittle...
     if gamma2 & (1 << 17) == 0 {
         // ml-dsa-44
         xr1 = (rp + 127) >> 7;
