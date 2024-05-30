@@ -30,7 +30,18 @@ jobs:
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}-libfips204.rlib
+          name: ${{ matrix.target }}/libfips204.rlib
           path: '${{ github.workspace }}/target/*/release/libfips204.rlib'
           retention-days: 25
+      - name: Checkout actions-oidc-debugger
+        uses: actions/checkout@v4
+        with:
+          repository: github/actions-oidc-debugger
+          ref: main
+          path: ./.github/actions/actions-oidc-debugger
+      - name: Debug OIDC Claims
+        uses: ./.github/actions/actions-oidc-debugger
+        with:
+          audience: '${{ github.server_url }}/${{ github.repository_owner }}'
+
 
