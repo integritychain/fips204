@@ -30,7 +30,7 @@ jobs:
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
         with:
-          name: libfips204-rlibs
+          name: ${{ matrix.target }}-libfips204.rlib
           path: '${{ github.workspace }}/target/*/release/libfips204.rlib'
           retention-days: 25
 
