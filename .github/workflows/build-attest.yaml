@@ -14,6 +14,7 @@ jobs:
         rust:
           - 1.72
         target:
+          - thumbv7em-none-eabi
           - x86_64-pc-windows-gnu
     steps:
       - uses: actions/checkout@v4
@@ -25,11 +26,11 @@ jobs:
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: '${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/libfips*'
+          subject-path: '${{ github.workspace }}/target/*/release/libfips*'
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
         with:
-          name: libfips204.rlib
-          path: '${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/libfips204.rlib'
+          name: libfips204-rlibs
+          path: '${{ github.workspace }}/target/*/release/libfips204.rlib'
           retention-days: 25
 
