@@ -4,6 +4,7 @@ use rand_core::{CryptoRng, RngCore};
 
 // Test RNG to regurgitate incremented values when 'asked'
 #[derive(Clone)]
+#[repr(align(8))]
 struct TestRng { value: u32 }
 
 impl RngCore for TestRng {

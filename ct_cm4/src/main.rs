@@ -8,8 +8,8 @@ use cortex_m_rt::entry;
 use fips204::{ml_dsa_44::PublicKey, traits::{SerDes, Verifier}};
 use hex_literal::hex;
 use microbit::{board::Board, hal::{pac::DWT, prelude::OutputPin}};
-use rtt_target::{rprintln, rtt_init_print};
 use panic_rtt_target as _;
+use rtt_target::{rprintln, rtt_init_print};
 
 
 const MESSAGE: [u8; 4] = *b"asdf";  // this would be a firmware hash

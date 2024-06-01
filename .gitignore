@@ -2,9 +2,9 @@
 /.idea
 **/artifacts
 **/corpus
-/fuzz/.gitignore
-/dudect/Cargo.lock
+**/coverage
 **/node_modules
 **/dist
 **/pkg
 **/Cargo.lock
+**/package-lock.json

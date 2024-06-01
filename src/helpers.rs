@@ -69,9 +69,9 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
 
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
     let x = partial_reduce32(a); // puts us within better than -Q to +Q
-    let x = x + ((x >> 31) & Q); // add Q if negative
-    debug_assert!(x < Q, "full_reduce32 output");
-    x
+    let res = x + ((x >> 31) & Q); // add Q if negative
+    debug_assert!(res < Q, "full_reduce32 output");
+    res
 }
 
 
@@ -115,79 +115,53 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 /// Vector addition; See bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
-    let result: [R; K] =
-        core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])));
-    result
+    core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])))
 }
 
 
 #[allow(clippy::cast_possible_truncation)] // as i32
 pub(crate) fn to_mont<const L: usize>(vec_a: &[T; L]) -> [T; L] {
-    let result: [T; L] = core::array::from_fn(|l| {
+    core::array::from_fn(|l| {
         T(core::array::from_fn(|n| partial_reduce64(i64::from(vec_a[l].0[n]) << 32)))
-    });
-    result
+    })
 }
 
 
 pub(crate) fn infinity_norm<const ROW: usize>(w: &[R; ROW]) -> i32 {
-    let mut result = 0; // no early exit
-    for row in w {
-        for element in row.0 {
-            let z_q = center_mod(element).abs();
-            result = if z_q > result { z_q } else { result }; // outside of CT assurance
-        }
-    }
-    result
+    w.iter()
+        .flat_map(|row| row.0)
+        .map(|element| center_mod(element).abs())
+        .max()
+        .expect("infinity norm fails")
 }
 
 
-const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
-
-
-#[allow(clippy::cast_possible_truncation)] // t as i32
+#[allow(clippy::cast_possible_truncation)] // res as i32
 pub(crate) const fn mont_reduce(a: i64) -> i32 {
+    const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
     let t = a.wrapping_mul(QINV) as i32;
-    let t = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
-    debug_assert!(t < (Q as i64), "mont_reduce output 1");
-    debug_assert!(-(Q as i64) < t, "mont_reduce output 2");
-    t as i32
+    let res = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
+    debug_assert!(res < (Q as i64), "mont_reduce output 1");
+    debug_assert!(-(Q as i64) < res, "mont_reduce output 2");
+    res as i32
 }
 
 
-// ----- The following functions only run at compile time (thus, not CT etc) -----
-
-/// HAC Algorithm 14.76 Right-to-left binary exponentiation mod Q.
-const fn pow_mod_q(g: i32, e: u8) -> i32 {
-    let g = g as i64;
-    let mut result = 1;
-    let mut s = g;
-    let mut e = e;
-    while e != 0 {
-        if e & 1 != 0 {
-            result = partial_reduce64(result * s) as i64;
-        };
-        e >>= 1;
-        if e != 0 {
-            s = partial_reduce64(s * s) as i64;
-        };
-    }
-    full_reduce32(partial_reduce64(result))
-}
-
-
-pub(crate) static ZETA_TABLE_MONT: [i32; 256] = gen_zeta_table_mont();
-
+// ----- The following function only runs at compile time (thus, not CT etc) -----
 
 #[allow(clippy::cast_possible_truncation)]
 const fn gen_zeta_table_mont() -> [i32; 256] {
     let mut result = [0i32; 256];
-    let mut i = 0_usize;
+    let mut x = 1i64;
+    let mut i = 0u32;
     while i < 256 {
-        let result_norm = pow_mod_q(ZETA, i.to_le_bytes()[0].reverse_bits());
-        let result_mont = (result_norm as i64).wrapping_mul(1 << 32).rem_euclid(Q as i64) as i32;
-        result[i] = result_mont;
+        result[(i as u8).reverse_bits() as usize] =
+            x.wrapping_mul(1 << 32).rem_euclid(Q as i64) as i32;
+        x = (x * ZETA as i64).rem_euclid(Q as i64);
         i += 1;
     }
     result
 }
+
+
+pub(crate) static ZETA_TABLE_MONT: [i32; 256] = gen_zeta_table_mont();

@@ -5,8 +5,7 @@ use crate::encodings::{
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
 use crate::helpers::{
-    bit_length, center_mod, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont,
-    vec_add,
+    center_mod, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont, vec_add,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -121,6 +120,7 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
 #[allow(clippy::similar_names, clippy::many_single_char_names, clippy::too_many_arguments)]
 pub(crate) fn sign_finish<
     const CTEST: bool,
+    const CTILDE_LEN: usize,
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
@@ -196,10 +196,9 @@ pub(crate) fn sign_finish<
             core::array::from_fn(|k| R(core::array::from_fn(|n| high_bits(gamma2, w[k].0[n]))));
 
         // 15: c_tilde ∈ {0,1}^{2·Lambda} ← H(µ || w1Encode(w_1), 2·Lambda)     ▷ Commitment hash
-        let w1e_len = 32 * K * bit_length((Q - 1) / (2 * gamma2) - 1);
-        let mut w1_tilde = [0u8; 1024]; // TODO: tighten size with pre-calc generic
-        w1_encode::<K>(gamma2, &w_1, &mut w1_tilde[0..w1e_len]);
-        let mut h15 = h_xof(&[&mu, &w1_tilde[0..w1e_len]]);
+        let mut w1_tilde = [0u8; CTILDE_LEN];
+        w1_encode::<K>(gamma2, &w_1, &mut w1_tilde);
+        let mut h15 = h_xof(&[&mu, &w1_tilde]);
         h15.read(&mut c_tilde);
 
         // 16: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2·Lambda-256} ← c_tilde    ▷ First 256 bits of commitment hash
@@ -344,6 +343,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
 /// Continuation of `verify_start()`.
 #[allow(clippy::too_many_arguments, clippy::similar_names)]
 pub(crate) fn verify_finish<
+    const CTILDE_LEN: usize,
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
@@ -410,18 +410,15 @@ pub(crate) fn verify_finish<
     });
 
     // 12: c_tilde_′ ← H(µ || w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
-    let qm12gm1 = (Q - 1) / (2 * gamma2) - 1;
-    let bl = bit_length(qm12gm1);
-    let t_max = 32 * K * bl;
-    let mut tmp = [0u8; 1024]; // TODO: tighten size with pre-calc generic (similar to sign step 15)
-    w1_encode::<K>(gamma2, &wp_1, &mut tmp[..t_max]);
-    let mut h12 = h_xof(&[&mu, &tmp[..t_max]]);
+    let mut tmp = [0u8; CTILDE_LEN];
+    w1_encode::<K>(gamma2, &wp_1, &mut tmp);
+    let mut h12 = h_xof(&[&mu, &tmp]);
     let mut c_tilde_p = [0u8; 64];
     h12.read(&mut c_tilde_p); // leftover to be ignored
 
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
     let left = infinity_norm(&z) < (gamma1 - beta);
-    let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4];
+    let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4]; // verify not CT
     let right = h.iter().all(|r| r.0.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
     Ok(left && center && right)
 }

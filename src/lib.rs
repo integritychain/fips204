@@ -16,7 +16,7 @@
 // Implements FIPS 204 draft Module-Lattice-Based Digital Signature Standard.
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf>
 
-// Functionality map per FIPS 204 draft
+// Functionality map per draft FIPS 204
 //
 // Algorithm 1 ML-DSA.KeyGen() on page 15                 --> ml_dsa.rs
 // Algorithm 2 ML-DSA.Sign(sk,M) on page 17               --> ml_dsa.rs
@@ -91,17 +91,20 @@ const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
 const D: u32 = 13; // See table 1 page 13 second row
 
 
-// This common functionality is injected into each security parameter set namespace
+// This common functionality is injected into each security parameter set namespace, and in
+// general is a lightweight wrapper into the ml_dsa functions.
 macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sk_decode};
+        use crate::helpers::bit_length;
         use crate::ml_dsa;
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
         use rand_core::CryptoRngCore;
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
-        const CTEST: bool = false;
+        const CTILDE_LEN: usize = 32 * K * bit_length((Q - 1) / (2 * GAMMA2) - 1);
+        const CTEST: bool = false; // when true, the logid goes into CT test mode
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
@@ -225,9 +228,10 @@ macro_rules! functionality {
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
-                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
-                )?;
+                let sig =
+                    ml_dsa::sign_finish::<CTEST, CTILDE_LEN, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                        rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
+                    )?;
                 Ok(sig)
             }
         }
@@ -239,9 +243,10 @@ macro_rules! functionality {
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
-                )?;
+                let sig =
+                    ml_dsa::sign_finish::<CTEST, CTILDE_LEN, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+                        rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
+                    )?;
                 Ok(sig)
             }
         }
@@ -254,7 +259,7 @@ macro_rules! functionality {
                 &self, message: &[u8], sig: &Self::Signature,
             ) -> Result<bool, &'static str> {
                 let epk = ml_dsa::verify_start(&self.0)?;
-                ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
+                ml_dsa::verify_finish::<CTILDE_LEN, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message, &sig,
                 )
             }
@@ -267,7 +272,7 @@ macro_rules! functionality {
             fn try_verify(
                 &self, message: &[u8], sig: &Self::Signature,
             ) -> Result<bool, &'static str> {
-                ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
+                ml_dsa::verify_finish::<CTILDE_LEN, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig,
                 )
             }
@@ -313,7 +318,7 @@ macro_rules! functionality {
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
-            let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+            let sig = ml_dsa::sign_finish::<true, CTILDE_LEN, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
                 rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
             )?;
             Ok(sig)
