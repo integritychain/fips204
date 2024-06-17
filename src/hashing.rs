@@ -1,6 +1,6 @@
 // This file implements functionality from FIPS 204 section 8.3 Hashing and Pseudorandom Sampling
 
-use crate::conversion::{bit_unpack, coef_from_half_byte, coef_from_three_bytes};
+use crate::conversion::{bit_unpack, coeff_from_half_byte, coeff_from_three_bytes};
 use crate::helpers::{bit_length, is_in_range};
 use crate::types::{R, R0, T, T0};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
@@ -84,8 +84,17 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8; 32]) -> R {
         // 11: end for
     }
 
+    // slightly redundant...
+    debug_assert!(
+        c.0.iter().map(|&e| usize::from(e != 0)).sum::<usize>() == tau,
+        "Alg 23: bad hamming weight (a)"
+    );
+    debug_assert!(
+        c.0.iter().map(|&e| e & 1).sum::<i32>() == tau.try_into().expect("cannot fail"),
+        "Alg 23: bad hamming weight (b)"
+    );
+
     // 12: return c
-    debug_assert!(c.0.iter().filter(|e| e.abs() != 0).count() == tau, "Alg 23: bad hamming weight");
     c
 }
 
@@ -112,7 +121,7 @@ pub(crate) fn rej_ntt_poly<const CTEST: bool>(rhos: &[&[u8]]) -> T {
         // 4: a_hat[j] ← CoefFromThreeBytes(H128(ρ)[[c]], H128(ρ)[[c + 1]], H128(ρ)[[c + 2]])
         let mut h128pc = [0u8; 3];
         xof.read(&mut h128pc); // implicit c += 3
-        let a_hat_j = coef_from_three_bytes::<CTEST>(h128pc); // gets a result
+        let a_hat_j = coeff_from_three_bytes::<CTEST>(h128pc); // gets a result
 
         // 5: c ← c + 3  (implicit)
 
@@ -162,10 +171,10 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
         xof.read(&mut z);
 
         // 5: z0 ← CoefFromHalfByte(z mod 16, η)
-        let z0 = coef_from_half_byte::<CTEST>(eta, z[0] & 0x0f);
+        let z0 = coeff_from_half_byte::<CTEST>(eta, z[0] & 0x0f);
 
         // 6: z1 ← CoefFromHalfByte(⌊z/16⌋, η)
-        let z1 = coef_from_half_byte::<CTEST>(eta, z[0] >> 4);
+        let z1 = coeff_from_half_byte::<CTEST>(eta, z[0] >> 4);
 
         // 7: if z0 != ⊥ then
         if let Ok(z0) = z0 {
@@ -280,8 +289,8 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
     for r in 0..u16::try_from(L).expect("cannot fail") {
         //
         // 3: n ← IntegerToBits(µ + r, 16)
-        debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range"); // TODO consider revising
-        let n = mu + r;
+        // debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range");   // arbitrary limit not needed
+        let n = mu + r; // This will perform overflow check in debug, which removes need for above assert
 
         // 4: v ← (H(ρ || n)[[32rc]], H(ρ || n)[[32rc+1]], ..., H(ρ || n)[[32rc+32c − 1]])
         let mut xof = h_xof(&[rho, &n.to_le_bytes()]);
@@ -290,7 +299,7 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
         // 5: s[r] ← BitUnpack(v, γ_1 − 1, γ_1)
         s[r as usize] = bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1).expect("cannot fail");
         debug_assert!(
-            s.iter().all(|r| is_in_range(r, gamma1, gamma1)),
+            s.iter().all(|r| is_in_range(r, gamma1 - 1, gamma1)),
             "Alg 28: s coeff out of range"
         );
 

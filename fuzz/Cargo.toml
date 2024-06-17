@@ -1,6 +1,6 @@
 [package]
 name = "fips204-fuzz"
-version = "0.2.0"
+version = "0.2.1"
 publish = false
 edition = "2021"
 license = "MIT OR Apache-2.0"

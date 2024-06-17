@@ -7,7 +7,7 @@ use crate::{D, Q};
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
 
 
-/// # Algorithm 29: `Power2Round(r)` on page 34.
+/// # Algorithm 29: `Power2Round(r)` on page 33/34 applied over all coefficients of K polys.
 /// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·2^d + r0 mod q`.
 ///
 /// **Input**: `r ∈ Zq`. <br>
@@ -16,6 +16,10 @@ pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
     // 1: r+ ← r mod q
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
+    debug_assert!(
+        r.iter().flat_map(|row| row.0).all(|element| element < (i32::MAX - (1 << D))),
+        "power2round input"
+    );
     let r_1: [R; K] = core::array::from_fn(|k| {
         R(core::array::from_fn(|n| (r[k].0[n] + (1 << (D - 1)) - 1) >> D))
     });
@@ -40,8 +44,16 @@ pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
 
 
 /// # Algorithm 30: `Decompose(r)` on page 34.
-/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·(2·γ_2) + r0 mod q`.
-/// (this description is not sufficient; r0 is 'centered' wrt `2·γ_2`)
+/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·(2·γ_2) + r0 mod q`. If using the
+/// 'centered' `r0` yields `r1 = (q - 1)/(2*gamma2)` then the result should be adjusted
+/// by setting `r1` to `0`, and subtracting `1` from `r0`. In practice, this happens
+/// only with one input value of `rp` for each possible `gamma2`: <br>
+/// `        gamma2        rp      r0'   r1'        r0     r1` <br>
+/// `         95232   8285185   -95231    44    -95232      0` <br>
+/// `        261888   8118529  -261887    16   -261888      0` <br>
+/// For each `gamma2` and the specific `r mod q` value, `r0'` is `rp mod± 2*gamma2`, and
+/// `r1'` is `rp - 2*gamma2*r0`. Values `(r0,r1)` are the value that just be returned in
+/// that case.
 ///
 /// **Input**: `r ∈ Zq` <br>
 /// **Output**: Integers `(r1, r0)`.
@@ -127,9 +139,10 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 
 /// # Algorithm 34: `UseHint(h,r)` on page 35.
 /// Returns the high bits of `r` adjusted according to hint `h`.
-/// This function uses public data from the signature; thus does not need to be constant time
+/// This non-CT function uses public data from the signature; thus
+/// does not need to be constant time
 ///
-/// **Input**: boolean `h`, `r` ∈ `Zq` <br>
+/// **Input**: Boolean `h` (cast in Zq), `r` ∈ `Zq` <br>
 /// **Output**: `r1 ∈ Z` with `0 ≤ r1 ≤ (q − 1)/(2·γ_2)`
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
@@ -146,13 +159,13 @@ pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     // 3: if h = 1 and r0 > 0 return (r1 + 1) mod m
     // 4: if h = 1 and r0 ≤ 0 return (r1 − 1) mod m
     if gamma2 & (1 << 17) == 0 {
-        // ml-dsa-44; explicit r1 + 1 mod m(43)
+        // ml-dsa-44; explicit r1 + 1 mod m(44)
         if r0 > 0 {
             if r1 == 43 {
                 return 0;
             }
             return r1 + 1;
-        } // explicit r1 - 1 mod m(43)
+        } // explicit r1 - 1 mod m(44)
         if r1 == 0 {
             return 43;
         }

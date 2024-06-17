@@ -125,7 +125,7 @@ pub trait Signer {
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
     /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
-    /// let v = pk.try_verify(&message, &sig)?; // Use the public to verify message signature
+    /// let v = pk.verify(&message, &sig); // Use the public to verify message signature
     /// # }
     /// # Ok(())}
     /// ```
@@ -158,7 +158,7 @@ pub trait Signer {
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
     /// let sig = sk.try_sign_with_rng(&mut rng, &message)?;  // Use the secret key to generate a message signature
-    /// let v = pk.try_verify(&message, &sig)?; // Use the public to verify message signature
+    /// let v = pk.verify(&message, &sig); // Use the public to verify message signature
     /// # }
     /// # Ok(())}
     /// ```
@@ -175,9 +175,7 @@ pub trait Verifier {
     type Signature;
 
     /// Verifies a digital signature with respect to a `PublicKey`. As this function operates on
-    /// purely public data, it need not proved constant-time assurances.
-    /// # Errors
-    /// Returns an error on a malformed signature; propagates internal errors.
+    /// purely public data, it need/does not provide constant-time assurances.
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -191,21 +189,21 @@ pub trait Verifier {
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
     /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
-    /// let v = pk.try_verify(&message, &sig)?; // Use the public to verify message signature
+    /// let v = pk.verify(&message, &sig); // Use the public to verify message signature
     /// # }
     /// # Ok(())}
     /// ```
-    fn try_verify(&self, message: &[u8], signature: &Self::Signature)
-        -> Result<bool, &'static str>;
+    fn verify(&self, message: &[u8], signature: &Self::Signature)
+        -> bool;
 }
 
 
 /// The `SerDes` trait provides for validated serialization and deserialization of fixed- and correctly-size elements.
 /// Note that FIPS 204 currently states that outside of exact length checks "ML-DSA is not designed to require any
-/// additional public-key validity checks". Nonetheless, a `Result()` is returned during all deserialization operations
-/// to preserve the ability to add future checks (and for symmetry across structures). Note that for the current
-/// implementation, both of the private and public key deserialization routines invoke an internal decode that catches
-/// over-sized coefficients (for early detection).
+/// additional public-key validity checks" (perhaps "...designed not to require..." would be better). Nonetheless, a
+/// `Result()` is returned during all deserialization operations to preserve the ability to add future checks (and for
+/// symmetry across structures). Note that for the current implementation, both of the private and public key
+/// deserialization routines invoke an internal decode that catches over-sized coefficients (for early detection).
 pub trait SerDes {
     /// The fixed-size byte array to be serialized or deserialized
     type ByteArray;

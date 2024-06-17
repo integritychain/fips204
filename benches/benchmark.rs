@@ -59,13 +59,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("ml_dsa_65 esk sign", |b| b.iter(|| esk65.try_sign_with_rng(&mut rng, &msg)));
     c.bench_function("ml_dsa_87 esk sign", |b| b.iter(|| esk87.try_sign_with_rng(&mut rng, &msg)));
 
-    c.bench_function("ml_dsa_44 pk verify", |b| b.iter(|| pk44.try_verify(&msg, &sig44)));
-    c.bench_function("ml_dsa_65 pk verify", |b| b.iter(|| pk65.try_verify(&msg, &sig65)));
-    c.bench_function("ml_dsa_87 pk verify", |b| b.iter(|| pk87.try_verify(&msg, &sig87)));
+    c.bench_function("ml_dsa_44 pk verify", |b| b.iter(|| pk44.verify(&msg, &sig44)));
+    c.bench_function("ml_dsa_65 pk verify", |b| b.iter(|| pk65.verify(&msg, &sig65)));
+    c.bench_function("ml_dsa_87 pk verify", |b| b.iter(|| pk87.verify(&msg, &sig87)));
 
-    c.bench_function("ml_dsa_44 epk verify", |b| b.iter(|| epk44.try_verify(&msg, &sig44)));
-    c.bench_function("ml_dsa_65 epk verify", |b| b.iter(|| epk65.try_verify(&msg, &sig65)));
-    c.bench_function("ml_dsa_87 epk verify", |b| b.iter(|| epk87.try_verify(&msg, &sig87)));
+    c.bench_function("ml_dsa_44 epk verify", |b| b.iter(|| epk44.verify(&msg, &sig44)));
+    c.bench_function("ml_dsa_65 epk verify", |b| b.iter(|| epk65.verify(&msg, &sig65)));
+    c.bench_function("ml_dsa_87 epk verify", |b| b.iter(|| epk87.verify(&msg, &sig87)));
 }
 
 criterion_group!(benches, criterion_benchmark);

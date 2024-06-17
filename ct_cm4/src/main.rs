@@ -37,7 +37,7 @@ fn main() -> ! {
         let start = DWT::cycle_count();
         asm::isb();
 
-        assert!(pk.try_verify(&MESSAGE, &SIGNATURE).unwrap());
+        assert!(pk.verify(&MESSAGE, &SIGNATURE));
 
         asm::isb();
         let finish = DWT::cycle_count();

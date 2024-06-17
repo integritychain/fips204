@@ -49,7 +49,7 @@ pub(crate) struct R(pub(crate) [i32; 256]);
 pub(crate) const R0: R = R([0i32; 256]);
 
 
-/// Polynomial coefficients inT, with default T0
+/// Polynomial coefficients in T, with default T0
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub(crate) struct T(pub(crate) [i32; 256]);

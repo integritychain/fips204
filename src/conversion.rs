@@ -18,7 +18,7 @@ use crate::Q;
 // algorithms have been reimplemented at a higher level.
 
 
-/// # Algorithm 8: `CoefFromThreeBytes(b0,b1,b2)` on page 21.
+/// # Algorithm 8: `CoeffFromThreeBytes(b0,b1,b2)` on page 21.
 /// Generates an element of `{0, 1, 2, ... , q − 1} ∪ {⊥}` used in rejection sampling.
 /// This function is used during keygen and signing, but only operates on the non-secret
 /// `rho` value stored in the public key, so need not be constant-time in normal
@@ -33,7 +33,7 @@ use crate::Q;
 /// Returns an error `⊥` on input 3 bytes forming values between `Q=0x7F_E0_01`--`0x7F_FF_FF`,
 /// and between `0xFF_E0_01`--`0xFF_FF_FF` (latter range due to masking of bit 7 of byte 2)
 /// per spec; for rejection sampling.
-pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i32, &'static str> {
+pub(crate) fn coeff_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i32, &'static str> {
     // 1: if b2 > 127 then
     // 2: b2 ← b2 − 128     ▷ Set the top bit of b2 to zero
     // 3: end if
@@ -56,7 +56,7 @@ pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i
 }
 
 
-/// # Algorithm 9: `CoefFromHalfByte(b)` on page 22.
+/// # Algorithm 9: `CoeffFromHalfByte(b)` on page 22.
 /// Generates an element of `{−η, −η + 1, ... , η} ∪ {⊥}` used in rejection sampling.
 /// This function is used during keygen, but only operates on the hash-derived
 /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and
@@ -72,7 +72,9 @@ pub(crate) fn coef_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<i
 /// # Errors
 /// Returns an error `⊥` on when eta = 4 and b > 8 for rejection sampling. (panics on b > 15)
 #[allow(clippy::cast_possible_truncation)] // rem as u8
-pub(crate) fn coef_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<i32, &'static str> {
+pub(crate) fn coeff_from_half_byte<const CTEST: bool>(
+    eta: i32, b: u8,
+) -> Result<i32, &'static str> {
     const M5: u32 = ((1u32 << 24) / 5) + 1;
     debug_assert!((eta == 2) || (eta == 4), "Alg 9: incorrect eta");
     debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
@@ -269,9 +271,9 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
             if CTEST || (h[i].0[j] != 0) {
                 //
                 // 6: y[Index] ← j      ▷ Store the locations of the nonzero coefficients in h[i]
-                y_bytes[index] = j.to_le_bytes()[0];
-                //
-                // 7: Index ← Index + 1
+                y_bytes[index] = j.to_le_bytes()[0]; // ...bytes()[0] for clippy benefit ; )
+                                                     //
+                                                     // 7: Index ← Index + 1
                 index += 1;
 
                 // 8: end if
@@ -378,21 +380,21 @@ mod tests {
     #[test]
     fn test_coef_from_three_bytes1() {
         let bytes = [0x12u8, 0x34, 0x56];
-        let res = coef_from_three_bytes::<false>(bytes).unwrap();
+        let res = coeff_from_three_bytes::<false>(bytes).unwrap();
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes2() {
         let bytes = [0x12u8, 0x34, 0x80];
-        let res = coef_from_three_bytes::<false>(bytes).unwrap();
+        let res = coeff_from_three_bytes::<false>(bytes).unwrap();
         assert_eq!(res, 0x0000_3412);
     }
 
     #[test]
     fn test_coef_from_three_bytes3() {
         let bytes = [0x01u8, 0xe0, 0x80];
-        let res = coef_from_three_bytes::<false>(bytes).unwrap();
+        let res = coeff_from_three_bytes::<false>(bytes).unwrap();
         assert_eq!(res, 0x0000_e001);
     }
 
@@ -400,21 +402,21 @@ mod tests {
     #[should_panic(expected = "panic: out of range")]
     fn test_coef_from_three_bytes4() {
         let bytes = [0x01u8, 0xe0, 0x7f];
-        let res = coef_from_three_bytes::<false>(bytes).expect("panic: out of range");
+        let res = coeff_from_three_bytes::<false>(bytes).expect("panic: out of range");
         assert_eq!(res, 0x0056_3412);
     }
 
     #[test]
     fn test_coef_from_half_byte1() {
         let inp = 3;
-        let res = coef_from_half_byte::<false>(2, inp).unwrap();
+        let res = coeff_from_half_byte::<false>(2, inp).unwrap();
         assert_eq!(-1, res);
     }
 
     #[test]
     fn test_coef_from_half_byte2() {
         let inp = 8;
-        let res = coef_from_half_byte::<false>(4, inp).unwrap();
+        let res = coeff_from_half_byte::<false>(4, inp).unwrap();
         assert_eq!(-4, res);
     }
 
@@ -423,7 +425,7 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte_validation1() {
         let inp = 22;
-        let res = coef_from_half_byte::<false>(2, inp);
+        let res = coeff_from_half_byte::<false>(2, inp);
         assert!(res.is_err());
     }
 
@@ -432,14 +434,14 @@ mod tests {
     #[test]
     fn test_coef_from_half_byte_validation2() {
         let inp = 5;
-        let res = coef_from_half_byte::<false>(1, inp);
+        let res = coeff_from_half_byte::<false>(1, inp);
         assert!(res.is_err());
     }
 
     #[test]
     fn test_coef_from_half_byte_validation3() {
         let inp = 10;
-        let res = coef_from_half_byte::<false>(4, inp);
+        let res = coeff_from_half_byte::<false>(4, inp);
         assert!(res.is_err());
     }
 

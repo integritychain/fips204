@@ -172,8 +172,8 @@ fn test_verify() {
         let (pk, msg, sig) =
             get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-44.txt");
         let pk = ml_dsa_44::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-        let pass = pk.try_verify(&msg, &sig.try_into().unwrap());
-        assert!(pass.unwrap());
+        let pass = pk.verify(&msg, &sig.try_into().unwrap());
+        assert!(pass);
     }
 
     #[cfg(feature = "ml-dsa-65")]
@@ -181,8 +181,8 @@ fn test_verify() {
         let (pk, message, sig) =
             get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-65.txt");
         let pk = ml_dsa_65::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-        let pass = pk.try_verify(&message, &sig.try_into().unwrap());
-        assert!(pass.unwrap());
+        let pass = pk.verify(&message, &sig.try_into().unwrap());
+        assert!(pass);
     }
 
     #[cfg(feature = "ml-dsa-87")]
@@ -190,7 +190,7 @@ fn test_verify() {
         let (pk, message, sig) =
             get_verify_vec("./tests/test_vectors/Signature Verification -- ML-DSA-87.txt");
         let pk = ml_dsa_87::PublicKey::try_from_bytes(pk.try_into().unwrap()).unwrap();
-        let pass = pk.try_verify(&message, &sig.try_into().unwrap());
-        assert!(pass.unwrap());
+        let pass = pk.verify(&message, &sig.try_into().unwrap());
+        assert!(pass);
     }
 }

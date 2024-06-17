@@ -12,14 +12,16 @@ $ mkdir -p corpus/fuzz_all
 $ dd if=/dev/zero bs=1 count=6292 > corpus/fuzz_all/seed0
 $ for i in $(seq 1 2); do head -c 6292 </dev/urandom > corpus/fuzz_all/seed$i; done
 $ dd if=/dev/zero bs=1 count=6292 | tr '\0x00' '\377' > corpus/fuzz_all/seed3
-$ cargo fuzz run fuzz_all -j 4 -- -max_total_time=3600  # run twice
+$ cargo fuzz run fuzz_all -j 4 -- -max_total_time=1000  # run twice
 
-#452: cov: 13276 ft: 9644 corp: 84 exec/s 0 oom/timeout/crash: 0/0/0 time: 509s job: 37 dft_time: 0
-#483: cov: 13276 ft: 9651 corp: 86 exec/s 0 oom/timeout/crash: 0/0/0 time: 521s job: 38 dft_time: 0
-#500: cov: 13276 ft: 9652 corp: 87 exec/s 0 oom/timeout/crash: 0/0/0 time: 527s job: 39 dft_time: 0
-#518: cov: 13276 ft: 9652 corp: 87 exec/s 0 oom/timeout/crash: 0/0/0 time: 536s job: 40 dft_time: 0
-#534: cov: 13276 ft: 9681 corp: 89 exec/s 0 oom/timeout/crash: 0/0/0 time: 557s job: 41 dft_time: 0
-#553: cov: 13276 ft: 10255 corp: 92 exec/s 0 oom/timeout/crash: 0/0/0 time: 575s job: 42 dft_time: 0
+#1054: cov: 13559 ft: 10028 corp: 102 exec/s 0 oom/timeout/crash: 0/0/0 time: 899s job: 60 dft_time: 0
+#1084: cov: 13559 ft: 10028 corp: 102 exec/s 0 oom/timeout/crash: 0/0/0 time: 913s job: 61 dft_time: 0
+#1124: cov: 13559 ft: 10028 corp: 102 exec/s 0 oom/timeout/crash: 0/0/0 time: 936s job: 62 dft_time: 0
+#1170: cov: 13559 ft: 10134 corp: 104 exec/s 0 oom/timeout/crash: 0/0/0 time: 954s job: 63 dft_time: 0
+#1207: cov: 13559 ft: 10135 corp: 105 exec/s 0 oom/timeout/crash: 0/0/0 time: 970s job: 64 dft_time: 0
+#1240: cov: 13559 ft: 10135 corp: 105 exec/s 0 oom/timeout/crash: 0/0/0 time: 985s job: 65 dft_time: 0
+INFO: fuzzed for 1001 seconds, wrapping up soon
+INFO: exiting: 0 time: 1004s
 ~~~
 
 Coverage status of ml_dsa_44 is robust, see:

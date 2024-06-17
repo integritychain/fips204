@@ -29,14 +29,14 @@ pub(crate) fn is_in_range(w: &R, lo: i32, hi: i32) -> bool {
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     const M: i64 = (1 << 48) / (Q as i64);
-    debug_assert!(a < (i64::MAX / 64), "partial_reduce64 input"); // bit of headroom
+    debug_assert!(a.abs() < (67_058_539 << 32), "partial_reduce64 input");
     let x = a >> 23;
     let a = a - x * (Q as i64);
     let x = a >> 23;
     let a = a - x * (Q as i64);
     let q = (a * M) >> 48;
     let res = a - q * (Q as i64);
-    debug_assert!(res < 2 * Q as i64, "partial_reduce64 output");
+    debug_assert!(res.abs() < 2 * Q as i64, "partial_reduce64 output");
     res as i32
 }
 
@@ -46,10 +46,10 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
     const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
-    debug_assert!(a < (i64::MAX / 64), "partial_reduce64b input"); // bit of headroom
+    debug_assert!(a < (i64::MAX / 64), "partial_reduce64b input"); // actually, works for all 64b inputs!!
     let q = (a as i128 * MM as i128) >> 64; // only top half is relevant
     let res = a - (q as i64 * Q as i64);
-    debug_assert!(res < 2 * Q as i64, "partial_reduce64b output");
+    debug_assert!(res.abs() < 2 * Q as i64, "partial_reduce64b output");
     res as i32
 }
 
@@ -60,6 +60,7 @@ pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
 // error). So, increment these bits and then subtract off the corresponding
 // number of Q. The result is within (better than) -Q < res < Q.
 pub(crate) const fn partial_reduce32(a: i32) -> i32 {
+    debug_assert!(a.abs() < 2_143_289_344, "partial_reduce32 input");
     let x = (a + (1 << 22)) >> 23;
     let res = a - x * Q;
     debug_assert!(res.abs() < Q, "partial_reduce32 output");
@@ -68,6 +69,7 @@ pub(crate) const fn partial_reduce32(a: i32) -> i32 {
 
 
 pub(crate) const fn full_reduce32(a: i32) -> i32 {
+    debug_assert!(a.abs() < 2_143_289_344, "full_reduce32 input");
     let x = partial_reduce32(a); // puts us within better than -Q to +Q
     let res = x + ((x >> 31) & Q); // add Q if negative
     debug_assert!(res < Q, "full_reduce32 output");
@@ -85,7 +87,8 @@ pub(crate) const fn bit_length(a: i32) -> usize { a.ilog2() as usize + 1 }
 /// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
 /// modulo α.  'ready to optimize'
 pub(crate) fn center_mod(m: i32) -> i32 {
-    let t = partial_reduce32(m);
+    debug_assert!(m.abs() < 2_143_289_344, "center_mod input"); // for clarity; caught in full_reduce32
+    let t = full_reduce32(m);
     let over2 = (Q / 2) - t; // check if t is larger than Q/2
     let res = t - ((over2 >> 31) & Q); // sub Q if over2 is negative
     debug_assert_eq!(m.rem_euclid(Q), res.rem_euclid(Q), "center_mod output");
@@ -93,7 +96,7 @@ pub(crate) fn center_mod(m: i32) -> i32 {
 }
 
 
-/// Matrix by vector multiplication; See top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
+/// Matrix by vector multiplication; e.g., fips 203 top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
 #[must_use]
 pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     a_hat: &[[T; L]; K], u_hat: &[T; L],
@@ -112,7 +115,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 }
 
 
-/// Vector addition; See bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
+/// Vector addition; e.g., fips 203 bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
 pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
     core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])))
@@ -131,15 +134,20 @@ pub(crate) fn infinity_norm<const ROW: usize>(w: &[R; ROW]) -> i32 {
     w.iter()
         .flat_map(|row| row.0)
         .map(|element| center_mod(element).abs())
+        // .max() might be non-CT on some targets. infinity_norm() is used in signature generation and
+        // verification; the values are ultimately revealed in the signature, so worst case is leaking
+        // which vector element failed. Not a problem since the whole thing is permutation-agnostic
         .max()
         .expect("infinity norm fails")
 }
 
 
-#[allow(clippy::cast_possible_truncation)] // res as i32
+#[allow(clippy::cast_possible_truncation)] // a as i32, res as i32
 pub(crate) const fn mont_reduce(a: i64) -> i32 {
-    const QINV: i64 = 58_728_449; // (Q * QINV) % 2**32 = 1
-    let t = a.wrapping_mul(QINV) as i32;
+    const QINV: i32 = 58_728_449; // (Q * QINV) % 2**32 = 1
+    debug_assert!(a >= -17_996_808_479_301_632, "mont_reduce input (a)");
+    debug_assert!(a <= 17_996_808_470_921_215, "mont_reduce input (b)");
+    let t = (a as i32).wrapping_mul(QINV);
     let res = (a - (t as i64).wrapping_mul(Q as i64)) >> 32;
     debug_assert!(res < (Q as i64), "mont_reduce output 1");
     debug_assert!(-(Q as i64) < res, "mont_reduce output 2");
@@ -155,9 +163,8 @@ const fn gen_zeta_table_mont() -> [i32; 256] {
     let mut x = 1i64;
     let mut i = 0u32;
     while i < 256 {
-        result[(i as u8).reverse_bits() as usize] =
-            x.wrapping_mul(1 << 32).rem_euclid(Q as i64) as i32;
-        x = (x * ZETA as i64).rem_euclid(Q as i64);
+        result[(i as u8).reverse_bits() as usize] = ((x << 32) % (Q as i64)) as i32;
+        x = (x * ZETA as i64) % (Q as i64);
         i += 1;
     }
     result

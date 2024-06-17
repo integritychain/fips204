@@ -7,7 +7,7 @@ use crate::Q;
 
 /// # Algorithm 35 NTT(w) on page 36.
 /// Computes the Number-Theoretic Transform. An inner loop over `w/w_hat` has
-/// been refactored into this function.
+/// been refactored into this function, so it processes an array of elements.
 ///
 /// **Input**: polynomial `w(X) = ∑_{j=0}^{255} w_j X^j ∈ Rq` <br>
 /// **Output**: `w_hat = (w_hat[0], ... , w_hat[255]) ∈ Tq`
@@ -78,7 +78,7 @@ pub(crate) fn ntt<const KL: usize>(w: &[R; KL]) -> [T; KL] {
 
 /// # Algorithm 36 NTT−1 (`w_hat`) on page 37.
 /// Computes the inverse of the Number-Theoretic Transform. An inner loop over `w/w_hat` has
-/// been refactored into this function.
+/// been refactored into this function, so it processes an array of elements.
 ///
 /// **Input**: `w_hat` = `(w_hat[0], . . . , w_hat[255]) ∈ Tq` <br>
 /// **Output**: polynomial `w(X) = ∑_{j=0}^{255} w_j X^j ∈ Rq`

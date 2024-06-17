@@ -1,6 +1,9 @@
 name: build-attest
 
-on: [ push ]
+on:
+  push:
+    tags:
+      - '*'
 
 jobs:
   build:
@@ -26,13 +29,13 @@ jobs:
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: '${{ github.workspace }}/target/*/release/libfips*'
+          subject-path: '${{ github.workspace }}/target/*/release/libfips204.rlib'
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}--libfips204.rlib
           path: '${{ github.workspace }}/target/*/release/libfips204.rlib'
-          retention-days: 25
+          retention-days: 60
       - name: Checkout actions-oidc-debugger
         uses: actions/checkout@v4
         with:

@@ -103,7 +103,7 @@ macro_rules! functionality {
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
-        const CTILDE_LEN: usize = 32 * K * bit_length((Q - 1) / (2 * GAMMA2) - 1);
+        const W1_LEN: usize = 32 * K * bit_length((Q - 1) / (2 * GAMMA2) - 1);
         const CTEST: bool = false; // when true, the logid goes into CT test mode
 
         // ----- 'EXTERNAL' DATA TYPES -----
@@ -228,10 +228,9 @@ macro_rules! functionality {
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
-                let sig =
-                    ml_dsa::sign_finish::<CTEST, CTILDE_LEN, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
-                        rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
-                    )?;
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
+                )?;
                 Ok(sig)
             }
         }
@@ -243,10 +242,9 @@ macro_rules! functionality {
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                let sig =
-                    ml_dsa::sign_finish::<CTEST, CTILDE_LEN, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
-                        rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
-                    )?;
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
+                )?;
                 Ok(sig)
             }
         }
@@ -255,13 +253,16 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_verify(
+            fn verify(
                 &self, message: &[u8], sig: &Self::Signature,
-            ) -> Result<bool, &'static str> {
-                let epk = ml_dsa::verify_start(&self.0)?;
-                ml_dsa::verify_finish::<CTILDE_LEN, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message, &sig,
-                )
+            ) -> bool {
+                let epk = ml_dsa::verify_start(&self.0);
+                if epk.is_err() { return false };
+                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk.unwrap(), &message, &sig,
+                );
+                if res.is_err() { return false };
+                res.unwrap()
             }
         }
 
@@ -269,12 +270,14 @@ macro_rules! functionality {
         impl Verifier for ExpandedPublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn try_verify(
+            fn verify(
                 &self, message: &[u8], sig: &Self::Signature,
-            ) -> Result<bool, &'static str> {
-                ml_dsa::verify_finish::<CTILDE_LEN, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN>(
+            ) -> bool {
+                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig,
-                )
+                );
+                if res.is_err() { return false }
+                res.unwrap()
             }
         }
 
@@ -318,7 +321,7 @@ macro_rules! functionality {
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
-            let sig = ml_dsa::sign_finish::<true, CTILDE_LEN, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN>(
+            let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                 rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
             )?;
             Ok(sig)
@@ -344,7 +347,7 @@ macro_rules! functionality {
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
-/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify()`] function implemented on the
+/// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
 /// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
@@ -386,7 +389,7 @@ pub mod ml_dsa_44 {
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
-/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify()`] function implemented on the
+/// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
 /// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.
@@ -428,7 +431,7 @@ pub mod ml_dsa_65 {
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
-/// **3)** Finally, the remote party uses the [`traits::Verifier::try_verify()`] function implemented on the
+/// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
 /// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
 ///
 /// See the top-level [crate] documentation for example code that implements the above flow.

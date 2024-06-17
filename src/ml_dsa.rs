@@ -120,12 +120,12 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
 #[allow(clippy::similar_names, clippy::many_single_char_names, clippy::too_many_arguments)]
 pub(crate) fn sign_finish<
     const CTEST: bool,
-    const CTILDE_LEN: usize,
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
     const SIG_LEN: usize,
     const SK_LEN: usize,
+    const W1_LEN: usize,
 >(
     rand_gen: &mut impl CryptoRngCore, beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32,
     esk: &ExpandedPrivateKey<K, L>, message: &[u8],
@@ -171,18 +171,18 @@ pub(crate) fn sign_finish<
     h8.read(&mut rho_prime);
 
     // 9: κ ← 0    ▷ Initialize counter κ
-    let mut k_ctr = 0u16;
+    let mut kappa_ctr = 0u16;
 
     // 10: (z, h) ← ⊥    ▷ we will handle ⊥ inline with 'continue'
     let mut z: [R; L];
     let mut h: [R; K];
-    let mut c_tilde = [0u8; LAMBDA_DIV4];
+    let mut c_tilde = [0u8; LAMBDA_DIV4]; // size could be fixed at 32; but spec will fix flaw
 
     // 11: while (z, h) = ⊥ do    ▷ Rejection sampling loop (with continue for ⊥)
     loop {
         //
         // 12: y ← ExpandMask(ρ′, κ)
-        let y: [R; L] = expand_mask(gamma1, &rho_prime, k_ctr);
+        let y: [R; L] = expand_mask(gamma1, &rho_prime, kappa_ctr);
 
         // 13: w ← NTT−1(cap_a_hat ◦ NTT(y))
         let w: [R; K] = {
@@ -196,7 +196,7 @@ pub(crate) fn sign_finish<
             core::array::from_fn(|k| R(core::array::from_fn(|n| high_bits(gamma2, w[k].0[n]))));
 
         // 15: c_tilde ∈ {0,1}^{2·Lambda} ← H(µ || w1Encode(w_1), 2·Lambda)     ▷ Commitment hash
-        let mut w1_tilde = [0u8; CTILDE_LEN];
+        let mut w1_tilde = [0u8; W1_LEN];
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde);
         let mut h15 = h_xof(&[&mu, &w1_tilde]);
         h15.read(&mut c_tilde);
@@ -248,7 +248,7 @@ pub(crate) fn sign_finish<
         let r0_norm = infinity_norm(&r0);
         // CTEST is used only for constant-time measurements via `dudect`
         if !CTEST && ((z_norm >= (gamma1 - beta)) || (r0_norm >= (gamma2 - beta))) {
-            k_ctr += u16::try_from(L).expect("cannot fail");
+            kappa_ctr += u16::try_from(L).expect("cannot fail");
             continue;
             // 24: else  ... not needed with 'continue'
         }
@@ -276,10 +276,11 @@ pub(crate) fn sign_finish<
 
         // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
         // CTEST is used only for constant-time measurements via `dudect`
-        if !CTEST && (infinity_norm(&c_t_0) >= gamma2)
-            || (h.iter().map(|h_i| h_i.0.iter().sum::<i32>()).sum::<i32>() > omega)
+        if !CTEST
+            && ((infinity_norm(&c_t_0) >= gamma2)
+                || (h.iter().map(|h_i| h_i.0.iter().sum::<i32>()).sum::<i32>() > omega))
         {
-            k_ctr += u16::try_from(L).expect("cannot fail");
+            kappa_ctr += u16::try_from(L).expect("cannot fail");
             continue;
             // 28: end if
         }
@@ -340,15 +341,15 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
 }
 
 
-/// Continuation of `verify_start()`.
+/// Continuation of `verify_start()`. The `lib.rs` wrapper around this will convert `Error()` to false.
 #[allow(clippy::too_many_arguments, clippy::similar_names)]
 pub(crate) fn verify_finish<
-    const CTILDE_LEN: usize,
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
     const PK_LEN: usize,
     const SIG_LEN: usize,
+    const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>,
     m: &[u8], sig: &[u8; SIG_LEN],
@@ -385,7 +386,7 @@ pub(crate) fn verify_finish<
 
     // 8: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2λ-256} ← c_tilde
     let c_tilde_1 = <&[u8; 32]>::try_from(&c_tilde[0..32]).expect("cannot fail");
-    // c_tilde_2 is just discarded...
+    // c_tilde_2 identifier is unused...
 
     // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
     let c: R = sample_in_ball::<false>(tau, c_tilde_1); // false, as this instance isn't pertinent to CT
@@ -410,15 +411,15 @@ pub(crate) fn verify_finish<
     });
 
     // 12: c_tilde_′ ← H(µ || w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
-    let mut tmp = [0u8; CTILDE_LEN];
+    let mut tmp = [0u8; W1_LEN];
     w1_encode::<K>(gamma2, &wp_1, &mut tmp);
     let mut h12 = h_xof(&[&mu, &tmp]);
-    let mut c_tilde_p = [0u8; 64];
+    let mut c_tilde_p = [0u8; LAMBDA_DIV4];
     h12.read(&mut c_tilde_p); // leftover to be ignored
 
     // 13: return [[ ||z||∞ < γ1 −β]] and [[c_tilde = c_tilde_′]] and [[number of 1’s in h is ≤ ω]]
     let left = infinity_norm(&z) < (gamma1 - beta);
-    let center = c_tilde[0..LAMBDA_DIV4] == c_tilde_p[0..LAMBDA_DIV4]; // verify not CT
+    let center = c_tilde == c_tilde_p; // verify not CT
     let right = h.iter().all(|r| r.0.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
     Ok(left && center && right)
 }

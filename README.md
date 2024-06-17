@@ -42,7 +42,7 @@ let (pk_recv, msg_recv, sig_recv) = (pk_send, msg_send, sig_send);
 
 // Deserialize the public key and signature, then verify the message
 let pk2 = ml_dsa_44::PublicKey::try_from_bytes(pk_recv)?;
-let v = pk2.try_verify(&msg_recv, &sig_recv)?; // Use the public to verify message signature
+let v = pk2.verify(&msg_recv, &sig_recv); // Use the public to verify message signature
 assert!(v);
 # }
 # Ok(())
