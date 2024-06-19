@@ -3,14 +3,14 @@ workspace = { exclude = ["ct_cm4", "dudect", "fuzz", "wasm"] }
 [package]
 name = "fips204"
 version = "0.2.1"
-edition = "2021"
-license = "MIT OR Apache-2.0"
-description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
-documentation = "https://docs.rs/fips204"
+description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
 categories = ["cryptography", "no-std"]
-repository = "https://github.com/integritychain/fips204"
+documentation = "https://docs.rs/fips204"
+edition = "2021"
 keywords = ["FIPS204", "lattice", "dilithium", "signature"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/integritychain/fips204"
 # MSRV set at 1.70 for debian testing, e.g. https://packages.debian.org/search?keywords=rustc
 # This requires several marginally outdated dependencies, see below
 rust-version = "1.70"

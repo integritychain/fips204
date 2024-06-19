@@ -1,4 +1,4 @@
-name: build-attest
+name: provenance
 
 on:
   push:

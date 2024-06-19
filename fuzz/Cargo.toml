@@ -1,9 +1,11 @@
 [package]
 name = "fips204-fuzz"
 version = "0.2.1"
-publish = false
+authors = ["Eric Schorn <eschorn@integritychain.com>"]
+description = "Fuzz harness for FIPS 204 (draft) ML-DSA"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+publish = false
 rust-version = "1.70"
 
 
@@ -20,8 +22,8 @@ path = ".."
 
 
 # Prevent this from interfering with workspaces
-[workspace]
-members = ["."]
+#[workspace]
+#members = ["."]
 
 
 [profile.release]

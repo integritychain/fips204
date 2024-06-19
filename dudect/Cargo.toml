@@ -3,9 +3,9 @@ name = "fips204-dudect"
 version = "0.2.1"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
 description = "Dudect testbench for FIPS 204 (draft) ML-DSA"
-publish = false
 edition = "2021"
 license = "MIT OR Apache-2.0"
+publish = false
 rust-version = "1.70"
 
 

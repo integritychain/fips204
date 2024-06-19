@@ -1,11 +1,11 @@
 [package]
 name = "fips204-ct_cm4"
 version = "0.2.1"
-license = "MIT OR Apache-2.0"
-description = "Cortex-M4 testbench for FIPS 204 (draft) ML-DSA"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
-publish = false
+description = "Cortex-M4 testbench for FIPS 204 (draft) ML-DSA"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
 rust-version = "1.70"
 
 
@@ -27,6 +27,7 @@ overflow-checks = false
 lto = true
 opt-level = 3
 codegen-units = 1
+
 
 
 # If cargo complains about 'fixed' on MSRV 1.70, use version 1.23.1
