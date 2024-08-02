@@ -193,8 +193,7 @@ pub trait Verifier {
     /// # }
     /// # Ok(())}
     /// ```
-    fn verify(&self, message: &[u8], signature: &Self::Signature)
-        -> bool;
+    fn verify(&self, message: &[u8], signature: &Self::Signature) -> bool;
 }
 
 

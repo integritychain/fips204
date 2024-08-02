@@ -253,9 +253,7 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn verify(
-                &self, message: &[u8], sig: &Self::Signature,
-            ) -> bool {
+            fn verify(&self, message: &[u8], sig: &Self::Signature) -> bool {
                 let epk = ml_dsa::verify_start(&self.0);
                 if epk.is_err() { return false };
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
@@ -270,9 +268,7 @@ macro_rules! functionality {
         impl Verifier for ExpandedPublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn verify(
-                &self, message: &[u8], sig: &Self::Signature,
-            ) -> bool {
+            fn verify(&self, message: &[u8], sig: &Self::Signature) -> bool {
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig,
                 );
