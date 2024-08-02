@@ -17,7 +17,7 @@ pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
     debug_assert!(
-        r.iter().flat_map(|row| row.0).all(|element| 0 <= element && element < Q),
+        r.iter().flat_map(|row| row.0).all(|element| (0..Q).contains(&element)),
         "power2round input"
     );
     let r_1: [R; K] = core::array::from_fn(|k| {
