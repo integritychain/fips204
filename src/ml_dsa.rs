@@ -39,50 +39,16 @@ pub(crate) fn key_gen<
     let mut xi = [0u8; 32];
     rng.try_fill_bytes(&mut xi).map_err(|_| "Random number generator failed")?;
 
-    // 2: (ρ, ρ′, K) ∈ {0,1}^{256} × {0,1}^{512} × {0,1}^{256} ← H(ξ, 1024)    ▷ Expand seed
-    let mut h2 = h_xof(&[&xi]);
-    let mut rho = [0u8; 32];
-    h2.read(&mut rho);
-    let mut rho_prime = [0u8; 64];
-    h2.read(&mut rho_prime);
-    let mut cap_k = [0u8; 32];
-    h2.read(&mut cap_k);
-
-    // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
-
-    // 4: (s_1, s_2) ← ExpandS(ρ′)
-    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, &rho_prime);
-
-    // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
-    let t: [R; K] = {
-        let s_1_hat: [T; L] = ntt(&s_1);
-        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-        let t_not_reduced: [R; K] = vec_add(&inv_ntt(&as1_hat), &s_2);
-        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
-    };
-
-    // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
-    let (t_1, t_0): ([R; K], [R; K]) = power2round(&t);
-
-    // 7: pk ← pkEncode(ρ, t_1)
-    let pk: [u8; PK_LEN] = pk_encode(&rho, &t_1);
-
-    // 8: tr ← H(BytesToBits(pk), 512)
-    let mut tr = [0u8; 64];
-    let mut h8 = h_xof(&[&pk]);
-    h8.read(&mut tr);
-
-    // 9: sk ← skEncode(ρ, K, tr, s_1, s_2, t_0)     ▷ K and tr are for use in signing
-    let sk: [u8; SK_LEN] = sk_encode(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0);
-
-    // 10: return (pk, sk)
-    Ok((pk, sk))
+    Ok(key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(eta, xi))
 }
 
 
-/// Algorithm 2 ML-DSA.Sign(sk, M) on page 17
-/// Generates a signature for a message M. Intuitive flow `result = sign_finish(sign_start())`
+// The following two functions effectively implement A) Algorithm 2 ML-DSA.Sign(sk, M) on
+// page 17 and B) Algorithm 7 ML-DSA.Sign_internal(sk, M', rnd) on page 25 in conjunction
+// with the top level try_sign* API in lib.rs. This is due to the support for a precomputed
+// private key that is able to sign with higher performance.
+
+/// TKTK Generates a signature for a message M. Intuitive flow `result = sign_finish(sign_start())`
 ///
 /// **Input**:  Private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2·η)+d·k)}` and the message `M` ∈ {0,1}^∗ <br>
 /// **Output**: Expanded private key, then Signature, `σ ∈ B^{32+ℓ·32·(1+bitlen(gamma_1−1))+ω+k}`
@@ -130,7 +96,7 @@ pub(crate) fn sign_finish<
     const W1_LEN: usize,
 >(
     rand_gen: &mut impl CryptoRngCore, beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32,
-    esk: &ExpandedPrivateKey<K, L>, message: &[u8],
+    esk: &ExpandedPrivateKey<K, L>, message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8],
 ) -> Result<[u8; SIG_LEN], &'static str> {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
@@ -158,8 +124,15 @@ pub(crate) fn sign_finish<
         cap_a_hat,
     } = esk;
 
-    // 6: µ ← H(tr || M, 512)    ▷ Compute message representative µ
-    let mut h6 = h_xof(&[tr, message]);
+    // 6: µ ← H(tr || M', 512)    ▷ Compute message representative µ
+    // We may have arrived via `HashML-DSA.Sign()`
+    let mut h6 = if oid.is_empty() {
+        // From ML-DSA.Sing():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+        h_xof(&[tr, &[0x00u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
+    } else {
+        // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+        h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+    };
     let mut mu = [0u8; 64];
     h6.read(&mut mu);
 
@@ -354,7 +327,7 @@ pub(crate) fn verify_finish<
     const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>,
-    m: &[u8], sig: &[u8; SIG_LEN],
+    m: &[u8], sig: &[u8; SIG_LEN],  ctx: &[u8], oid: &[u8], phm: &[u8]
 ) -> Result<bool, &'static str> {
     //
     let ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat_mont } = epk;
@@ -381,8 +354,27 @@ pub(crate) fn verify_finish<
     // 6: tr ← H(BytesToBits(pk), 512)
     // --> calculated in verify_start()
 
+    // // 6: µ ← H(tr || M', 512)    ▷ Compute message representative µ
+    // // We may have arrived via `HashML-DSA.Sign()`
+    // let mut h6 = if oid.len() != 0 {
+    //     // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+    //     h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+    // } else {
+    //     // From ML-DSA.Sign():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+    //     h_xof(&[tr, &[0x00u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
+    // };
+    // let mut mu = [0u8; 64];
+    // h6.read(&mut mu);
+
+
     // 7: µ ← H(tr || M, 512)    ▷ Compute message representative µ
-    let mut h7 = h_xof(&[tr, m]);
+    let mut h7 = if oid.is_empty() {
+        // From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])
+    } else {
+        // From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+        h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+    };
     let mut mu = [0u8; 64];
     h7.read(&mut mu);
 
@@ -424,4 +416,69 @@ pub(crate) fn verify_finish<
     let center = c_tilde == c_tilde_p; // verify not CT
     let right = h.iter().all(|r| r.0.iter().filter(|&&e| e == 1).sum::<i32>() <= omega);
     Ok(left && center && right)
+}
+
+/// Algorithm: 6 `ML-DSA.KeyGen_internal()` on page 15.
+/// Generates a public-private key pair.
+///
+/// **Input**: `rng` a cryptographically-secure random number generator. <br>
+/// **Output**: Public key, `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`, and
+///             private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2·η)+d·k)}`
+///
+/// # Errors
+/// Returns an error when the random number generator fails.
+pub(crate) fn key_gen_internal<
+    const CTEST: bool,
+    const K: usize,
+    const L: usize,
+    const PK_LEN: usize,
+    const SK_LEN: usize,
+>(
+    eta: i32, xi: [u8; 32],
+) -> ([u8; PK_LEN], [u8; SK_LEN]) {
+    //
+    // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
+    // let mut xi = [0u8; 32];
+    // rng.try_fill_bytes(&mut xi).map_err(|_| "Random number generator failed")?;
+
+    // WRONG: 2: (ρ, ρ′, K) ∈ {0,1}^{256} × {0,1}^{512} × {0,1}^{256} ← H(ξ, 1024)    ▷ Expand seed
+    // 1: (𝜌, 𝜌′, 𝐾) ∈ 𝔹32 × 𝔹64 × 𝔹32 ← H(𝜉||IntegerToBytes(𝑘, 1)||IntegerToBytes(ℓ, 1), 128)
+    let mut h2 = h_xof(&[&xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
+    let mut rho = [0u8; 32];
+    h2.read(&mut rho);
+    let mut rho_prime = [0u8; 64];
+    h2.read(&mut rho_prime);
+    let mut cap_k = [0u8; 32];
+    h2.read(&mut cap_k);
+
+    // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
+    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
+
+    // 4: (s_1, s_2) ← ExpandS(ρ′)
+    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, &rho_prime);
+
+    // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
+    let t: [R; K] = {
+        let s_1_hat: [T; L] = ntt(&s_1);
+        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        let t_not_reduced: [R; K] = vec_add(&inv_ntt(&as1_hat), &s_2);
+        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
+    };
+
+    // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
+    let (t_1, t_0): ([R; K], [R; K]) = power2round(&t);
+
+    // 7: pk ← pkEncode(ρ, t_1)
+    let pk: [u8; PK_LEN] = pk_encode(&rho, &t_1);
+
+    // 8: tr ← H(BytesToBits(pk), 512)
+    let mut tr = [0u8; 64];
+    let mut h8 = h_xof(&[&pk]);
+    h8.read(&mut tr);
+
+    // 9: sk ← skEncode(ρ, K, tr, s_1, s_2, t_0)     ▷ K and tr are for use in signing
+    let sk: [u8; SK_LEN] = sk_encode(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0);
+
+    // 10: return (pk, sk)
+    (pk, sk)
 }

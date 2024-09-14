@@ -1,3 +1,4 @@
+use crate::types::Ph;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "default-rng")]
 use rand_core::OsRng;
@@ -37,7 +38,7 @@ pub trait KeyGen {
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_44::KG::try_keygen()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
+    /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
     /// # }
     /// # Ok(())}
     /// ```
@@ -67,7 +68,7 @@ pub trait KeyGen {
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_44::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
-    /// let sig = sk.try_sign(&message)?;  // Use the secret key to generate a message signature
+    /// let sig = sk.try_sign(&message, &[0])?;  // Use the secret key to generate a message signature
     /// }
     /// # Ok(())}
     /// ```
@@ -124,15 +125,16 @@ pub trait Signer {
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
-    /// let v = pk.verify(&message, &sig); // Use the public to verify message signature
+    /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
+    /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
     /// # }
     /// # Ok(())}
     /// ```
     #[cfg(feature = "default-rng")]
-    fn try_sign(&self, message: &[u8]) -> Result<Self::Signature, &'static str> {
-        self.try_sign_with_rng(&mut OsRng, message)
+    fn try_sign(&self, message: &[u8], ctx: &[u8]) -> Result<Self::Signature, &'static str> {
+        self.try_sign_with_rng(&mut OsRng, message, ctx)
     }
+
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **provided** random number generator.
@@ -157,13 +159,20 @@ pub trait Signer {
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
-    /// let sig = sk.try_sign_with_rng(&mut rng, &message)?;  // Use the secret key to generate a message signature
-    /// let v = pk.verify(&message, &sig); // Use the public to verify message signature
+    /// let sig = sk.try_sign_with_rng(&mut rng, &message, &[0])?;  // Use the secret key to generate a message signature
+    /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
     /// # }
     /// # Ok(())}
     /// ```
     fn try_sign_with_rng(
-        &self, rng: &mut impl CryptoRngCore, message: &[u8],
+        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
+    ) -> Result<Self::Signature, &'static str>;
+
+    /// TKTKT placeholder
+    /// # Errors
+    /// Will return an error on rng failure
+    fn try_hash_sign_with_rng(
+        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: Ph,
     ) -> Result<Self::Signature, &'static str>;
 }
 
@@ -188,16 +197,20 @@ pub trait Verifier {
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
-    /// let sig = sk.try_sign(&message)?; // Use the secret key to generate a message signature
-    /// let v = pk.verify(&message, &sig); // Use the public to verify message signature
+    /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
+    /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
     /// # }
     /// # Ok(())}
     /// ```
-    fn verify(&self, message: &[u8], signature: &Self::Signature) -> bool;
+    fn verify(&self, message: &[u8], signature: &Self::Signature, ctx: &[u8]) -> bool;
+
+    /// TKTK placeholder
+    fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: Ph) -> bool;
 }
 
 
 /// The `SerDes` trait provides for validated serialization and deserialization of fixed- and correctly-size elements.
+///
 /// Note that FIPS 204 currently states that outside of exact length checks "ML-DSA is not designed to require any
 /// additional public-key validity checks" (perhaps "...designed not to require..." would be better). Nonetheless, a
 /// `Result()` is returned during all deserialization operations to preserve the ability to add future checks (and for

@@ -1,7 +1,7 @@
 #![no_std]
 #![deny(clippy::pedantic, warnings, missing_docs, unsafe_code)]
 // Most of the 'allow' category...
-#![deny(absolute_paths_not_starting_with_crate, box_pointers, dead_code)]
+#![deny(absolute_paths_not_starting_with_crate, dead_code)]
 #![deny(elided_lifetimes_in_paths, explicit_outlives_requirements, keyword_idents)]
 #![deny(let_underscore_drop, macro_use_extern_crate, meta_variable_misuse, missing_abi)]
 #![deny(non_ascii_idents, rust_2021_incompatible_closure_captures)]
@@ -69,6 +69,7 @@
 // except for the single function (per namespace) `dudect_keygen_sign_with_rng()` which is only
 // exposed when the non-default `dudect` feature is enabled.
 
+use crate::helpers::ensure;
 /// The `rand_core` types are re-exported so that users of fips204 do not
 /// have to worry about using the exact correct version of `rand_core`.
 pub use rand_core::{CryptoRng, Error as RngError, RngCore};
@@ -96,10 +97,13 @@ const D: u32 = 13; // See table 1 page 13 second row
 macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sk_decode};
+        use crate::ensure;
         use crate::helpers::bit_length;
         use crate::ml_dsa;
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
+        use crate::types::Ph;
         use rand_core::CryptoRngCore;
+        use sha2::{Digest, Sha256};
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
@@ -113,7 +117,9 @@ macro_rules! functionality {
         pub type PrivateKey = crate::types::PrivateKey<SK_LEN>;
 
         /// Expanded private key, specific to the target security parameter set, that contains <br>
-        /// precomputed elements which increase (repeated) signature performance. Implements only
+        /// precomputed elements which increase (repeated) signature performance.
+        ///
+        /// Implements only
         /// the [`crate::traits::Signer`] trait. Derived from the `PrivateKey`.
         pub type ExpandedPrivateKey = crate::types::ExpandedPrivateKey<K, L>;
 
@@ -122,7 +128,9 @@ macro_rules! functionality {
         pub type PublicKey = crate::types::PublicKey<PK_LEN>;
 
         /// Expanded public key, specific to the target security parameter set, that contains <br>
-        /// precomputed elements which increase (repeated) verification performance. Implements only
+        /// precomputed elements which increase (repeated) verification performance.
+        ///
+        /// Implements only
         /// the [`crate::traits::Verifier`] traits. Derived from the `PublicKey`.
         pub type ExpandedPublicKey = crate::types::ExpandedPublicKey<K, L>;
 
@@ -134,6 +142,7 @@ macro_rules! functionality {
         // ----- PRIMARY FUNCTIONS ---
 
         /// Generates a public and private key pair specific to this security parameter set.
+        ///
         /// This function utilizes the **OS default** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the OS random
         /// number generator internals, the `rho` value stored in the public key, and the hash-derived
@@ -152,7 +161,7 @@ macro_rules! functionality {
         ///
         /// // Generate key pair and signature
         /// let (pk1, sk) = ml_dsa_44::try_keygen()?; // Generate both public and secret keys
-        /// let sig1 = sk.try_sign(&message)?; // Use the secret key to generate a message signature
+        /// let sig1 = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
         /// # }
         /// # Ok(())}
         /// ```
@@ -161,6 +170,7 @@ macro_rules! functionality {
 
 
         /// Generates a public and private key pair specific to this security parameter set.
+        ///
         /// This function utilizes the **provided** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the provided random
         /// number generator internals, the `rho` value stored in the public key, and the hash-derived
@@ -181,7 +191,7 @@ macro_rules! functionality {
         ///
         /// // Generate key pair and signature
         /// let (pk1, sk) = ml_dsa_44::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
-        /// let sig1 = sk.try_sign_with_rng(&mut rng, &message)?;  // Use the secret key to generate a message signature
+        /// let sig1 = sk.try_sign_with_rng(&mut rng, &message, &[0])?;  // Use the secret key to generate a message signature
         /// # }
         /// # Ok(())}
         /// ```
@@ -224,12 +234,59 @@ macro_rules! functionality {
         impl Signer for PrivateKey {
             type Signature = [u8; SIG_LEN];
 
+            // This is effectively Algorithm 2 ML-DSA.Sign calling several sub-functions. The split
+            // enables the ability of signing with an pre-computeed expanded public key for
+            // performance (see next function).
             fn try_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8],
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
+                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
+                    rng,
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &esk,
+                    message,
+                    ctx,
+                    &[],
+                    &[],
+                )?;
+                Ok(sig)
+            }
+
+            fn try_hash_sign_with_rng(
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: Ph,
+            ) -> Result<Self::Signature, &'static str> {
+                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
+                let (oid, phm) = match ph {
+                    Ph::SHA256 => {
+                        let mut hasher = Sha256::new();
+                        hasher.update(message);
+                        (
+                            [
+                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+                            ],
+                            hasher.finalize(),
+                        )
+                    }
+                    _ => {
+                        let mut hasher = Sha256::new();
+                        hasher.update(message);
+                        (
+                            [
+                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+                            ],
+                            hasher.finalize(),
+                        )
+                    }
+                };
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm,
                 )?;
                 Ok(sig)
             }
@@ -240,10 +297,41 @@ macro_rules! functionality {
             type Signature = [u8; SIG_LEN];
 
             fn try_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8],
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
+                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message,
+                    rng,
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &self,
+                    message,
+                    ctx,
+                    &[],
+                    &[],
+                )?;
+                Ok(sig)
+            }
+
+            fn try_hash_sign_with_rng(
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], _ph: Ph,
+            ) -> Result<Self::Signature, &'static str> {
+                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    rng,
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &self,
+                    message,
+                    ctx,
+                    &[],
+                    &[],
                 )?;
                 Ok(sig)
             }
@@ -253,13 +341,69 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn verify(&self, message: &[u8], sig: &Self::Signature) -> bool {
+            fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
+                if ctx.len() > 255 { return false };
                 let epk = ml_dsa::verify_start(&self.0);
-                if epk.is_err() { return false };
+                if epk.is_err() {
+                    return false;
+                };
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk.unwrap(), &message, &sig,
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &epk.unwrap(),
+                    &message,
+                    &sig, ctx, &[], &[]
                 );
-                if res.is_err() { return false };
+                if res.is_err() {
+                    return false;
+                };
+                res.unwrap()
+            }
+
+            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: Ph) -> bool {
+                if ctx.len() > 255 { return false };
+                let epk = ml_dsa::verify_start(&self.0);
+                if epk.is_err() {
+                    return false;
+                };
+                let (oid, phm) = match ph {
+                    Ph::SHA256 => {
+                        let mut hasher = Sha256::new();
+                        hasher.update(message);
+                        (
+                            [
+                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+                            ],
+                            hasher.finalize(),
+                        )
+                    }
+                    _ => {
+                        let mut hasher = Sha256::new();
+                        hasher.update(message);
+                        (
+                            [
+                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+                            ],
+                            hasher.finalize(),
+                        )
+                    }
+                };
+                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &epk.unwrap(),
+                    &message,
+                    &sig, ctx, &oid, &phm
+                );
+                if res.is_err() {
+                    return false;
+                };
                 res.unwrap()
             }
         }
@@ -268,13 +412,20 @@ macro_rules! functionality {
         impl Verifier for ExpandedPublicKey {
             type Signature = [u8; SIG_LEN];
 
-            fn verify(&self, message: &[u8], sig: &Self::Signature) -> bool {
+            fn verify(&self, message: &[u8], sig: &Self::Signature, _ctx: &[u8]) -> bool {
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig,
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, &[], &[], &[]
                 );
-                if res.is_err() { return false }
+                if res.is_err() {
+                    return false;
+                }
                 res.unwrap()
             }
+
+            fn hash_verify(&self, _message: &[u8], _sig: &Self::Signature, _ctx: &[u8], _ph: Ph) -> bool {
+                unimplemented!()
+            }
+
         }
 
 
@@ -328,7 +479,9 @@ macro_rules! functionality {
 // Regarding private key sizes, see https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/EKoI0u_PuOw/m/b02zPvomBAAJ
 
 
-/// Functionality for the **ML-DSA-44** security parameter set. This includes specific sizes for the
+/// Functionality for the **ML-DSA-44** security parameter set.
+///
+/// This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-44
 /// parameter set is claimed to be in security strength category 2.
 ///
@@ -370,7 +523,9 @@ pub mod ml_dsa_44 {
 }
 
 
-/// Functionality for the **ML-DSA-65** security parameter set. This includes specific sizes for the
+/// Functionality for the **ML-DSA-65** security parameter set.
+///
+/// This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-65
 /// parameter set is claimed to be in security strength category 3.
 ///
@@ -412,7 +567,9 @@ pub mod ml_dsa_65 {
 }
 
 
-/// Functionality for the **ML-DSA-87** security parameter set. This includes specific sizes for the
+/// Functionality for the **ML-DSA-87** security parameter set.
+///
+/// This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-87
 /// parameter set is claimed to be in security strength category 5.
 ///

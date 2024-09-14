@@ -1,5 +1,11 @@
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+/// Supported hash functions for `hash_sign()` and `hash_verify()` functions
+pub enum Ph {
+    SHA256,
+    SHA512,
+    SHAKE128,
+}
 
 /// Correctly sized private key specific to the target security parameter set. <br>
 /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.
