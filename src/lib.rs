@@ -469,7 +469,7 @@ macro_rules! functionality {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message,
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, &[], &[], &[]
             )?;
             Ok(sig)
         }
