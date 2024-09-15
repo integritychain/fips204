@@ -6,6 +6,15 @@ use crate::types::{R, R0, T, T0};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
 
+// use sha3::Shake256Core;
+// use sha3::digest::core_api::CoreWrapper;
+//
+// pub(crate) fn hhh_xof(v: &[&[u8]]) -> CoreWrapper<Shake256Core> {
+//     let mut hasher = Shake256::default();
+//     v.iter().for_each(|b| hasher.update(b));
+//     hasher
+// }
+
 
 /// # Function H(v,d) of (8.1) on page 29.
 /// Takes a reference to a list of byte-slice references and runs them through Shake256.
@@ -38,51 +47,74 @@ pub(crate) fn h128_xof(v: &[&[u8]]) -> impl XofReader {
 ///
 /// **Input**: A seed `ρ ∈{0,1}^256` <br>
 /// **Output**: A polynomial `c` in `Rq`.
-pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8; 32]) -> R {
+pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8]) -> R {
     let tau = usize::try_from(tau).expect("cannot fail");
-    let mut xof = h_xof(&[rho]);
-    let mut hpk8 = [0u8; 8];
-    xof.read(&mut hpk8); // Save the first 8 bytes for step 9
+    //let mut xof = hhh_xof(&[rho]).finalize_xof();
 
     // 1: c ← 0
     let mut c = R0;
 
-    // 2: k ← 8; k implicitly advances with each sample
-    let mut hpk = [0u8];
+    // 2: ctx ← H.Init()
+    // 3: ctx ← H.Absorb(ctx, 𝜌)
+    let mut h_ctx = h_xof(&[rho]);  // init and absorb
+
+    // 4: (ctx, 𝑠) ← H.Squeeze(ctx, 8)
+    // 5: ℎ ← BytesToBits(𝑠)
+    let mut h = [0u8; 8];
+    h_ctx.read(&mut h); // Save the first 8 bytes for step 9
+
+    // 6: for 𝑖 from 256 − 𝜏 to 255 do
+    for i in (256 - tau)..=255 {
+
+        // 7: (ctx, 𝑗) ← H.Squeeze(ctx, 1)
+        let mut j = [0u8];
+        h_ctx.read(&mut j);
+
+        // 8: while 𝑗 > 𝑖 do
+        while usize::from(j[0]) > i {
+
+            // 9: (ctx, 𝑗) ← H.Squeeze(ctx, 1)
+            h_ctx.read(&mut j);
+
+            // 10: end while
+        }
+
+        // 11: ci ← cj
+        c.0[i] = c.0[usize::from(j[0])];
+
+        // 12: c_j ← (−1)^{H(ρ)[i+τ−256]
+        let index = i + tau - 256;
+        let bite = h[index / 8];
+        let shifted = bite >> (index & 0x07);
+        c.0[usize::from(j[0])] = 1 - 2 * i32::from(shifted & 0x01);
+
+        // 13: end for
+    }
+
+
+        // 2: k ← 8; k implicitly advances with each sample
+    //let mut hpk = [0u8];
 
     // 3: for i from 256 − τ to 255 do
-    for i in (256 - tau)..=255 {
         //
         // 4: while H(ρ)[[k]] > i do
         // 5: k ← k + 1
         // 6: end while
         // The above/below loop reads xof bytes until less than or equal to i
-        loop {
-            xof.read(&mut hpk); // Every 'read' effectively contains k = k + 1
-            if CTEST {
-                hpk[0] = i.to_le_bytes()[0];
-            }
-            if hpk[0] <= i.to_le_bytes()[0] {
-                break;
-            }
-        }
+        // loop {
+        //     xof.read(&mut hpk); // Every 'read' effectively contains k = k + 1
+        //     if CTEST {
+        //         hpk[0] = i.to_le_bytes()[0];
+        //     }
+        //     if hpk[0] <= i.to_le_bytes()[0] {
+        //         break;
+        //     }
+        // }
 
         // 7: j ← H(ρ)[[k]] ▷ j is a pseudorandom byte that is ≤ i
-        let j = hpk[0];
-
-        // 8: ci ← cj
-        c.0[i] = c.0[usize::from(j)];
-
-        // 9: c_j ← (−1)^{H(ρ)[i+τ−256]
-        let index = i + tau - 256;
-        let bite = hpk8[index / 8];
-        let shifted = bite >> (index & 0x07);
-        c.0[usize::from(j)] = 1 - 2 * i32::from(shifted & 0x01);
+        //let j = hpk[0];
 
         // 10: k ← k + 1   (implicit)
-
-        // 11: end for
-    }
 
     // slightly redundant...
     debug_assert!(
@@ -94,7 +126,7 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8; 32]) -> R {
         "Alg 23: bad hamming weight (b)"
     );
 
-    // 12: return c
+    // 14: return c
     c
 }
 

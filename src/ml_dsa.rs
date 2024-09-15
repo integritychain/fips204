@@ -128,7 +128,7 @@ pub(crate) fn sign_finish<
     // We may have arrived via `HashML-DSA.Sign()`
     let mut h6 = if oid.is_empty() {
         // From ML-DSA.Sing():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h_xof(&[tr, &[0x00u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
+        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
     } else {
         // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
         h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
@@ -177,11 +177,11 @@ pub(crate) fn sign_finish<
         h15.read(&mut c_tilde);
 
         // 16: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2·Lambda-256} ← c_tilde    ▷ First 256 bits of commitment hash
-        let c_tilde_1: [u8; 32] = core::array::from_fn(|i| c_tilde[i]);
+        //let c_tilde_1: [u8; 32] = core::array::from_fn(|i| c_tilde[i]);
         // c_tilde_2 is never used!
 
         // 17: c ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
-        let c: R = sample_in_ball::<CTEST>(tau, &c_tilde_1);
+        let c: R = sample_in_ball::<CTEST>(tau, &c_tilde);
 
         // 18: c_hat ← NTT(c)
         let c_hat: &T = &ntt(&[c])[0];
@@ -379,11 +379,11 @@ pub(crate) fn verify_finish<
     h7.read(&mut mu);
 
     // 8: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2λ-256} ← c_tilde
-    let c_tilde_1 = <&[u8; 32]>::try_from(&c_tilde[0..32]).expect("cannot fail");
+    //let c_tilde_1 = <&[u8; 32]>::try_from(&c_tilde[0..32]).expect("cannot fail");
     // c_tilde_2 identifier is unused...
 
     // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
-    let c: R = sample_in_ball::<false>(tau, c_tilde_1); // false, as this instance isn't pertinent to CT
+    let c: R = sample_in_ball::<false>(tau, &c_tilde); // false, as this instance isn't pertinent to CT
 
     // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let wp_approx: [R; K] = {

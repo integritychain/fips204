@@ -16,7 +16,7 @@ use fips204::ml_dsa_65;
 #[cfg(feature = "ml-dsa-87")]
 use fips204::ml_dsa_87;
 
-use fips204::traits::SerDes; //{KeyGen, SerDes, Signer, Verifier};
+use fips204::traits::{SerDes, Signer}; //{KeyGen, SerDes, Signer, Verifier};
 
 
 // ----- CUSTOM RNG TO REPLAY VALUES -----
@@ -87,6 +87,48 @@ fn test_keygen() {
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
+        }
+    }
+}
+
+#[ignore]
+#[test]
+fn test_siggen() {
+    let vectors =
+        fs::read_to_string("./tests/nist_vectors/ML-DSA-sigGen-FIPS204/internalProjection.json")
+            .expect("Unable to read file");
+    let v: Value = serde_json::from_str(&vectors).unwrap();
+
+    for test_group in v["testGroups"].as_array().unwrap().iter() {
+        for test in test_group["tests"].as_array().unwrap().iter() {
+            let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
+            let message = decode(test["message"].as_str().unwrap()).unwrap();
+            let sig_exp = decode(test["signature"].as_str().unwrap()).unwrap();
+            let seed = test["rnd"].as_str();
+            if seed.is_none() {continue};  // TODO: no seed means 00000...00?
+            let mut rnd = TestRng::new();
+            rnd.push(&decode(seed.unwrap()).unwrap());
+
+            #[cfg(feature = "ml-dsa-44")]
+            if test_group["parameterSet"] == "ML-DSA-44" {
+                let sk = ml_dsa_44::PrivateKey::try_from_bytes(sk_bytes.try_into().unwrap()).unwrap();
+                let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
+                assert_eq!(sig_exp, sig_act);
+            }
+
+            // #[cfg(feature = "ml-dsa-65")]
+            // if test_group["parameterSet"] == "ML-DSA-65" {
+            //     let (pk_act, sk_act) = ml_dsa_65::try_keygen_with_rng(&mut rnd).unwrap();
+            //     assert_eq!(pk_exp, pk_act.into_bytes());
+            //     assert_eq!(sk_exp, sk_act.into_bytes());
+            // }
+            //
+            // #[cfg(feature = "ml-dsa-87")]
+            // if test_group["parameterSet"] == "ML-DSA-87" {
+            //     let (pk_act, sk_act) = ml_dsa_87::try_keygen_with_rng(&mut rnd).unwrap();
+            //     assert_eq!(pk_exp, pk_act.into_bytes());
+            //     assert_eq!(sk_exp, sk_act.into_bytes());
+            // }
         }
     }
 }

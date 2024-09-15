@@ -319,48 +319,53 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
         //
         // 4: if y[ω + i] < Index or y[ω + i] > ω then return ⊥
         if (y_bytes[omega_u + i] < index) || (y_bytes[omega_u + i] > omega.to_le_bytes()[0]) {
-            return Err("Alg 15a: returns ⊥");
+            return Err("Alg 15a: returns ⊥ (4)");
 
             // 5: end if
         }
 
-        // Note that there is a bug in the FIPS 204 draft specification that allows forgeability.
-        // Discussion/thread here: https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/TQo-qFbBO1A/m/YcYKjMblAAAJ
-        // The missed portion of reference code: https://github.com/pq-crystals/dilithium/blob/master/ref/packing.c#L223
-        // The code currently implemented here intentionally matches the flawed FIPS 204 draft spec.
-        // The `bad_sig()` test implemented in `integration.rs` demonstrates the flaw, and the adjacent `forever()`
-        // test is able to uncover additional instances.
-        // This code will implement the fix forthcoming in FIPS 204 as soon as it is available.
+        // 6: First ← Index
+        let first = index;
 
-        // 6: while Index < y[ω + i] do
+        // 7: while Index < y[ω + i] do
         while index < y_bytes[omega_u + i] {
+
+            // 8: if Index > First then
+            if index > first {
+                //
+                // 9: if 𝑦[Index − 1] ≥ 𝑦[Index] then return ⊥    ▷ malformed input
+                if y_bytes[usize::from(index) - 1] >= y_bytes[usize::from(index)] {
+                    return Err("Alg 15a: returns ⊥ (9)");
+
+                    // 10: end if
+                }
+
+                // 11: end if
+            }
             //
-            // 7: h[i]_{y[Index]} ← 1
+            // 12: h[i]_{y[Index]} ← 1
             h[i].0[y_bytes[index as usize] as usize] = 1;
 
-            // 8: Index ← Index + 1
+            // 13: Index ← Index + 1
             index += 1;
 
-            // 9: end while
+            // 14: end while
         }
 
-        // 10: end for
+        // 15: end for
     }
 
-    // 11: while Index < ω do
-    while index < omega.to_le_bytes()[0] {
+    // 16: for 𝑖 from Index to 𝜔 − 1 do    ▷ read any leftover bytes in the first 𝜔 bytes of 𝑦
+    for i in index..omega.to_le_bytes()[0] {
         //
-        // 12: if y[Index] != 0 then return ⊥
-        if y_bytes[index as usize] != 0 {
-            return Err("Alg 15b: returns ⊥");
+        // 17: if y[i] != 0 then return ⊥
+        if y_bytes[i as usize] != 0 {
+            return Err("Alg 15b: returns ⊥ (17");
 
-            // 13: end if
+            // 18: end if
         }
 
-        // 14: Index ← Index + 1
-        index += 1;
-
-        // 15: end while
+        // 19: end for
     }
 
     // 16: return h
