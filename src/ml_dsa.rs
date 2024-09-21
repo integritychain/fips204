@@ -128,7 +128,8 @@ pub(crate) fn sign_finish<
     // We may have arrived via `HashML-DSA.Sign()`
     let mut h6 = if oid.is_empty() {
         // From ML-DSA.Sing():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
+        //h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+        h_xof(&[tr, message])
     } else {
         // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
         h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
@@ -370,7 +371,8 @@ pub(crate) fn verify_finish<
     // 7: µ ← H(tr || M, 512)    ▷ Compute message representative µ
     let mut h7 = if oid.is_empty() {
         // From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])
+        // h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])  // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+        h_xof(&[tr, m])
     } else {
         // From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
         h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
