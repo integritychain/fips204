@@ -104,11 +104,10 @@ fn test_siggen() {
             let message = decode(test["message"].as_str().unwrap()).unwrap();
             let sig_exp = decode(test["signature"].as_str().unwrap()).unwrap();
             let seed = test["rnd"].as_str();
-            let x: [u8; 32];
-            if seed.is_none() {
-                x = [0u8; 32];
+            let x = if seed.is_none() {
+                [0u8; 32]
             } else {
-                x = decode(seed.unwrap()).unwrap().try_into().unwrap();
+                decode(seed.unwrap()).unwrap().try_into().unwrap()
             };
             let mut rnd = TestRng::new();
             rnd.push(&x);
