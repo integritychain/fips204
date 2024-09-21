@@ -98,6 +98,7 @@ fn test_siggen() {
             .expect("Unable to read file");
     let v: Value = serde_json::from_str(&vectors).unwrap();
 
+    #[allow(clippy::unnecessary_unwrap)]
     for test_group in v["testGroups"].as_array().unwrap().iter() {
         for test in test_group["tests"].as_array().unwrap().iter() {
             let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
