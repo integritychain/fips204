@@ -250,18 +250,15 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
 /// **Input**: `ρ ∈ {0,1}^256`. <br>
 /// **Output**: Matrix `cap_a_hat`
 #[allow(clippy::cast_possible_truncation)] // s and r as u8
-pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(
-    rho: &[u8; 32],
-) -> [[T; L]; K] {
+pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(rho: &[u8; 32]) -> [[T; L]; K] {
     // 1: for r from 0 to k − 1 do
     // 2:   for s from 0 to ℓ − 1 do
     // 3:     A_hat[r, s] ← RejNTTPoly(ρ||IntegerToBits(s, 8) || IntegerToBits(r, 8))
     // 4:   end for
     // 5: end for
 
-    let cap_a_hat: [[T; L]; K] = core::array::from_fn(|r| {
-        core::array::from_fn(|s| rej_ntt_poly::<CTEST>(&[&rho[..], &[s as u8], &[r as u8]]))
-    });
+    let cap_a_hat: [[T; L]; K] =
+        core::array::from_fn(|r| core::array::from_fn(|s| rej_ntt_poly::<CTEST>(&[&rho[..], &[s as u8], &[r as u8]])));
     cap_a_hat
 }
 
@@ -285,14 +282,12 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
     // 1: for r from 0 to ℓ − 1 do
     // 2: s1[r] ← RejBoundedPoly(ρ || IntegerToBits(r, 16))
     // 3: end for
-    let s1: [R; L] =
-        core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[r as u8], &[0]]));
+    let s1: [R; L] = core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[r as u8], &[0]]));
 
     // 4: for r from 0 to k − 1 do
     // 5: s2[r] ← RejBoundedPoly(ρ || IntegerToBits(r + ℓ, 16))
     // 6: end for
-    let s2: [R; K] =
-        core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]));
+    let s2: [R; K] = core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]));
 
     // 7: return (s_1 , s_2)
     debug_assert!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Alg 27: s1 out of range");

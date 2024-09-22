@@ -98,9 +98,7 @@ pub(crate) fn center_mod(m: i32) -> i32 {
 
 /// Matrix by vector multiplication; e.g., fips 203 top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
 #[must_use]
-pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
-    a_hat: &[[T; L]; K], u_hat: &[T; L],
-) -> [T; K] {
+pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(a_hat: &[[T; L]; K], u_hat: &[T; L]) -> [T; K] {
     let mut w_hat = [T0; K];
     let u_hat_mont = to_mont(u_hat);
     for i in 0..K {
@@ -124,9 +122,7 @@ pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] 
 
 #[allow(clippy::cast_possible_truncation)] // as i32
 pub(crate) fn to_mont<const L: usize>(vec_a: &[T; L]) -> [T; L] {
-    core::array::from_fn(|l| {
-        T(core::array::from_fn(|n| partial_reduce64(i64::from(vec_a[l].0[n]) << 32)))
-    })
+    core::array::from_fn(|l| T(core::array::from_fn(|n| partial_reduce64(i64::from(vec_a[l].0[n]) << 32))))
 }
 
 

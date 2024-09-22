@@ -98,7 +98,7 @@ fn test_siggen() {
             .expect("Unable to read file");
     let v: Value = serde_json::from_str(&vectors).unwrap();
 
-    #[allow(clippy::unnecessary_unwrap)]
+    #[allow(clippy::unnecessary_unwrap, deprecated)]
     for test_group in v["testGroups"].as_array().unwrap().iter() {
         for test in test_group["tests"].as_array().unwrap().iter() {
             let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
@@ -152,6 +152,7 @@ fn test_sigver() {
             .expect("Unable to read file");
     let v: Value = serde_json::from_str(&vectors).unwrap();
 
+    #[allow(deprecated)]
     for test_group in v["testGroups"].as_array().unwrap().iter() {
         let pk_bytes = decode(test_group["pk"].as_str().unwrap()).unwrap();
         for test in test_group["tests"].as_array().unwrap().iter() {
@@ -163,7 +164,12 @@ fn test_sigver() {
             if test_group["parameterSet"] == "ML-DSA-44" {
                 let pk = ml_dsa_44::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
                     .unwrap();
-                let res = ml_dsa_44::_internal_verify(&pk, &message, &signature.clone().try_into().unwrap(), &[]);
+                let res = ml_dsa_44::_internal_verify(
+                    &pk,
+                    &message,
+                    &signature.clone().try_into().unwrap(),
+                    &[],
+                );
                 assert_eq!(res, test_passed);
             }
 
@@ -171,7 +177,12 @@ fn test_sigver() {
             if test_group["parameterSet"] == "ML-DSA-65" {
                 let pk = ml_dsa_65::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
                     .unwrap();
-                let res = ml_dsa_65::_internal_verify(&pk, &message, &signature.clone().try_into().unwrap(), &[]);
+                let res = ml_dsa_65::_internal_verify(
+                    &pk,
+                    &message,
+                    &signature.clone().try_into().unwrap(),
+                    &[],
+                );
                 assert_eq!(res, test_passed);
             }
 
@@ -179,7 +190,12 @@ fn test_sigver() {
             if test_group["parameterSet"] == "ML-DSA-87" {
                 let pk = ml_dsa_87::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
                     .unwrap();
-                let res = ml_dsa_87::_internal_verify(&pk, &message, &signature.clone().try_into().unwrap(), &[]);
+                let res = ml_dsa_87::_internal_verify(
+                    &pk,
+                    &message,
+                    &signature.clone().try_into().unwrap(),
+                    &[],
+                );
                 assert_eq!(res, test_passed);
             }
         }

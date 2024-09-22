@@ -195,9 +195,7 @@ macro_rules! functionality {
         /// # }
         /// # Ok(())}
         /// ```
-        pub fn try_keygen_with_rng(
-            rng: &mut impl CryptoRngCore,
-        ) -> Result<(PublicKey, PrivateKey), &'static str> {
+        pub fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
             KG::try_keygen_with_rng(rng)
         }
 
@@ -208,23 +206,17 @@ macro_rules! functionality {
             type PrivateKey = PrivateKey;
             type PublicKey = PublicKey;
 
-            fn try_keygen_with_rng(
-                rng: &mut impl CryptoRngCore,
-            ) -> Result<(PublicKey, PrivateKey), &'static str> {
+            fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             }
 
-            fn gen_expanded_private(
-                sk: &PrivateKey,
-            ) -> Result<Self::ExpandedPrivateKey, &'static str> {
+            fn gen_expanded_private(sk: &PrivateKey) -> Result<Self::ExpandedPrivateKey, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
                 Ok(esk)
             }
 
-            fn gen_expanded_public(
-                pk: &PublicKey,
-            ) -> Result<Self::ExpandedPublicKey, &'static str> {
+            fn gen_expanded_public(pk: &PublicKey) -> Result<Self::ExpandedPublicKey, &'static str> {
                 let epk = ml_dsa::verify_start(&pk.0)?;
                 Ok(epk)
             }
@@ -243,17 +235,7 @@ macro_rules! functionality {
                 ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng,
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &esk,
-                    message,
-                    ctx,
-                    &[],
-                    &[], false
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &[], &[], false,
                 )?;
                 Ok(sig)
             }
@@ -286,7 +268,7 @@ macro_rules! functionality {
                     }
                 };
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm, false
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm, false,
                 )?;
                 Ok(sig)
             }
@@ -311,7 +293,8 @@ macro_rules! functionality {
                     message,
                     ctx,
                     &[],
-                    &[], false
+                    &[],
+                    false,
                 )?;
                 Ok(sig)
             }
@@ -331,7 +314,8 @@ macro_rules! functionality {
                     message,
                     ctx,
                     &[],
-                    &[], false
+                    &[],
+                    false,
                 )?;
                 Ok(sig)
             }
@@ -342,7 +326,9 @@ macro_rules! functionality {
             type Signature = [u8; SIG_LEN];
 
             fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
-                if ctx.len() > 255 { return false };
+                if ctx.len() > 255 {
+                    return false;
+                };
                 let epk = ml_dsa::verify_start(&self.0);
                 if epk.is_err() {
                     return false;
@@ -355,7 +341,11 @@ macro_rules! functionality {
                     TAU,
                     &epk.unwrap(),
                     &message,
-                    &sig, ctx, &[], &[], false
+                    &sig,
+                    ctx,
+                    &[],
+                    &[],
+                    false,
                 );
                 if res.is_err() {
                     return false;
@@ -364,7 +354,9 @@ macro_rules! functionality {
             }
 
             fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: Ph) -> bool {
-                if ctx.len() > 255 { return false };
+                if ctx.len() > 255 {
+                    return false;
+                };
                 let epk = ml_dsa::verify_start(&self.0);
                 if epk.is_err() {
                     return false;
@@ -399,7 +391,11 @@ macro_rules! functionality {
                     TAU,
                     &epk.unwrap(),
                     &message,
-                    &sig, ctx, &oid, &phm, false
+                    &sig,
+                    ctx,
+                    &oid,
+                    &phm,
+                    false,
                 );
                 if res.is_err() {
                     return false;
@@ -414,7 +410,18 @@ macro_rules! functionality {
 
             fn verify(&self, message: &[u8], sig: &Self::Signature, _ctx: &[u8]) -> bool {
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, &[], &[], &[], false
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &self,
+                    &message,
+                    &sig,
+                    &[],
+                    &[],
+                    &[],
+                    false,
                 );
                 if res.is_err() {
                     return false;
@@ -425,7 +432,6 @@ macro_rules! functionality {
             fn hash_verify(&self, _message: &[u8], _sig: &Self::Signature, _ctx: &[u8], _ph: Ph) -> bool {
                 unimplemented!()
             }
-
         }
 
 
@@ -435,8 +441,7 @@ macro_rules! functionality {
             type ByteArray = [u8; PK_LEN];
 
             fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _unused =
-                    pk_decode::<K, PK_LEN>(&pk).map_err(|_e| "Public key deserialization failed");
+                let _unused = pk_decode::<K, PK_LEN>(&pk).map_err(|_e| "Public key deserialization failed");
                 Ok(PublicKey { 0: pk })
             }
 
@@ -448,8 +453,7 @@ macro_rules! functionality {
             type ByteArray = [u8; SK_LEN];
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk)
-                    .map_err(|_e| "Private key deserialization failed");
+                let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
                 Ok(PrivateKey { 0: sk })
             }
 
@@ -469,12 +473,23 @@ macro_rules! functionality {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, &[], &[], &[], false
+                rng,
+                BETA,
+                GAMMA1,
+                GAMMA2,
+                OMEGA,
+                TAU,
+                &esk,
+                message,
+                &[],
+                &[],
+                &[],
+                false,
             )?;
             Ok(sig)
         }
 
-        #[deprecated="Temporary function to allow application of internal nist vectors; will be removed"]
+        #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
         /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
         /// the external API. T
         ///
@@ -485,27 +500,28 @@ macro_rules! functionality {
         /// # Errors
         /// Propagate errors from the `sign_finish()` function (for failing RNG).
         pub fn _internal_sign(
-                            sk: &PrivateKey, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
-            ) -> Result<[u8; SIG_LEN], &'static str> {
-                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
-                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
-                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng,
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &esk,
-                    message,
-                    ctx,
-                    &[],
-                    &[], true
-                )?;
-                Ok(sig)
-            }
+            sk: &PrivateKey, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
+        ) -> Result<[u8; SIG_LEN], &'static str> {
+            ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+            let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
+            let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                rng,
+                BETA,
+                GAMMA1,
+                GAMMA2,
+                OMEGA,
+                TAU,
+                &esk,
+                message,
+                ctx,
+                &[],
+                &[],
+                true,
+            )?;
+            Ok(sig)
+        }
 
-        #[deprecated="Temporary function to allow application of internal nist vectors; will be removed"]
+        #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
         #[must_use]
         /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
         /// the external API.
@@ -515,27 +531,32 @@ macro_rules! functionality {
         /// the last `nist=true` function argument). This is expected to change such that the full API can
         /// be robustly tested - when this happens, this function will no longer be needed.
         pub fn _internal_verify(pk: &PublicKey, message: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8]) -> bool {
-                if ctx.len() > 255 { return false };
-                let epk = ml_dsa::verify_start(&pk.0);
-                if epk.is_err() {
-                    return false;
-                };
-                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &epk.unwrap(),
-                    &message,
-                    &sig, ctx, &[], &[], true
-                );
-                if res.is_err() {
-                    return false;
-                };
-                res.unwrap()
-            }
-
+            if ctx.len() > 255 {
+                return false;
+            };
+            let epk = ml_dsa::verify_start(&pk.0);
+            if epk.is_err() {
+                return false;
+            };
+            let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                BETA,
+                GAMMA1,
+                GAMMA2,
+                OMEGA,
+                TAU,
+                &epk.unwrap(),
+                &message,
+                &sig,
+                ctx,
+                &[],
+                &[],
+                true,
+            );
+            if res.is_err() {
+                return false;
+            };
+            res.unwrap()
+        }
     };
 }
 
