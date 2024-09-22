@@ -5,7 +5,7 @@ use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 #[cfg(feature = "ml-dsa-44")]
 use rand_chacha::rand_core::SeedableRng;
 
-#[ignore]  // TODO: Fix in final update
+#[ignore] // TODO: Fix in final update
 #[cfg(feature = "ml-dsa-44")]
 #[test]
 fn test_browser_message() {

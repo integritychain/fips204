@@ -51,13 +51,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("ml_dsa_65 keygen", |b| b.iter(|| ml_dsa_65::try_keygen_with_rng(&mut rng)));
     c.bench_function("ml_dsa_87 keygen", |b| b.iter(|| ml_dsa_87::try_keygen_with_rng(&mut rng)));
 
-    c.bench_function("ml_dsa_44 sk sign", |b| b.iter(|| sk44.try_sign_with_rng(&mut rng, &msg, &[0])));
-    c.bench_function("ml_dsa_65 sk sign", |b| b.iter(|| sk65.try_sign_with_rng(&mut rng, &msg, &[0])));
-    c.bench_function("ml_dsa_87 sk sign", |b| b.iter(|| sk87.try_sign_with_rng(&mut rng, &msg, &[0])));
+    c.bench_function("ml_dsa_44 sk sign", |b| {
+        b.iter(|| sk44.try_sign_with_rng(&mut rng, &msg, &[0]))
+    });
+    c.bench_function("ml_dsa_65 sk sign", |b| {
+        b.iter(|| sk65.try_sign_with_rng(&mut rng, &msg, &[0]))
+    });
+    c.bench_function("ml_dsa_87 sk sign", |b| {
+        b.iter(|| sk87.try_sign_with_rng(&mut rng, &msg, &[0]))
+    });
 
-    c.bench_function("ml_dsa_44 esk sign", |b| b.iter(|| esk44.try_sign_with_rng(&mut rng, &msg, &[0])));
-    c.bench_function("ml_dsa_65 esk sign", |b| b.iter(|| esk65.try_sign_with_rng(&mut rng, &msg, &[0])));
-    c.bench_function("ml_dsa_87 esk sign", |b| b.iter(|| esk87.try_sign_with_rng(&mut rng, &msg, &[0])));
+    c.bench_function("ml_dsa_44 esk sign", |b| {
+        b.iter(|| esk44.try_sign_with_rng(&mut rng, &msg, &[0]))
+    });
+    c.bench_function("ml_dsa_65 esk sign", |b| {
+        b.iter(|| esk65.try_sign_with_rng(&mut rng, &msg, &[0]))
+    });
+    c.bench_function("ml_dsa_87 esk sign", |b| {
+        b.iter(|| esk87.try_sign_with_rng(&mut rng, &msg, &[0]))
+    });
 
     c.bench_function("ml_dsa_44 pk verify", |b| b.iter(|| pk44.verify(&msg, &sig44, &[0])));
     c.bench_function("ml_dsa_65 pk verify", |b| b.iter(|| pk65.verify(&msg, &sig65, &[0])));

@@ -85,7 +85,7 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
 }
 
 /// Continuation of `sign_start()`
-#[allow(clippy::similar_names, clippy::many_single_char_names, clippy::too_many_arguments)]
+#[allow(clippy::similar_names, clippy::many_single_char_names, clippy::too_many_arguments, clippy::too_many_lines)]
 pub(crate) fn sign_finish<
     const CTEST: bool,
     const K: usize,
@@ -96,7 +96,7 @@ pub(crate) fn sign_finish<
     const W1_LEN: usize,
 >(
     rand_gen: &mut impl CryptoRngCore, beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32,
-    esk: &ExpandedPrivateKey<K, L>, message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8],
+    esk: &ExpandedPrivateKey<K, L>, message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<[u8; SIG_LEN], &'static str> {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
@@ -126,10 +126,11 @@ pub(crate) fn sign_finish<
 
     // 6: µ ← H(tr || M', 512)    ▷ Compute message representative µ
     // We may have arrived via `HashML-DSA.Sign()`
-    let mut h6 = if oid.is_empty() {
-        // From ML-DSA.Sing():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        //h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+    let mut h6 = if nist {
         h_xof(&[tr, message])
+    } else if oid.is_empty() {
+        // From ML-DSA.Sing():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
     } else {
         // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
         h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
@@ -328,7 +329,7 @@ pub(crate) fn verify_finish<
     const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>,
-    m: &[u8], sig: &[u8; SIG_LEN],  ctx: &[u8], oid: &[u8], phm: &[u8]
+    m: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<bool, &'static str> {
     //
     let ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat_mont } = epk;
@@ -369,10 +370,11 @@ pub(crate) fn verify_finish<
 
 
     // 7: µ ← H(tr || M, 512)    ▷ Compute message representative µ
-    let mut h7 = if oid.is_empty() {
-        // From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        // h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])  // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+    let mut h7 = if nist {
         h_xof(&[tr, m])
+    } else if oid.is_empty() {
+        // From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
     } else {
         // From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
         h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])

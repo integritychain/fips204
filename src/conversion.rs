@@ -329,7 +329,6 @@ pub(crate) fn hint_bit_unpack<const K: usize>(
 
         // 7: while Index < y[ω + i] do
         while index < y_bytes[omega_u + i] {
-
             // 8: if Index > First then
             if index > first {
                 //

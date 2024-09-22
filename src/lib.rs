@@ -253,7 +253,7 @@ macro_rules! functionality {
                     message,
                     ctx,
                     &[],
-                    &[],
+                    &[], false
                 )?;
                 Ok(sig)
             }
@@ -286,7 +286,7 @@ macro_rules! functionality {
                     }
                 };
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm, false
                 )?;
                 Ok(sig)
             }
@@ -311,7 +311,7 @@ macro_rules! functionality {
                     message,
                     ctx,
                     &[],
-                    &[],
+                    &[], false
                 )?;
                 Ok(sig)
             }
@@ -331,7 +331,7 @@ macro_rules! functionality {
                     message,
                     ctx,
                     &[],
-                    &[],
+                    &[], false
                 )?;
                 Ok(sig)
             }
@@ -355,7 +355,7 @@ macro_rules! functionality {
                     TAU,
                     &epk.unwrap(),
                     &message,
-                    &sig, ctx, &[], &[]
+                    &sig, ctx, &[], &[], false
                 );
                 if res.is_err() {
                     return false;
@@ -399,7 +399,7 @@ macro_rules! functionality {
                     TAU,
                     &epk.unwrap(),
                     &message,
-                    &sig, ctx, &oid, &phm
+                    &sig, ctx, &oid, &phm, false
                 );
                 if res.is_err() {
                     return false;
@@ -414,7 +414,7 @@ macro_rules! functionality {
 
             fn verify(&self, message: &[u8], sig: &Self::Signature, _ctx: &[u8]) -> bool {
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, &[], &[], &[]
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, &[], &[], &[], false
                 );
                 if res.is_err() {
                     return false;
@@ -469,10 +469,73 @@ macro_rules! functionality {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, &[], &[], &[]
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, &[], &[], &[], false
             )?;
             Ok(sig)
         }
+
+        #[deprecated="Temporary function to allow application of internal nist vectors; will be removed"]
+        /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
+        /// the external API. T
+        ///
+        /// he primary difference pertains to the prepending of domain, context, OID and
+        /// hash information to the message in the `sign_finish()` and `verify_finish()` functions (follow
+        /// the last `nist=true` function argument). This is expected to change such that the full API can
+        /// be robustly tested - when this happens, this function will no longer be needed.
+        /// # Errors
+        /// Propagate errors from the `sign_finish()` function (for failing RNG).
+        pub fn _internal_sign(
+                            sk: &PrivateKey, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
+            ) -> Result<[u8; SIG_LEN], &'static str> {
+                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
+                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    rng,
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &esk,
+                    message,
+                    ctx,
+                    &[],
+                    &[], true
+                )?;
+                Ok(sig)
+            }
+
+        #[deprecated="Temporary function to allow application of internal nist vectors; will be removed"]
+        #[must_use]
+        /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
+        /// the external API.
+        ///
+        /// The primary difference pertains to the prepending of domain, context, OID and
+        /// hash information to the message in the `sign_finish()` and `verify_finish()` functions (follow
+        /// the last `nist=true` function argument). This is expected to change such that the full API can
+        /// be robustly tested - when this happens, this function will no longer be needed.
+        pub fn _internal_verify(pk: &PublicKey, message: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8]) -> bool {
+                if ctx.len() > 255 { return false };
+                let epk = ml_dsa::verify_start(&pk.0);
+                if epk.is_err() {
+                    return false;
+                };
+                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &epk.unwrap(),
+                    &message,
+                    &sig, ctx, &[], &[], true
+                );
+                if res.is_err() {
+                    return false;
+                };
+                res.unwrap()
+            }
+
     };
 }
 
