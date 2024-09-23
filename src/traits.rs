@@ -72,7 +72,9 @@ pub trait KeyGen {
     /// }
     /// # Ok(())}
     /// ```
-    fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
+    fn try_keygen_with_rng(
+        rng: &mut impl CryptoRngCore,
+    ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
     /// Generates an expanded private key from the normal/compressed private key.
     /// This supports improved signing performance. This function operates in constant-time
@@ -82,7 +84,9 @@ pub trait KeyGen {
     /// This function operates on trusted data - either a private key directly from `keygen()`
     /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
     /// symmetry which can propagates internal errors.
-    fn gen_expanded_private(sk: &Self::PrivateKey) -> Result<Self::ExpandedPrivateKey, &'static str>;
+    fn gen_expanded_private(
+        sk: &Self::PrivateKey,
+    ) -> Result<Self::ExpandedPrivateKey, &'static str>;
 
     /// Generates an expanded public key from the normal/compressed public key.
     /// This supports improved verification performance. As this function operates on purely

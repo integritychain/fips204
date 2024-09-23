@@ -1,9 +1,12 @@
 // This file implements functionality from FIPS 204 section 5 Key Generation, 6 Signing, 7 Verification
 
-use crate::encodings::{pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode};
+use crate::encodings::{
+    pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
+};
 use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
 use crate::helpers::{
-    center_mod, full_reduce32, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont, vec_add,
+    center_mod, full_reduce32, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont,
+    vec_add,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -22,7 +25,13 @@ use sha3::digest::XofReader;
 ///
 /// # Errors
 /// Returns an error when the random number generator fails.
-pub(crate) fn key_gen<const CTEST: bool, const K: usize, const L: usize, const PK_LEN: usize, const SK_LEN: usize>(
+pub(crate) fn key_gen<
+    const CTEST: bool,
+    const K: usize,
+    const L: usize,
+    const PK_LEN: usize,
+    const SK_LEN: usize,
+>(
     rng: &mut impl CryptoRngCore, eta: i32,
 ) -> Result<([u8; PK_LEN], [u8; SK_LEN]), &'static str> {
     //
@@ -165,7 +174,8 @@ pub(crate) fn sign_finish<
         };
 
         // 14: w_1 ← HighBits(w)    ▷ Signer’s commitment
-        let w_1: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| high_bits(gamma2, w[k].0[n]))));
+        let w_1: [R; K] =
+            core::array::from_fn(|k| R(core::array::from_fn(|n| high_bits(gamma2, w[k].0[n]))));
 
         // 15: c_tilde ∈ {0,1}^{2·Lambda} ← H(µ || w1Encode(w_1), 2·Lambda)     ▷ Commitment hash
         let mut w1_tilde = [0u8; W1_LEN];
@@ -204,7 +214,9 @@ pub(crate) fn sign_finish<
         };
 
         // 21: z ← y + ⟨⟨c_s_1⟩⟩    ▷ Signer’s response
-        z = core::array::from_fn(|l| R(core::array::from_fn(|n| partial_reduce32(y[l].0[n] + c_s_1[l].0[n]))));
+        z = core::array::from_fn(|l| {
+            R(core::array::from_fn(|n| partial_reduce32(y[l].0[n] + c_s_1[l].0[n])))
+        });
 
         // 22: r0 ← LowBits(w − ⟨⟨c_s_2⟩⟩)
         let r0: [R; K] = core::array::from_fn(|k| {
@@ -267,7 +279,8 @@ pub(crate) fn sign_finish<
     }
 
     // 32: σ ← sigEncode(c_tilde, z mod± q, h)
-    let zmodq: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| center_mod(z[l].0[n]))));
+    let zmodq: [R; L] =
+        core::array::from_fn(|l| R(core::array::from_fn(|n| center_mod(z[l].0[n]))));
     let sig = sig_encode::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde, &zmodq, &h);
 
     // 33: return σ
@@ -320,8 +333,8 @@ pub(crate) fn verify_finish<
     const SIG_LEN: usize,
     const W1_LEN: usize,
 >(
-    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>, m: &[u8],
-    sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>,
+    m: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<bool, &'static str> {
     //
     let ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat_mont } = epk;
@@ -330,7 +343,8 @@ pub(crate) fn verify_finish<
     // --> calculated in verify_start()
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
-    let (c_tilde, z, h): ([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>) = sig_decode(gamma1, omega, sig)?;
+    let (c_tilde, z, h): ([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>) =
+        sig_decode(gamma1, omega, sig)?;
 
     // 3: if h = ⊥ then return false ▷ Hint was not properly encoded
     if h.is_none() {
@@ -388,14 +402,16 @@ pub(crate) fn verify_finish<
         let c_hat: &T = &ntt(&[c])[0];
         inv_ntt(&core::array::from_fn(|k| {
             T(core::array::from_fn(|n| {
-                az_hat[k].0[n] - mont_reduce(i64::from(c_hat.0[n]) * i64::from(t1_d2_hat_mont[k].0[n]))
+                az_hat[k].0[n]
+                    - mont_reduce(i64::from(c_hat.0[n]) * i64::from(t1_d2_hat_mont[k].0[n]))
             }))
         }))
     };
 
     // 11: w′_1 ← UseHint(h, w′_Approx)    ▷ Reconstruction of signer’s commitment
-    let wp_1: [R; K] =
-        core::array::from_fn(|k| R(core::array::from_fn(|n| use_hint(gamma2, h[k].0[n], wp_approx[k].0[n]))));
+    let wp_1: [R; K] = core::array::from_fn(|k| {
+        R(core::array::from_fn(|n| use_hint(gamma2, h[k].0[n], wp_approx[k].0[n])))
+    });
 
     // 12: c_tilde_′ ← H(µ || w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
     let mut tmp = [0u8; W1_LEN];

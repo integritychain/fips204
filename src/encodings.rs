@@ -1,6 +1,8 @@
 // This file implements functionality from FIPS 204 section 8.2 Encodings of ML-DSA Keys and Signatures
 
-use crate::conversion::{bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack};
+use crate::conversion::{
+    bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
+};
 use crate::helpers::{bit_length, is_in_range};
 use crate::types::{R, R0};
 use crate::{D, Q};
@@ -12,7 +14,9 @@ use crate::{D, Q};
 ///
 /// **Input**:  `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}-1]`. <br>
 /// **Output**: Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`.
-pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(rho: &[u8; 32], t1: &[R; K]) -> [u8; PK_LEN] {
+pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
+    rho: &[u8; 32], t1: &[R; K],
+) -> [u8; PK_LEN] {
     let blqd = bit_length(Q - 1) - D as usize;
     debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 16: t1 out of range");
     debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 17: bad pk/config size");
@@ -25,7 +29,11 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(rho: &[u8; 32], t1:
     for i in 0..K {
         //
         // 3: pk ← pk || SimpleBitPack(t1[i], 2^{bitlen(q−1)−d}-1)
-        simple_bit_pack(&t1[i], (1 << blqd) - 1, &mut pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd]);
+        simple_bit_pack(
+            &t1[i],
+            (1 << blqd) - 1,
+            &mut pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd],
+        );
 
         // 4: end for
     }
@@ -62,7 +70,8 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     for i in 0..K {
         //
         // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1))    ▷ This is always in the correct range
-        t1[i] = simple_bit_unpack(&pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd], (1 << blqd) - 1)?;
+        t1[i] =
+            simple_bit_unpack(&pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd], (1 << blqd) - 1)?;
         //
         // 5: end for
     }
@@ -279,7 +288,12 @@ pub(crate) fn sig_encode<
 /// # Errors
 /// Returns an error when decoded coefficients fall out of range.
 #[allow(clippy::type_complexity)]
-pub(crate) fn sig_decode<const K: usize, const L: usize, const LAMBDA_DIV4: usize, const SIG_LEN: usize>(
+pub(crate) fn sig_decode<
+    const K: usize,
+    const L: usize,
+    const LAMBDA_DIV4: usize,
+    const SIG_LEN: usize,
+>(
     gamma1: i32, omega: i32, sigma: &[u8; SIG_LEN],
 ) -> Result<([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>), &'static str> {
     debug_assert_eq!(
@@ -392,7 +406,10 @@ mod tests {
 
     fn get_vec(max: u32) -> R {
         let mut rnd_r = R0; //[0i32; 256];
-        rnd_r.0.iter_mut().for_each(|e| *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap()));
+        rnd_r
+            .0
+            .iter_mut()
+            .for_each(|e| *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap()));
         rnd_r
     }
 
@@ -434,8 +451,10 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut c_tilde);
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
-        let sigma = sig_encode::<false, 4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
-        let (c_test, z_test, h_test) = sig_decode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &sigma).unwrap();
+        let sigma =
+            sig_encode::<false, 4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &c_tilde.clone(), &z, &h);
+        let (c_test, z_test, h_test) =
+            sig_decode::<4, 4, { 128 / 4 }, 2420>(1 << 17, 80, &sigma).unwrap();
         assert_eq!(c_tilde[0..8], c_test[0..8]);
         assert!(z.iter().zip(z_test.iter()).all(|(a, b)| a.0 == b.0));
         assert!(h.iter().zip(h_test.unwrap().iter()).all(|(a, b)| a.0 == b.0));

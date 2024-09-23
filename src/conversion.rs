@@ -72,7 +72,9 @@ pub(crate) fn coeff_from_three_bytes<const CTEST: bool>(bbb: [u8; 3]) -> Result<
 /// # Errors
 /// Returns an error `⊥` on when eta = 4 and b > 8 for rejection sampling. (panics on b > 15)
 #[allow(clippy::cast_possible_truncation)] // rem as u8
-pub(crate) fn coeff_from_half_byte<const CTEST: bool>(eta: i32, b: u8) -> Result<i32, &'static str> {
+pub(crate) fn coeff_from_half_byte<const CTEST: bool>(
+    eta: i32, b: u8,
+) -> Result<i32, &'static str> {
     const M5: u32 = ((1u32 << 24) / 5) + 1;
     debug_assert!((eta == 2) || (eta == 4), "Alg 9: incorrect eta");
     debug_assert!(b < 16, "Alg 9: b out of range"); // Note other cases involving b/eta will fall through to Err()
@@ -238,7 +240,9 @@ pub(crate) fn bit_unpack(v: &[u8], a: i32, b: i32) -> Result<R, &'static str> {
 /// **Input**:  A polynomial vector `h ∈ R^k_2` such that at most `ω` of the coefficients in `h` are equal to `1`.
 ///             Security parameters `ω` (omega) and k must sum to be less than 256. <br>
 /// **Output**: A byte string `y` of length `ω + k`.
-pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(omega: i32, h: &[R; K], y_bytes: &mut [u8]) {
+pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
+    omega: i32, h: &[R; K], y_bytes: &mut [u8],
+) {
     let omega_u = usize::try_from(omega).expect("cannot fail");
     debug_assert!((1..256).contains(&(omega_u + K)), "Alg 14: omega+K out of range");
     debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 14: bad output size");
@@ -297,7 +301,9 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(omega: i32, h: &[
 ///
 /// # Errors
 /// Returns an error on invalid input.
-pub(crate) fn hint_bit_unpack<const K: usize>(omega: i32, y_bytes: &[u8]) -> Result<[R; K], &'static str> {
+pub(crate) fn hint_bit_unpack<const K: usize>(
+    omega: i32, y_bytes: &[u8],
+) -> Result<[R; K], &'static str> {
     let omega_u = usize::try_from(omega).expect("Alg 15: omega try_into fail");
     debug_assert!((1..256).contains(&(omega_u + K)), "Alg 15: omega+K too large");
     debug_assert_eq!(y_bytes.len(), omega_u + K, "Alg 15: bad output size");

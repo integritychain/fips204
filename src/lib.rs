@@ -13,47 +13,60 @@
 //
 #![doc = include_str!("../README.md")]
 
-// Implements FIPS 204 draft Module-Lattice-Based Digital Signature Standard.
-// See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.ipd.pdf>
+// Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
+// See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>
 
-// Functionality map per draft FIPS 204
+// Functionality map per FIPS 204
 //
-// Algorithm 1 ML-DSA.KeyGen() on page 15                 --> ml_dsa.rs
-// Algorithm 2 ML-DSA.Sign(sk,M) on page 17               --> ml_dsa.rs
-// Algorithm 3 ML-DSA.Verify(pk,M,σ) on page 19           --> ml_dsa.rs
-// Algorithm 4 IntegerToBits(x,α) one page 20             --> (optimized away) conversion.rs
-// Algorithm 5 BitsToInteger(y) on page 20                --> (optimized away) conversion.rs
-// Algorithm 6 BitsToBytes(y) on page 21                  --> (optimized away) conversion.rs
-// Algorithm 7 BytesToBits(z) on page 21                  --> (optimized away) conversion.rs
-// Algorithm 8 CoefFromThreeBytes(b0,b1,b2) on page 21    --> conversion.rs
-// Algorithm 9 CoefFromHalfByte(b) on page 22             --> conversion.rs
-// Algorithm 10 SimpleBitPack(w,b) on page 22             --> conversion.rs
-// Algorithm 11 BitPack(w,a,b) on page 22                 --> conversion.rs
-// Algorithm 12 SimpleBitUnpack(v,b) on page 23           --> conversion.rs
-// Algorithm 13 BitUnpack(v,a,b) on page 23               --> conversion.rs
-// Algorithm 14 HintBitPack(h) on page 24                 --> conversion.rs
-// Algorithm 15 HintBitUnpack(y) on page 24               --> conversion.rs
-// Algorithm 16 pkEncode(ρ,t1) on page 25                 --> encodings.rs
-// Algorithm 17 pkDecode(pk) on page 25                   --> encodings.rs
-// Algorithm 18 skEncode(ρ,K,tr,s1,s2,t0) on page 26      --> encodings.rs
-// Algorithm 19 skDecode(sk) on page 27                   --> encodings.rs
-// Algorithm 20 sigEncode(c˜,z,h) on page 28              --> encodings.rs
-// Algorithm 21 sigDecode(σ) on page 28                   --> encodings.rs
-// Algorithm 22 w1Encode(w1) on page 28                   --> encodings.rs
-// Algorithm 23 SampleInBall(ρ) on page 30                --> hashing.rs
-// Algorithm 24 RejNTTPoly(ρ) on page 30                  --> hashing.rs
-// Algorithm 25 RejBoundedPoly(ρ) on page 31              --> hashing.rs
-// Algorithm 26 ExpandA(ρ) on page 31                     --> hashing.rs
-// Algorithm 27 ExpandS(ρ) on page 32                     --> hashing.rs
-// Algorithm 28 ExpandMask(ρ,µ) on page 32                --> hashing.rs
-// Algorithm 29 Power2Round(r) on page 34                 --> high_low.rs
-// Algorithm 30 Decompose(r) on page 34                   --> high_low.rs
-// Algorithm 31 HighBits(r) on page 34                    --> high_low.rs
-// Algorithm 32 LowBits(r) on page 35                     --> high_low.rs
-// Algorithm 33 MakeHint(z,r) on page 35                  --> high_low.rs
-// Algorithm 34 UseHint(h,r) on page 35                   --> high_low.rs
-// Algorithm 35 NTT(w) on page 35                         --> ntt.rs
-// Algorithm 36 NTT−1(wˆ) on page 27                      --> ntt.rs
+// Algorithm 1 ML-DSA.KeyGen() on page 17                   --> lib.rs
+// Algorithm 2 ML-DSA.Sign(sk,M) on page 18                 --> lib.rs
+// Algorithm 3 ML-DSA.Verify(pk,M,s) on page 18             --> lib.rs
+// Algorithm 4 HashML-DSA.Sign(sk,M,ctx,PH) on page 20      --> lib.rs
+// Algorithm 5 HashML-DSA.Verify(sk,M,s,ctx,PH) on page 21  --> lib.rs
+// Algorithm 6 ML-DSA.KeyGen_internal(g) on page 23         --> (refactored) ml_dsa.rs
+// Algorithm 7 ML-DSA.Sign_internal(sk,M',rnd) on page 25   --> (refactored) ml_dsa.rs
+// Algorithm 8 ML-DSA.Verify_internal(pk,M',s) on page 27   --> (refactored) ml_dsa.rs
+// Algorithm 9 IntegerToBits(x,a) one page 28               --> (optimized away) conversion.rs
+// Algorithm 10 BitsToInteger(y,a) on page 28               --> (optimized away) conversion.rs
+// Algorithm 11 IntegerToBytes(x,a) on page 28              --> (optimized away) conversion.rs
+// Algorithm 12 BitsToBytes(y) on page 29                   --> (optimized away) conversion.rs
+// Algorithm 13 BytesToBits(z) on page 29                   --> (optimized away) conversion.rs
+// Algorithm 14 CoefFromThreeBytes(b0,b1,b2) on page 29     --> conversion.rs
+// Algorithm 15 CoefFromHalfByte(b) on page 30              --> conversion.rs
+// Algorithm 16 SimpleBitPack(w,b) on page 30               --> conversion.rs
+// Algorithm 17 BitPack(w,a,b) on page 30                   --> conversion.rs
+// Algorithm 18 SimpleBitUnpack(v,b) on page 31             --> conversion.rs
+// Algorithm 19 BitUnpack(v,a,b) on page 31                 --> conversion.rs
+// Algorithm 20 HintBitPack(h) on page 32                   --> conversion.rs
+// Algorithm 21 HintBitUnpack(y) on page 32                 --> conversion.rs
+// Algorithm 22 pkEncode(ρ,t1) on page 33                   --> encodings.rs
+// Algorithm 23 pkDecode(pk) on page 33                     --> encodings.rs
+// Algorithm 24 skEncode(ρ,K,tr,s1,s2,t0) on page 34        --> encodings.rs
+// Algorithm 25 skDecode(sk) on page 34                     --> encodings.rs
+// Algorithm 26 sigEncode(c˜,z,h) on page 35                --> encodings.rs
+// Algorithm 27 sigDecode(σ) on page 35                     --> encodings.rs
+// Algorithm 28 w1Encode(w1) on page 35                     --> encodings.rs
+// Algorithm 29 SampleInBall(ρ) on page 36                  --> hashing.rs
+// Algorithm 30 RejNTTPoly(ρ) on page 37                    --> hashing.rs
+// Algorithm 31 RejBoundedPoly(ρ) on page 37                --> hashing.rs
+// Algorithm 32 ExpandA(ρ) on page 38                       --> hashing.rs
+// Algorithm 33 ExpandS(ρ) on page 38                       --> hashing.rs
+// Algorithm 34 ExpandMask(ρ,µ) on page 38                  --> hashing.rs
+// Algorithm 35 Power2Round(r) on page 40                   --> high_low.rs
+// Algorithm 36 Decompose(r) on page 40                     --> high_low.rs
+// Algorithm 37 HighBits(r) on page 40                      --> high_low.rs
+// Algorithm 38 LowBits(r) on page 41                       --> high_low.rs
+// Algorithm 39 MakeHint(z,r) on page 41                    --> high_low.rs
+// Algorithm 40 UseHint(h,r) on page 41                     --> high_low.rs
+// Algorithm 41 NTT(w) on page 43                           --> ntt.rs
+// Algorithm 42 NTT−1(wˆ) on page 44                        --> ntt.rs
+// Algorithm 43 BitRev8(m) on page 44                       --> helpers.rs
+// Algorithm 44 AddNTT(a,b)̂ on page 45                      --> helpers.rs
+// Algorithm 45 MultiplyNTT(a,b)̂ on page 45                 --> helpers.rs
+// Algorithm 46 AddVectorNTT(v,w) on page 45                --> helpers.rs
+// Algorithm 47 ScalarVectorNTT(c,v)̂ on page 46             --> helpers.rs
+// Algorithm 48 MatrixVectorNTT(M,v) on page 46             --> helpers.rs
+// Algorithm 49 MontgomeryReduce(a) on page 50              --> helpers.rs
 // Types are in types.rs, traits are in traits.rs...
 
 // Note that debug! statements enforce correct program construction and are not involved
@@ -69,7 +82,6 @@
 // except for the single function (per namespace) `dudect_keygen_sign_with_rng()` which is only
 // exposed when the non-default `dudect` feature is enabled.
 
-use crate::helpers::ensure;
 /// The `rand_core` types are re-exported so that users of fips204 do not
 /// have to worry about using the exact correct version of `rand_core`.
 pub use rand_core::{CryptoRng, Error as RngError, RngCore};
@@ -92,13 +104,12 @@ const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
 const D: u32 = 13; // See table 1 page 13 second row
 
 
-// This common functionality is injected into each security parameter set namespace, and in
-// general is a lightweight wrapper into the ml_dsa functions.
+// This common functionality is injected into each security parameter set namespace, and is
+// largely a lightweight wrapper into the ml_dsa functions.
 macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sk_decode};
-        use crate::ensure;
-        use crate::helpers::bit_length;
+        use crate::helpers::{bit_length, ensure};
         use crate::ml_dsa;
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
         use crate::types::Ph;
@@ -108,7 +119,7 @@ macro_rules! functionality {
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
         const W1_LEN: usize = 32 * K * bit_length((Q - 1) / (2 * GAMMA2) - 1);
-        const CTEST: bool = false; // when true, the logid goes into CT test mode
+        const CTEST: bool = false; // when true, the logic goes into CT test mode
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
@@ -141,14 +152,14 @@ macro_rules! functionality {
 
         // ----- PRIMARY FUNCTIONS ---
 
-        /// Generates a public and private key pair specific to this security parameter set.
+        /// Algorithm 1: Generates a public and private key pair specific to this security parameter set.
         ///
         /// This function utilizes the **OS default** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the OS random
         /// number generator internals, the `rho` value stored in the public key, and the hash-derived
         /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values).
         /// # Errors
-        /// Returns an error when the random number generator fails.
+        /// Returns an error if/when the random number generator fails.
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -160,8 +171,8 @@ macro_rules! functionality {
         /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
         ///
         /// // Generate key pair and signature
-        /// let (pk1, sk) = ml_dsa_44::try_keygen()?; // Generate both public and secret keys
-        /// let sig1 = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
+        /// let (pk1, sk) = ml_dsa_44::try_keygen()?;  // Generate both public and secret keys
+        /// let sig1 = sk.try_sign(&message, &[0])?;  // Use the secret key to generate a message signature
         /// # }
         /// # Ok(())}
         /// ```
@@ -169,7 +180,7 @@ macro_rules! functionality {
         pub fn try_keygen() -> Result<(PublicKey, PrivateKey), &'static str> { KG::try_keygen() }
 
 
-        /// Generates a public and private key pair specific to this security parameter set.
+        /// Algorithm 1: Generates a public and private key pair specific to this security parameter set.
         ///
         /// This function utilizes the **provided** random number generator. This function operates
         /// in constant-time relative to secret data (which specifically excludes the provided random
@@ -206,16 +217,19 @@ macro_rules! functionality {
             type PrivateKey = PrivateKey;
             type PublicKey = PublicKey;
 
+            // Algorithm 1 in KeyGen trait
             fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             }
 
+            // A portion of algorithm 1 in KeyGen trait -- expanded private key for faster signing
             fn gen_expanded_private(sk: &PrivateKey) -> Result<Self::ExpandedPrivateKey, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
                 Ok(esk)
             }
 
+            // A portion of algorithm 1 in KeyGen trait -- expanded public key for faster verification
             fn gen_expanded_public(pk: &PublicKey) -> Result<Self::ExpandedPublicKey, &'static str> {
                 let epk = ml_dsa::verify_start(&pk.0)?;
                 Ok(epk)
@@ -226,24 +240,34 @@ macro_rules! functionality {
         impl Signer for PrivateKey {
             type Signature = [u8; SIG_LEN];
 
-            // This is effectively Algorithm 2 ML-DSA.Sign calling several sub-functions. The split
-            // enables the ability of signing with an pre-computeed expanded public key for
-            // performance (see next function).
+            // Algorithm 2 in Signer trait.
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &[], &[], false,
+                    rng,
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &esk,
+                    message,
+                    ctx,
+                    &[],
+                    &[],
+                    false,
                 )?;
                 Ok(sig)
             }
 
+            // Algorithm 4 in Signer trait.
             fn try_hash_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: Ph,
             ) -> Result<Self::Signature, &'static str> {
-                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+                ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
                 let (oid, phm) = match ph {
                     Ph::SHA256 => {
@@ -278,6 +302,9 @@ macro_rules! functionality {
         impl Signer for ExpandedPrivateKey {
             type Signature = [u8; SIG_LEN];
 
+            // Algorithm 2 in Signer trait. Rather than an external+internal split, this split of
+            // start+finish enables the ability of signing with a pre-computeed expanded private
+            // key for performance.
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
@@ -299,10 +326,13 @@ macro_rules! functionality {
                 Ok(sig)
             }
 
+            // Algorithm 4 in Signer trait. Rather than an external+internal split, this split of
+            // start+finish enables the ability of signing with a pre-computeed expanded private
+            // key for performance.
             fn try_hash_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], _ph: Ph,
             ) -> Result<Self::Signature, &'static str> {
-                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+                ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                     rng,
                     BETA,
@@ -325,6 +355,7 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
+            // Algorithm 3 in Verifier trait.
             fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
                 if ctx.len() > 255 {
                     return false;
@@ -353,6 +384,7 @@ macro_rules! functionality {
                 res.unwrap()
             }
 
+            // Algorithm 5 in Verifier trait.
             fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: Ph) -> bool {
                 if ctx.len() > 255 {
                     return false;
@@ -408,6 +440,9 @@ macro_rules! functionality {
         impl Verifier for ExpandedPublicKey {
             type Signature = [u8; SIG_LEN];
 
+            // Algorithm 3 in Verifier trait. Rather than an external+internal split, this split of
+            // start+finish enables the ability of verifing with a pre-computeed expanded public
+            // key for performance.
             fn verify(&self, message: &[u8], sig: &Self::Signature, _ctx: &[u8]) -> bool {
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA,
@@ -429,6 +464,9 @@ macro_rules! functionality {
                 res.unwrap()
             }
 
+            // Algorithm 5 in Verifier trait. Rather than an external+internal split, this split of
+            // start+finish enables the ability of verifing with a pre-computeed expanded public
+            // key for performance.
             fn hash_verify(&self, _message: &[u8], _sig: &Self::Signature, _ctx: &[u8], _ph: Ph) -> bool {
                 unimplemented!()
             }
@@ -559,8 +597,6 @@ macro_rules! functionality {
         }
     };
 }
-
-// Regarding private key sizes, see https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/EKoI0u_PuOw/m/b02zPvomBAAJ
 
 
 /// Functionality for the **ML-DSA-44** security parameter set.
