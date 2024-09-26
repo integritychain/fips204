@@ -172,7 +172,7 @@ pub trait Signer {
     /// # Errors
     /// Will return an error on rng failure
     fn try_hash_sign_with_rng(
-        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: Ph,
+        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
     ) -> Result<Self::Signature, &'static str>;
 }
 
@@ -205,7 +205,7 @@ pub trait Verifier {
     fn verify(&self, message: &[u8], signature: &Self::Signature, ctx: &[u8]) -> bool;
 
     /// TKTK placeholder
-    fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: Ph) -> bool;
+    fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool;
 }
 
 

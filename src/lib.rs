@@ -109,12 +109,12 @@ const D: u32 = 13; // See table 1 page 13 second row
 macro_rules! functionality {
     () => {
         use crate::encodings::{pk_decode, sk_decode};
+        use crate::hashing::hash_message;
         use crate::helpers::{bit_length, ensure};
         use crate::ml_dsa;
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
         use crate::types::Ph;
         use rand_core::CryptoRngCore;
-        use sha2::{Digest, Sha256};
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
@@ -265,34 +265,14 @@ macro_rules! functionality {
 
             // Algorithm 4 in Signer trait.
             fn try_hash_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: Ph,
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
             ) -> Result<Self::Signature, &'static str> {
                 ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
-                let (oid, phm) = match ph {
-                    Ph::SHA256 => {
-                        let mut hasher = Sha256::new();
-                        hasher.update(message);
-                        (
-                            [
-                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
-                            ],
-                            hasher.finalize(),
-                        )
-                    }
-                    _ => {
-                        let mut hasher = Sha256::new();
-                        hasher.update(message);
-                        (
-                            [
-                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
-                            ],
-                            hasher.finalize(),
-                        )
-                    }
-                };
+                let mut phm = [0u8; 64];  // hashers don't all play well with each other
+                let (oid, phm_len) = hash_message(message, ph, &mut phm);
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm, false,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm[0..phm_len], false,
                 )?;
                 Ok(sig)
             }
@@ -330,22 +310,13 @@ macro_rules! functionality {
             // start+finish enables the ability of signing with a pre-computeed expanded private
             // key for performance.
             fn try_hash_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], _ph: Ph,
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
             ) -> Result<Self::Signature, &'static str> {
                 ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
+                let mut phm = [0u8; 64];  // hashers don't all play well with each other
+                let (oid, phm_len) = hash_message(message, ph, &mut phm);
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng,
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &self,
-                    message,
-                    ctx,
-                    &[],
-                    &[],
-                    false,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], false,
                 )?;
                 Ok(sig)
             }
@@ -385,7 +356,7 @@ macro_rules! functionality {
             }
 
             // Algorithm 5 in Verifier trait.
-            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: Ph) -> bool {
+            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool {
                 if ctx.len() > 255 {
                     return false;
                 };
@@ -393,28 +364,8 @@ macro_rules! functionality {
                 if epk.is_err() {
                     return false;
                 };
-                let (oid, phm) = match ph {
-                    Ph::SHA256 => {
-                        let mut hasher = Sha256::new();
-                        hasher.update(message);
-                        (
-                            [
-                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
-                            ],
-                            hasher.finalize(),
-                        )
-                    }
-                    _ => {
-                        let mut hasher = Sha256::new();
-                        hasher.update(message);
-                        (
-                            [
-                                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
-                            ],
-                            hasher.finalize(),
-                        )
-                    }
-                };
+                let mut phm = [0u8; 64];  // hashers don't all play well with each other
+                let (oid, phm_len) = hash_message(message, ph, &mut phm);
                 let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA,
                     GAMMA1,
@@ -426,7 +377,7 @@ macro_rules! functionality {
                     &sig,
                     ctx,
                     &oid,
-                    &phm,
+                    &phm[0..phm_len],
                     false,
                 );
                 if res.is_err() {
@@ -467,8 +418,30 @@ macro_rules! functionality {
             // Algorithm 5 in Verifier trait. Rather than an external+internal split, this split of
             // start+finish enables the ability of verifing with a pre-computeed expanded public
             // key for performance.
-            fn hash_verify(&self, _message: &[u8], _sig: &Self::Signature, _ctx: &[u8], _ph: Ph) -> bool {
-                unimplemented!()
+            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool {
+                if ctx.len() > 255 {
+                    return false;
+                };
+                let mut phm = [0u8; 64];  // hashers don't all play well with each other
+                let (oid, phm_len) = hash_message(message, ph, &mut phm);
+                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA,
+                    GAMMA1,
+                    GAMMA2,
+                    OMEGA,
+                    TAU,
+                    &self,
+                    &message,
+                    &sig,
+                    ctx,
+                    &oid,
+                    &phm[0..phm_len],
+                    false,
+                );
+                if res.is_err() {
+                    return false;
+                };
+                res.unwrap()
             }
         }
 
@@ -496,6 +469,32 @@ macro_rules! functionality {
             }
 
             fn into_bytes(self) -> Self::ByteArray { self.0 }
+        }
+
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+            use crate::types::Ph;
+            use rand_chacha::rand_core::SeedableRng;
+
+            #[test]
+            fn smoke_test() {
+                let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
+                let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+
+                for _i in 0..100 {
+                    let (pk, sk) = try_keygen_with_rng(&mut rng).unwrap();
+                    let sig = sk.try_sign_with_rng(&mut rng, &message, &[]).unwrap();
+                    let v = pk.verify(&message, &sig, &[]);
+                    assert!(v);
+                    for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
+                        let sig = sk.try_hash_sign_with_rng(&mut rng, &message, &[], &ph).unwrap();
+                        let v = pk.hash_verify(&message, &sig, &[], &ph);
+                        assert!(v);
+                    }
+                }
+            }
         }
 
         // ----- SUPPORT FOR DUDECT CONSTANT TIME MEASUREMENTS ---

@@ -130,15 +130,16 @@ pub(crate) fn sign_finish<
     } = esk;
 
     // 6: µ ← H(tr || M', 512)    ▷ Compute message representative µ
-    // We may have arrived via `HashML-DSA.Sign()`
+    // We may have arrived from 3 different paths
     let mut h6 = if nist {
+        // 1. NIST vectors are being applied to "internal" functions
         h_xof(&[tr, message])
     } else if oid.is_empty() {
-        // From ML-DSA.Sing():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+        // 2. From ML-DSA.Sign():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
     } else {
-        // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+        // 3. From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+        h_xof(&[tr, &[1u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
     };
     let mut mu = [0u8; 64];
     h6.read(&mut mu);
