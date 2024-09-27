@@ -9,8 +9,8 @@ pub fn sign(message: &str) -> String {
     let seed = 123;
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
     let (pk, sk) = ml_dsa_44::try_keygen_with_rng(&mut rng).expect("keygen failed");
-    let sig = sk.try_sign_with_rng(&mut rng, message.as_ref()).expect("sign failed");
-    assert!(pk.verify(message.as_ref(), &sig), "verify failed");
+    let sig = sk.try_sign_with_rng(&mut rng, message.as_ref(), &[]).expect("sign failed");
+    assert!(pk.verify(message.as_ref(), &sig, &[]), "verify failed");
 
     let sk_hex = hex::encode(&sk.into_bytes());
     let sig_hex = hex::encode(&sig);
