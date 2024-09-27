@@ -3,17 +3,9 @@
 use crate::conversion::{bit_unpack, coeff_from_half_byte, coeff_from_three_bytes};
 use crate::helpers::{bit_length, is_in_range};
 use crate::types::{Ph, R, R0, T, T0};
+use sha2::{Digest, Sha256, Sha512};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
-
-// use sha3::Shake256Core;
-// use sha3::digest::core_api::CoreWrapper;
-//
-// pub(crate) fn hhh_xof(v: &[&[u8]]) -> CoreWrapper<Shake256Core> {
-//     let mut hasher = Shake256::default();
-//     v.iter().for_each(|b| hasher.update(b));
-//     hasher
-// }
 
 
 /// # Function H(v,d) of (8.1) on page 29.
@@ -343,48 +335,39 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
 
 pub(crate) fn hash_message(message: &[u8], ph: &Ph, phm: &mut [u8; 64]) -> ([u8; 11], usize) {
     match ph {
-        Ph::SHA256 => {
-            use sha2::{Digest, Sha256};
-            (
-                [
-                    0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
-                ],
-                {
-                    let mut hasher = Sha256::new();
-                    Digest::update(&mut hasher, message); //hasher.update(message);
-                    phm[0..32].copy_from_slice(&hasher.finalize());
-                    32
-                },
-            )
-        }
-        Ph::SHA512 => {
-            use sha2::{Digest, Sha512};
-            (
-                [
-                    0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03,
-                ],
-                {
-                    let mut hasher = Sha512::new();
-                    Digest::update(&mut hasher, message); //hasher.update(message);
-                    phm.copy_from_slice(&hasher.finalize());
-                    64
-                },
-            )
-        }
-        Ph::SHAKE128 => {
-            (
-                [
-                    0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B,
-                ],
-                {
-                    //use sha3::digest::{ExtendableOutput, Update, XofReader}; // some collide with sha2
-                    let mut hasher = Shake128::default();
-                    hasher.update(message);
-                    let mut reader = hasher.finalize_xof();
-                    reader.read(phm);
-                    64
-                },
-            )
-        }
+        Ph::SHA256 => (
+            [
+                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+            ],
+            {
+                let mut hasher = Sha256::new();
+                Digest::update(&mut hasher, message);
+                phm[0..32].copy_from_slice(&hasher.finalize());
+                32
+            },
+        ),
+        Ph::SHA512 => (
+            [
+                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03,
+            ],
+            {
+                let mut hasher = Sha512::new();
+                Digest::update(&mut hasher, message);
+                phm.copy_from_slice(&hasher.finalize());
+                64
+            },
+        ),
+        Ph::SHAKE128 => (
+            [
+                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B,
+            ],
+            {
+                let mut hasher = Shake128::default();
+                hasher.update(message);
+                let mut reader = hasher.finalize_xof();
+                reader.read(phm);
+                64
+            },
+        ),
     }
 }

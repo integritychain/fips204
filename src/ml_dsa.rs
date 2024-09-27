@@ -39,7 +39,7 @@ pub(crate) fn key_gen<
     let mut xi = [0u8; 32];
     rng.try_fill_bytes(&mut xi).map_err(|_| "Random number generator failed")?;
 
-    Ok(key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(eta, xi))
+    Ok(key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(eta, &xi))
 }
 
 
@@ -444,7 +444,7 @@ pub(crate) fn key_gen_internal<
     const PK_LEN: usize,
     const SK_LEN: usize,
 >(
-    eta: i32, xi: [u8; 32],
+    eta: i32, xi: &[u8; 32],
 ) -> ([u8; PK_LEN], [u8; SK_LEN]) {
     //
     // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
@@ -453,7 +453,7 @@ pub(crate) fn key_gen_internal<
 
     // WRONG: 2: (ρ, ρ′, K) ∈ {0,1}^{256} × {0,1}^{512} × {0,1}^{256} ← H(ξ, 1024)    ▷ Expand seed
     // 1: (𝜌, 𝜌′, 𝐾) ∈ 𝔹32 × 𝔹64 × 𝔹32 ← H(𝜉||IntegerToBytes(𝑘, 1)||IntegerToBytes(ℓ, 1), 128)
-    let mut h2 = h_xof(&[&xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
+    let mut h2 = h_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
     let mut rho = [0u8; 32];
     h2.read(&mut rho);
     let mut rho_prime = [0u8; 64];

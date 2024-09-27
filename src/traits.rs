@@ -76,6 +76,40 @@ pub trait KeyGen {
         rng: &mut impl CryptoRngCore,
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
+    /// Generates an public and private key key pair specific to this security parameter set
+    /// based on a provided seed. <br>
+    /// This function operates in constant-time relative to secret data (which specifically excludes
+    /// the the `rho` value stored in the public key and the hash-derived `rho_prime` values that are
+    /// rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(feature = "ml-dsa-44")] {
+    /// use crate::fips204::RngCore;
+    /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, Signer, Verifier};
+    /// use rand_core::OsRng;
+    ///
+    /// // The signor gets the xi seed from the OS random number generator
+    /// let mut xi = [0u8; 32];
+    /// OsRng.fill_bytes(&mut xi);
+    /// ///
+    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    ///
+    /// // Generate key pair and signature
+    /// let (pk, sk) = ml_dsa_44::KG::keygen_from_seed(&xi); // Generate both public and secret keys
+    /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
+    ///
+    /// let res = pk.verify(&message, &sig, &[0]);
+    /// assert!(res); // Signature accepted
+    /// # }
+    /// # Ok(())}
+    /// ```
+    #[must_use]
+    fn keygen_from_seed(_xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey);
+
+
     /// Generates an expanded private key from the normal/compressed private key.
     /// This supports improved signing performance. This function operates in constant-time
     /// relative to secret data (which specifically excludes the provided random `rho`

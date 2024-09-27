@@ -223,6 +223,14 @@ macro_rules! functionality {
                 Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
             }
 
+
+            fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey) {
+                // let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
+                // Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
+                let (pk, sk) = ml_dsa::key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, xi);
+                (PublicKey { 0: pk }, PrivateKey { 0: sk })
+            }
+
             // A portion of algorithm 1 in KeyGen trait -- expanded private key for faster signing
             fn gen_expanded_private(sk: &PrivateKey) -> Result<Self::ExpandedPrivateKey, &'static str> {
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
@@ -247,18 +255,7 @@ macro_rules! functionality {
                 ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
                 let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng,
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &esk,
-                    message,
-                    ctx,
-                    &[],
-                    &[],
-                    false,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &[], &[], false
                 )?;
                 Ok(sig)
             }
@@ -272,7 +269,7 @@ macro_rules! functionality {
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm[0..phm_len], false,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm[0..phm_len], false
                 )?;
                 Ok(sig)
             }
@@ -290,18 +287,7 @@ macro_rules! functionality {
             ) -> Result<Self::Signature, &'static str> {
                 ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng,
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &self,
-                    message,
-                    ctx,
-                    &[],
-                    &[],
-                    false,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], false
                 )?;
                 Ok(sig)
             }
@@ -316,7 +302,7 @@ macro_rules! functionality {
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
                 let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], false,
+                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], false
                 )?;
                 Ok(sig)
             }
@@ -331,28 +317,15 @@ macro_rules! functionality {
                 if ctx.len() > 255 {
                     return false;
                 };
-                let epk = ml_dsa::verify_start(&self.0);
-                if epk.is_err() {
+                let Ok(epk) = ml_dsa::verify_start(&self.0) else {
                     return false;
                 };
-                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &epk.unwrap(),
-                    &message,
-                    &sig,
-                    ctx,
-                    &[],
-                    &[],
-                    false,
-                );
-                if res.is_err() {
+                let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message, &sig, ctx, &[], &[], false
+                ) else {
                     return false;
                 };
-                res.unwrap()
+                res
             }
 
             // Algorithm 5 in Verifier trait.
@@ -360,30 +333,17 @@ macro_rules! functionality {
                 if ctx.len() > 255 {
                     return false;
                 };
-                let epk = ml_dsa::verify_start(&self.0);
-                if epk.is_err() {
+                let Ok(epk) = ml_dsa::verify_start(&self.0) else {
                     return false;
                 };
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &epk.unwrap(),
-                    &message,
-                    &sig,
-                    ctx,
-                    &oid,
-                    &phm[0..phm_len],
-                    false,
-                );
-                if res.is_err() {
+                let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message,  &sig, ctx, &oid, &phm[0..phm_len], false
+                ) else {
                     return false;
                 };
-                res.unwrap()
+                res
             }
         }
 

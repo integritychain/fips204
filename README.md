@@ -54,14 +54,15 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 
 ## Notes
 
-* This crate is fully functional and corresponds to FIPS 204 (August 13, 2024).    
+* This crate is fully functional and corresponds to FIPS 204 (August 13, 2024).
+* **BEWARE:** As of September 27, 2024 NIST has not release external/hash test vectors!
 * Constant-time assurances target the source-code level only on MSRV, with confirmation via
   manual review/inspection, the embedded target, and the `dudect` dynamic tests.
 * Note that FIPS 204 places specific requirements on randomness per section 3.5.1, hence the exposed `RNG`.
 * Requires Rust **1.70** or higher. The minimum supported Rust version may be changed in the future, but 
   it will be done with a minor version bump (when the major version is larger than 0)..
 * All on-by-default features of this library are covered by `SemVer`.
-* The FIPS 204 standard and this software is considered experimental -- USE AT YOUR OWN RISK!
+* The FIPS 204 standard and this software should be considered experimental -- USE AT YOUR OWN RISK!
 
 ## License
 
