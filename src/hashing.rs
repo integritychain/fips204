@@ -377,7 +377,7 @@ pub(crate) fn hash_message(message: &[u8], ph: &Ph, phm: &mut [u8; 64]) -> ([u8;
                     0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B,
                 ],
                 {
-                    use sha3::digest::{ExtendableOutput, Update, XofReader}; // some collide with sha2
+                    //use sha3::digest::{ExtendableOutput, Update, XofReader}; // some collide with sha2
                     let mut hasher = Shake128::default();
                     hasher.update(message);
                     let mut reader = hasher.finalize_xof();
