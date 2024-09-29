@@ -57,9 +57,12 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8]) -> R {
 
     // 6: for 𝑖 from 256 − 𝜏 to 255 do
     for i in (256 - tau)..=255 {
+        //
         // 7: (ctx, 𝑗) ← H.Squeeze(ctx, 1)
-        let mut j = [i.to_le_bytes()[0]];  // remove timing variability
-        if !CTEST { h_ctx.read(&mut j) };  // ..
+        let mut j = [i.to_le_bytes()[0]]; // remove timing variability
+        if !CTEST {
+            h_ctx.read(&mut j);
+        };
 
         // 8: while 𝑗 > 𝑖 do
         while usize::from(j[0]) > i {
@@ -286,7 +289,6 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
     for r in 0..u16::try_from(L).expect("cannot fail") {
         //
         // 3: n ← IntegerToBits(µ + r, 16)
-        // debug_assert!((mu + r < 1024), "Alg 28: mu + r out of range");   // arbitrary limit not needed
         let n = mu + r; // This will perform overflow check in debug, which removes need for above assert
 
         // 4: v ← (H(ρ || n)[[32rc]], H(ρ || n)[[32rc+1]], ..., H(ρ || n)[[32rc+32c − 1]])

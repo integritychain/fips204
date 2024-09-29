@@ -13,6 +13,8 @@
 //
 #![doc = include_str!("../README.md")]
 
+// TODO: Internal code comment alignment with release spec is underway...
+
 // Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>
 
@@ -453,9 +455,9 @@ macro_rules! functionality {
 
         #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
         /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
-        /// the external API. T
+        /// the external API.
         ///
-        /// he primary difference pertains to the prepending of domain, context, OID and
+        /// The primary difference pertains to the prepending of domain, context, OID and
         /// hash information to the message in the `sign_finish()` and `verify_finish()` functions (follow
         /// the last `nist=true` function argument). This is expected to change such that the full API can
         /// be robustly tested - when this happens, this function will no longer be needed.
@@ -510,7 +512,7 @@ macro_rules! functionality {
 /// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
 /// functions to sign byte-array messages, such as [`traits::Signer::try_sign()`].
 ///
-/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
+/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait.
 /// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
 /// into byte-arrays for storage and/or transmission, similar to the message. Upon retrieval and/or receipt,
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the

@@ -107,7 +107,7 @@ pub trait KeyGen {
     /// # Ok(())}
     /// ```
     #[must_use]
-    fn keygen_from_seed(_xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey);
+    fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey);
 
 
     /// Generates an expanded private key from the normal/compressed private key.
@@ -202,7 +202,14 @@ pub trait Signer {
         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 
-    /// TKTKT placeholder
+    /// Attempt to sign the hash of the given message, returning a digital signature on success,
+    /// or an error if something went wrong. This function utilizes the **provided** random number
+    /// generator and allows for several hash algorithms. This function operates in constant-time
+    /// relative to secret data (which specifically excludes the provided random number generator
+    /// internals, the `rho` value (also) stored in the public key, the hash-derived `rho_prime`
+    /// value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values, and the
+    /// main signing rejection loop as noted in section 5.5 of
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     /// # Errors
     /// Will return an error on rng failure
     fn try_hash_sign_with_rng(
@@ -217,8 +224,8 @@ pub trait Verifier {
     /// or ml-dsa-87
     type Signature;
 
-    /// Verifies a digital signature with respect to a `PublicKey`. As this function operates on
-    /// purely public data, it need/does not provide constant-time assurances.
+    /// Verifies a digital signature on a message with respect to a `PublicKey`. As this function
+    /// operates on purely public data, it need/does not provide constant-time assurances.
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -238,7 +245,8 @@ pub trait Verifier {
     /// ```
     fn verify(&self, message: &[u8], signature: &Self::Signature, ctx: &[u8]) -> bool;
 
-    /// TKTK placeholder
+    /// Verifies a digital signature on the hash of a message with respect to a `PublicKey`. As this
+    /// function operates on purely public data, it need/does not provide constant-time assurances.
     fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool;
 }
 
