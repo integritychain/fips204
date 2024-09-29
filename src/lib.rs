@@ -355,24 +355,12 @@ macro_rules! functionality {
             // start+finish enables the ability of verifing with a pre-computeed expanded public
             // key for performance.
             fn verify(&self, message: &[u8], sig: &Self::Signature, _ctx: &[u8]) -> bool {
-                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &self,
-                    &message,
-                    &sig,
-                    &[],
-                    &[],
-                    &[],
-                    false,
-                );
-                if res.is_err() {
+                let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, &[], &[], &[], false
+                ) else {
                     return false;
-                }
-                res.unwrap()
+                };
+                res
             }
 
             // Algorithm 5 in Verifier trait. Rather than an external+internal split, this split of
@@ -384,24 +372,12 @@ macro_rules! functionality {
                 };
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA,
-                    GAMMA1,
-                    GAMMA2,
-                    OMEGA,
-                    TAU,
-                    &self,
-                    &message,
-                    &sig,
-                    ctx,
-                    &oid,
-                    &phm[0..phm_len],
-                    false,
-                );
-                if res.is_err() {
+                let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
+                ) else {
                     return false;
                 };
-                res.unwrap()
+                res
             }
         }
 
@@ -470,18 +446,7 @@ macro_rules! functionality {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng,
-                BETA,
-                GAMMA1,
-                GAMMA2,
-                OMEGA,
-                TAU,
-                &esk,
-                message,
-                &[],
-                &[],
-                &[],
-                false,
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, &[1], &[2], &[3], false
             )?;
             Ok(sig)
         }
@@ -502,18 +467,7 @@ macro_rules! functionality {
             ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
             let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
             let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng,
-                BETA,
-                GAMMA1,
-                GAMMA2,
-                OMEGA,
-                TAU,
-                &esk,
-                message,
-                ctx,
-                &[],
-                &[],
-                true,
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &[], &[], true
             )?;
             Ok(sig)
         }
@@ -531,28 +485,15 @@ macro_rules! functionality {
             if ctx.len() > 255 {
                 return false;
             };
-            let epk = ml_dsa::verify_start(&pk.0);
-            if epk.is_err() {
+            let Ok(epk) = ml_dsa::verify_start(&pk.0) else {
                 return false;
             };
-            let res = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                BETA,
-                GAMMA1,
-                GAMMA2,
-                OMEGA,
-                TAU,
-                &epk.unwrap(),
-                &message,
-                &sig,
-                ctx,
-                &[],
-                &[],
-                true,
-            );
-            if res.is_err() {
+            let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message, &sig, ctx, &[], &[], true
+            ) else {
                 return false;
             };
-            res.unwrap()
+            res
         }
     };
 }

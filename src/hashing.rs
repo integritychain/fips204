@@ -58,8 +58,8 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8]) -> R {
     // 6: for 𝑖 from 256 − 𝜏 to 255 do
     for i in (256 - tau)..=255 {
         // 7: (ctx, 𝑗) ← H.Squeeze(ctx, 1)
-        let mut j = [0u8];
-        h_ctx.read(&mut j);
+        let mut j = [i.to_le_bytes()[0]];  // remove timing variability
+        if !CTEST { h_ctx.read(&mut j) };  // ..
 
         // 8: while 𝑗 > 𝑖 do
         while usize::from(j[0]) > i {
@@ -80,31 +80,6 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8]) -> R {
 
         // 13: end for
     }
-
-
-    // 2: k ← 8; k implicitly advances with each sample
-    //let mut hpk = [0u8];
-
-    // 3: for i from 256 − τ to 255 do
-    //
-    // 4: while H(ρ)[[k]] > i do
-    // 5: k ← k + 1
-    // 6: end while
-    // The above/below loop reads xof bytes until less than or equal to i
-    // loop {
-    //     xof.read(&mut hpk); // Every 'read' effectively contains k = k + 1
-    //     if CTEST {
-    //         hpk[0] = i.to_le_bytes()[0];
-    //     }
-    //     if hpk[0] <= i.to_le_bytes()[0] {
-    //         break;
-    //     }
-    // }
-
-    // 7: j ← H(ρ)[[k]] ▷ j is a pseudorandom byte that is ≤ i
-    //let j = hpk[0];
-
-    // 10: k ← k + 1   (implicit)
 
     // slightly redundant...
     debug_assert!(

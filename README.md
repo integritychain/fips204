@@ -55,7 +55,7 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to FIPS 204 (August 13, 2024).
-* **BEWARE:** As of September 27, 2024 NIST has not release external/hash test vectors!
+* **BEWARE:** As of September 27, 2024 NIST has not released external/hash test vectors!
 * Constant-time assurances target the source-code level only on MSRV, with confirmation via
   manual review/inspection, the embedded target, and the `dudect` dynamic tests.
 * Note that FIPS 204 places specific requirements on randomness per section 3.5.1, hence the exposed `RNG`.

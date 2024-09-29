@@ -2,7 +2,7 @@ workspace = { exclude = ["ct_cm4", "dudect", "fuzz", "wasm"] }
 
 [package]
 name = "fips204"
-version = "0.2.2"
+version = "0.4.0"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
 description = "FIPS 204 (draft): Module-Lattice-Based Digital Signature"
 categories = ["cryptography", "no-std"]

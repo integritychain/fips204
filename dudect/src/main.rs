@@ -2,10 +2,10 @@ use dudect_bencher::{ctbench_main, BenchRng, Class, CtRunner};
 use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
 use rand_core::{CryptoRng, RngCore};
 
-// Test RNG to regurgitate incremented values when 'asked'
+// Simplistic RNG to regurgitate set value
 #[derive(Clone)]
 #[repr(align(8))]
-struct TestRng { value: u32 }
+struct TestRng([u8; 32]);
 
 impl RngCore for TestRng {
     fn next_u32(&mut self) -> u32 { unimplemented!() }
@@ -15,9 +15,7 @@ impl RngCore for TestRng {
     fn fill_bytes(&mut self, _out: &mut [u8]) { unimplemented!() }
 
     fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
-        out.iter_mut().for_each(|b| *b = self.value.to_le_bytes()[0]);
-        out[0..4].copy_from_slice(&self.value.to_be_bytes());
-        self.value = self.value.wrapping_add(1);
+        out.copy_from_slice(&self.0);
         Ok(())
     }
 }
@@ -25,27 +23,33 @@ impl RngCore for TestRng {
 impl CryptoRng for TestRng {}
 
 
+#[repr(align(8))]
+pub struct AlignedBytes<const BYTE_LEN: usize>(pub(crate) [u8; BYTE_LEN]);
+
 
 fn keygen_and_sign(runner: &mut CtRunner, mut _rng: &mut BenchRng) {
     const ITERATIONS_INNER: usize = 5;
-    const ITERATIONS_OUTER: usize = 200_000;
+    const ITERATIONS_OUTER: usize = 2_000_000;
 
-    let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    let message = AlignedBytes::<8>([0u8, 1, 2, 3, 4, 5, 6, 7]);
+    let z_left = AlignedBytes::<32>([0xAAu8; 32]);
+    let z_right = AlignedBytes::<32>([0x55u8; 32]);
 
-    let mut classes = [Class::Right; ITERATIONS_OUTER];
-    let mut rngs: [TestRng; ITERATIONS_OUTER] = core::array::from_fn(|_| TestRng {value: 12});
+
+    let mut classes = vec![Class::Right; ITERATIONS_OUTER];
+    let mut z_refs = vec![&z_right.0; ITERATIONS_OUTER];
 
     // Interleave left and right
     for i in (0..ITERATIONS_OUTER).step_by(2) {
         classes[i] = Class::Left;
-        rngs[i] = TestRng {value: 56}; // <--- different seed value
+        z_refs[i] = &z_left.0;
     }
 
-    for (class, rng) in classes.into_iter().zip(rngs.into_iter()) {
+    for (class, z) in classes.into_iter().zip(z_refs.into_iter()) {
         runner.run_one(class, || {
-            let mut rng = rng.clone();
+            let mut rng = TestRng(*z); // regurgitates z as rng
             for _ in 0..ITERATIONS_INNER {
-                let _ = ml_dsa_44::dudect_keygen_sign_with_rng(&mut rng, &message).unwrap();
+                let _ = ml_dsa_44::dudect_keygen_sign_with_rng(&mut rng, &message.0);
             }
         })
     }
