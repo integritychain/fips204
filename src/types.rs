@@ -1,11 +1,16 @@
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+
 /// Supported hash functions for `hash_sign()` and `hash_verify()` functions
 pub enum Ph {
+    /// Use SHA256 as the pre-hash function
     SHA256,
+    /// Use SHA512 as the pre-hash function
     SHA512,
+    /// Use Shake128 as the pre-hash function
     SHAKE128,
 }
+
 
 /// Correctly sized private key specific to the target security parameter set. <br>
 /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.

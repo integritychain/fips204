@@ -99,6 +99,7 @@ mod types;
 
 /// All functionality is covered by traits, such that consumers can utilize trait objects as desired.
 pub mod traits;
+pub use crate::types::Ph;
 
 // Applies across all security parameter sets
 const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; See https://oeis.org/A234388
