@@ -342,8 +342,8 @@ pub(crate) fn hash_message(message: &[u8], ph: &Ph, phm: &mut [u8; 64]) -> ([u8;
                 let mut hasher = Shake128::default();
                 hasher.update(message);
                 let mut reader = hasher.finalize_xof();
-                reader.read(phm);
-                64
+                reader.read(&mut phm[0..32]);
+                32
             },
         ),
     }

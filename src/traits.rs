@@ -137,6 +137,8 @@ pub trait KeyGen {
 pub trait Signer {
     /// The signature is specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
     type Signature;
+    /// The public key that corresponds to the private/secret key
+    type PublicKey;
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **OS default** random number generator.
@@ -215,6 +217,28 @@ pub trait Signer {
     fn try_hash_sign_with_rng(
         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
     ) -> Result<Self::Signature, &'static str>;
+
+
+    /// Retrieves the public key associated with this private/secret key
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    ///
+    ///
+    /// // Generate both public and secret keys
+    /// let (pk1, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
+    ///
+    ///
+    /// // The public key can be derived from the secret key
+    /// let pk2 = sk.get_public_key();
+    /// assert_eq!(pk1.into_bytes(), pk2.into_bytes());
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn get_public_key(&self) -> Self::PublicKey;
 }
 
 

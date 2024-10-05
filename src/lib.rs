@@ -250,6 +250,7 @@ macro_rules! functionality {
 
         impl Signer for PrivateKey {
             type Signature = [u8; SIG_LEN];
+            type PublicKey = PublicKey;
 
             // Algorithm 2 in Signer trait.
             fn try_sign_with_rng(
@@ -276,11 +277,18 @@ macro_rules! functionality {
                 )?;
                 Ok(sig)
             }
+
+            // Documented in traits.rs
+            fn get_public_key(&self) -> Self::PublicKey {
+                let pk = crate::ml_dsa::private_to_public::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, &self.0);
+                PublicKey { 0: pk }
+            }
         }
 
 
         impl Signer for ExpandedPrivateKey {
             type Signature = [u8; SIG_LEN];
+            type PublicKey = [u8; PK_LEN];
 
             // Algorithm 2 in Signer trait. Rather than an external+internal split, this split of
             // start+finish enables the ability of signing with a pre-computeed expanded private
@@ -308,6 +316,11 @@ macro_rules! functionality {
                     rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], false
                 )?;
                 Ok(sig)
+            }
+
+            // Documented in traits.rs
+            fn get_public_key(&self) -> Self::PublicKey {
+                unimplemented!()  // Note that ExpandedPublicKey does not currently contain Rho
             }
         }
 
@@ -420,18 +433,20 @@ macro_rules! functionality {
             #[test]
             fn smoke_test() {
                 let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
-                let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+                let message1 = [0u8, 1, 2, 3, 4, 5, 6, 7];
+                let message2 = [7u8, 7, 7, 7, 7, 7, 7, 7];
 
-                for _i in 0..100 {
+                for _i in 0..32 {
                     let (pk, sk) = try_keygen_with_rng(&mut rng).unwrap();
-                    let sig = sk.try_sign_with_rng(&mut rng, &message, &[]).unwrap();
-                    let v = pk.verify(&message, &sig, &[]);
-                    assert!(v);
+                    let sig = sk.try_sign_with_rng(&mut rng, &message1, &[]).unwrap();
+                    assert!(pk.verify(&message1, &sig, &[]));
+                    assert!(!pk.verify(&message2, &sig, &[]));
                     for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
-                        let sig = sk.try_hash_sign_with_rng(&mut rng, &message, &[], &ph).unwrap();
-                        let v = pk.hash_verify(&message, &sig, &[], &ph);
+                        let sig = sk.try_hash_sign_with_rng(&mut rng, &message1, &[], &ph).unwrap();
+                        let v = pk.hash_verify(&message1, &sig, &[], &ph);
                         assert!(v);
                     }
+                    assert_eq!(pk.into_bytes(), sk.get_public_key().into_bytes());
                 }
             }
         }

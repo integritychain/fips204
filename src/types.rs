@@ -54,7 +54,7 @@ pub struct ExpandedPublicKey<const K: usize, const L: usize> {
 
 
 /// Polynomial coefficients in R, with default R0
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, Debug, PartialEq, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub(crate) struct R(pub(crate) [i32; 256]);
 pub(crate) const R0: R = R([0i32; 256]);

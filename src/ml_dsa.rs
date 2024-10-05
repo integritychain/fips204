@@ -428,6 +428,7 @@ pub(crate) fn verify_finish<
     Ok(left && center && right)
 }
 
+
 /// Algorithm: 6 `ML-DSA.KeyGen_internal()` on page 15.
 /// Generates a public-private key pair.
 ///
@@ -491,4 +492,41 @@ pub(crate) fn key_gen_internal<
 
     // 10: return (pk, sk)
     (pk, sk)
+}
+
+
+pub(crate) fn private_to_public<
+    const CTEST: bool,
+    const K: usize,
+    const L: usize,
+    const PK_LEN: usize,
+    const SK_LEN: usize,
+>(
+    eta: i32, sk: &[u8; SK_LEN],
+) -> [u8; PK_LEN] {
+    //
+    // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
+    // Code can only arrive here from keygen or a deserialized and validated sk
+    let (rho, _cap_k, _tr, s_1, s_2, sk_t_0) = sk_decode(eta, sk).unwrap();
+
+    // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
+    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
+
+    // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
+    let t: [R; K] = {
+        let s_1_hat: [T; L] = ntt(&s_1);
+        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        let t_not_reduced: [R; K] = vec_add(&inv_ntt(&as1_hat), &s_2);
+        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
+    };
+
+    // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
+    let (t_1, pk_t_0): ([R; K], [R; K]) = power2round(&t);
+    debug_assert_eq!(sk_t_0, pk_t_0); // fuzz target
+
+    // 7: pk ← pkEncode(ρ, t_1)
+    let pk: [u8; PK_LEN] = pk_encode(rho, &t_1);
+
+    // 10: return (pk) # , sk)
+    pk
 }
