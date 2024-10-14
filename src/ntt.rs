@@ -5,12 +5,12 @@ use crate::types::{R, T};
 use crate::Q;
 
 
-/// # Algorithm 35 NTT(w) on page 36.
+/// # Algorithm 41 NTT(w) on page 43.
 /// Computes the Number-Theoretic Transform. An inner loop over `w/w_hat` has
 /// been refactored into this function, so it processes an array of elements.
 ///
-/// **Input**: polynomial `w(X) = ∑_{j=0}^{255} w_j X^j ∈ Rq` <br>
-/// **Output**: `w_hat = (w_hat[0], ... , w_hat[255]) ∈ Tq`
+/// **Input**: polynomial `w(X) = ∑_{j=0}^{255} w_j X^j ∈ R_q` <br>
+/// **Output**: `w_hat = (w_hat[0], ... , w_hat[255]) ∈ T_q`
 pub(crate) fn ntt<const KL: usize>(w: &[R; KL]) -> [T; KL] {
     // 1: for j from 0 to 255 do
     // 2: w_hat[j] ← w_j
@@ -20,8 +20,8 @@ pub(crate) fn ntt<const KL: usize>(w: &[R; KL]) -> [T; KL] {
     // for each element of w_hat
     for w_poly in &mut w_hat {
         //
-        // 4: k ← 0
-        let mut k = 0;
+        // 4: m ← 0
+        let mut m = 0;
 
         // 5: len ← 128
         let mut len = 128;
@@ -35,11 +35,11 @@ pub(crate) fn ntt<const KL: usize>(w: &[R; KL]) -> [T; KL] {
             // 8: while start < 256 do
             while start < 256 {
                 //
-                // 9: k ← k + 1
-                k += 1;
+                // 9: m ← m + 1
+                m += 1;
 
                 // 10: zeta ← ζ^{brv(k)} mod q
-                let zeta = i64::from(ZETA_TABLE_MONT[k]);
+                let zeta = i64::from(ZETA_TABLE_MONT[m]);
 
                 // 11: for j from start to start + len − 1 do
                 for j in start..(start + len) {
@@ -76,16 +76,16 @@ pub(crate) fn ntt<const KL: usize>(w: &[R; KL]) -> [T; KL] {
 }
 
 
-/// # Algorithm 36 NTT−1 (`w_hat`) on page 37.
+/// # Algorithm 42 NTT−1 (`w_hat`) on page 44.
 /// Computes the inverse of the Number-Theoretic Transform. An inner loop over `w/w_hat` has
 /// been refactored into this function, so it processes an array of elements.
 ///
-/// **Input**: `w_hat` = `(w_hat[0], . . . , w_hat[255]) ∈ Tq` <br>
-/// **Output**: polynomial `w(X) = ∑_{j=0}^{255} w_j X^j ∈ Rq`
+/// **Input**: `w_hat` = `(w_hat[0], . . . , w_hat[255]) ∈ T_q` <br>
+/// **Output**: polynomial `w(X) = ∑_{j=0}^{255} w_j X^j ∈ R_q`
 pub(crate) fn inv_ntt<const KL: usize>(w_hat: &[T; KL]) -> [R; KL] {
     //
     #[allow(clippy::cast_possible_truncation)]
-    const F: i64 = 8_347_681_i128.wrapping_mul(1 << 32).rem_euclid(Q as i128) as i64;
+    const F_MONT: i64 = 8_347_681_i128.wrapping_mul(1 << 32).rem_euclid(Q as i128) as i64;
     //
     // 1: for j from 0 to 255 do
     // 2: w_j ← w_hat[j]
@@ -95,8 +95,8 @@ pub(crate) fn inv_ntt<const KL: usize>(w_hat: &[T; KL]) -> [R; KL] {
     // for each element of w_hat
     for w_poly in &mut w_out {
         //
-        // 4: k ← 256
-        let mut k = 256;
+        // 4: m ← 256
+        let mut m = 256;
 
         // 5: len ← 1
         let mut len = 1;
@@ -110,11 +110,11 @@ pub(crate) fn inv_ntt<const KL: usize>(w_hat: &[T; KL]) -> [R; KL] {
             // 8: while start < 256 do
             while start < 256 {
                 //
-                // 9: k ← k − 1
-                k -= 1;
+                // 9: m ← m − 1
+                m -= 1;
 
-                // 10: zeta ← −ζ^{brv(k)} mod q
-                let zeta = -ZETA_TABLE_MONT[k];
+                // 10: zeta ← −ζ^{brv(k)} mod q    ▷ 𝑧 ← −𝜁 BitRev8 (𝑚) mod 𝑞
+                let zeta = -ZETA_TABLE_MONT[m];
 
                 // 11: for j from start to start + len − 1 do
                 for j in start..(start + len) {
@@ -150,7 +150,7 @@ pub(crate) fn inv_ntt<const KL: usize>(w_hat: &[T; KL]) -> [R; KL] {
         // 22: for j from 0 to 255 do
         // 23: wj ← f · wj
         for i in &mut w_poly.0 {
-            *i = full_reduce32(mont_reduce(F * i64::from(*i)));
+            *i = full_reduce32(mont_reduce(F_MONT * i64::from(*i)));
         }
 
         // 24: end for

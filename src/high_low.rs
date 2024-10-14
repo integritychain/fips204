@@ -1,4 +1,4 @@
-// This file implements functionality from FIPS 204 section 8.4 High Order / Low Order Bits and Hints
+// This file implements functionality from FIPS 204 section 7.4 High-Order and Low-Order Bits and Hints
 
 use crate::helpers::full_reduce32;
 use crate::types::{Zq, R};
@@ -7,25 +7,30 @@ use crate::{D, Q};
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
 
 
-/// # Algorithm 29: `Power2Round(r)` on page 33/34 applied over all coefficients of K polys.
+/// # Algorithm 35: `Power2Round(r)` on page 40, but applied over all coefficients of K polys.
 /// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·2^d + r0 mod q`.
 ///
-/// **Input**: `r ∈ Zq`. <br>
+/// **Input**: `r ∈ Z_q`. <br>
 /// **Output**: Integers `(r1, r0)`.
 pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
     // 1: r+ ← r mod q
     // 2: r0 ← r+ mod±2^d
     // 3: return ((r+ − r0)/2^d, r0)
+
+    // Check input ranges
     debug_assert!(
         r.iter().flat_map(|row| row.0).all(|element| (0..Q).contains(&element)),
         "power2round input"
     );
+
     let r_1: [R; K] = core::array::from_fn(|k| {
         R(core::array::from_fn(|n| (r[k].0[n] + (1 << (D - 1)) - 1) >> D))
     });
+
     let r_0: [R; K] =
         core::array::from_fn(|k| R(core::array::from_fn(|n| r[k].0[n] - (r_1[k].0[n] << D))));
 
+    // Check output reconstruction
     debug_assert!(
         {
             let mut result = true;
@@ -36,18 +41,19 @@ pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
             }
             result
         },
-        "Alg 29: fail"
+        "Alg 35: fails"
     );
 
     (r_1, r_0)
 }
 
 
-/// # Algorithm 30: `Decompose(r)` on page 34.
-/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·(2·γ_2) + r0 mod q`. If using the
-/// 'centered' `r0` yields `r1 = (q - 1)/(2*gamma2)` then the result should be adjusted
-/// by setting `r1` to `0`, and subtracting `1` from `r0`. In practice, this happens
-/// only with one input value of `rp` for each possible `gamma2`: <br>
+/// # Algorithm 36: `Decompose(r)` on page 40.
+/// Decomposes `r` into `(r1, r0)` such that `r ≡ r1·(2·γ_2) + r0 mod q`.
+///
+/// If using the 'centered' `r0` yields `r1 = (q - 1)/(2*gamma2)` then the result should
+/// be adjusted by setting `r1` to `0`, and subtracting `1` from `r0`. In practice, this
+/// happens only with one input value of `rp` for each possible `gamma2`: <br>
 /// `        gamma2        rp      r0'   r1'        r0     r1` <br>
 /// `         95232   8285185   -95231    44    -95232      0` <br>
 /// `        261888   8118529  -261887    16   -261888      0` <br>
@@ -55,7 +61,7 @@ pub(crate) fn power2round<const K: usize>(r: &[R; K]) -> ([R; K], [R; K]) {
 /// `r1'` is `rp - 2*gamma2*r0`. Values `(r0,r1)` are the value that just be returned in
 /// that case.
 ///
-/// **Input**: `r ∈ Zq` <br>
+/// **Input**: `r ∈ Z_q` <br>
 /// **Output**: Integers `(r1, r0)`.
 pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     // 1: r+ ← r mod q
@@ -83,17 +89,18 @@ pub(crate) fn decompose(gamma2: i32, r: Zq) -> (Zq, Zq) {
     let xr0 = rp - xr1 * 2 * gamma2;
     let xr0 = xr0 - ((((Q - 1) / 2 - xr0) >> 31) & Q);
 
-    debug_assert_eq!(r.rem_euclid(Q), (xr1 * 2 * gamma2 + xr0).rem_euclid(Q), "Alg 30: fail");
+    // Reconstruct/validate outputs
+    debug_assert_eq!(r.rem_euclid(Q), (xr1 * 2 * gamma2 + xr0).rem_euclid(Q), "Alg 36: fails");
 
     (xr1, xr0)
 }
 
 
-/// # Algorithm 31: `HighBits(r)` on page 34.
+/// # Algorithm 37: `HighBits(r)` on page 40.
 /// Returns `r1` from the output of `Decompose(r)`.
 ///
-/// **Input**: `r ∈ Zq` <br>
-/// **Output**: Integer `r1`.
+/// **Input**: `r ∈ Z_q` <br>
+/// **Output**: Integer `r_1`.
 pub(crate) fn high_bits(gamma2: i32, r: Zq) -> Zq {
     //
     // 1: (r1, r0) ← Decompose(r)
@@ -104,11 +111,11 @@ pub(crate) fn high_bits(gamma2: i32, r: Zq) -> Zq {
 }
 
 
-/// # Algorithm 32: `LowBits(r)` on page 35.
-/// Returns r0 from the output of Decompose (r).
+/// # Algorithm 38: `LowBits(r)` on page 41.
+/// Returns `r_0` from the output of Decompose (r).
 ///
-/// **Input**: `r ∈ Zq` <br>
-/// **Output**: Integer `r0`.
+/// **Input**: `r ∈ Z_q` <br>
+/// **Output**: Integer `r_0`.
 pub(crate) fn low_bits(gamma2: i32, r: Zq) -> Zq {
     //
     // 1: (r1, r0) ← Decompose(r)
@@ -119,10 +126,10 @@ pub(crate) fn low_bits(gamma2: i32, r: Zq) -> Zq {
 }
 
 
-/// # Algorithm 33: `MakeHint(z,r)` on page 35.
+/// # Algorithm 39: `MakeHint(z,r)` on page 41.
 /// Compute hint bit indicating whether adding `z` to `r` alters the high bits of `r`.
 ///
-/// Input: `z`, `r` ∈ `Zq` <br>
+/// Input: `z`, `r` ∈ `Z_q` <br>
 /// Output: Boolean
 pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
     //
@@ -137,13 +144,14 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 }
 
 
-/// # Algorithm 34: `UseHint(h,r)` on page 35.
+/// # Algorithm 40: `UseHint(h,r)` on page 41.
 /// Returns the high bits of `r` adjusted according to hint `h`.
+///
 /// This non-CT function uses public data from the signature; thus
 /// does not need to be constant time
 ///
-/// **Input**: Boolean `h` (cast in Zq), `r` ∈ `Zq` <br>
-/// **Output**: `r1 ∈ Z` with `0 ≤ r1 ≤ (q − 1)/(2·γ_2)`
+/// **Input**: Boolean `h` (cast in `Z_q`), `r` ∈ `Z_q` <br>
+/// **Output**: `r_1 ∈ Z` with `0 ≤ r_1 ≤ (q − 1)/(2·γ_2)`
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
     // 1: m ← (q− 1)/(2*γ_2)
@@ -179,5 +187,5 @@ pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     }
 
     // 5: return r1
-    // r1 see 'if' above
+    // r1 see first 'if' above
 }

@@ -3,10 +3,10 @@
 use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
 };
-use crate::hashing::{expand_a, expand_mask, expand_s, h_xof, sample_in_ball};
+use crate::hashing::{expand_a, expand_mask, expand_s, h256_xof, sample_in_ball};
 use crate::helpers::{
     center_mod, full_reduce32, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont,
-    vec_add,
+    add_vector_ntt,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -129,72 +129,70 @@ pub(crate) fn sign_finish<
         cap_a_hat,
     } = esk;
 
-    // 6: µ ← H(tr || M', 512)    ▷ Compute message representative µ
+    // 6: 𝜇 ← H(BytesToBits(𝑡𝑟)||𝑀 , 64)    ▷ Compute message representative µ
     // We may have arrived from 3 different paths
     let mut h6 = if nist {
         // 1. NIST vectors are being applied to "internal" functions
-        h_xof(&[tr, message])
+        h256_xof(&[tr, message])
     } else if oid.is_empty() {
         // 2. From ML-DSA.Sign():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
+        h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
     } else {
         // 3. From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h_xof(&[tr, &[1u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+        h256_xof(&[tr, &[1u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
     };
     let mut mu = [0u8; 64];
     h6.read(&mut mu);
 
-    // 7: rnd ← {0,1}^256    ▷ For the optional deterministic variant, substitute rnd ← {0}^256
+    // rnd ← {0,1}^256    ▷ For the optional deterministic variant, substitute rnd ← {0}^256
     let mut rnd = [0u8; 32];
     rand_gen.try_fill_bytes(&mut rnd).map_err(|_| "Alg 2: rng fail")?;
 
-    // 8: ρ′ ← H(K || rnd || µ, 512)    ▷ Compute private random seed
-    let mut h8 = h_xof(&[cap_k, &rnd, &mu]);
+    // 7: ρ′ ← H(K || rnd || µ, 512)    ▷ Compute private random seed
+    let mut h8 = h256_xof(&[cap_k, &rnd, &mu]);
     let mut rho_prime = [0u8; 64];
     h8.read(&mut rho_prime);
 
-    // 9: κ ← 0    ▷ Initialize counter κ
+    // 8: κ ← 0    ▷ Initialize counter κ
     let mut kappa_ctr = 0u16;
 
-    // 10: (z, h) ← ⊥    ▷ we will handle ⊥ inline with 'continue'
+    // 9: (z, h) ← ⊥    ▷ we will handle ⊥ inline with 'continue'
     let mut z: [R; L];
     let mut h: [R; K];
     let mut c_tilde = [0u8; LAMBDA_DIV4]; // size could be fixed at 32; but spec will fix flaw
 
-    // 11: while (z, h) = ⊥ do    ▷ Rejection sampling loop (with continue for ⊥)
+    // 10: while (z, h) = ⊥ do    ▷ Rejection sampling loop (with continue for ⊥)
     loop {
         //
-        // 12: y ← ExpandMask(ρ′, κ)
+        // 11: y ← ExpandMask(ρ′, κ)
         let y: [R; L] = expand_mask(gamma1, &rho_prime, kappa_ctr);
 
-        // 13: w ← NTT−1(cap_a_hat ◦ NTT(y))
+        // 12: w ← NTT−1(cap_a_hat ◦ NTT(y))
         let w: [R; K] = {
             let y_hat: [T; L] = ntt(&y);
             let ay_hat: [T; K] = mat_vec_mul(cap_a_hat, &y_hat);
             inv_ntt(&ay_hat)
         };
 
-        // 14: w_1 ← HighBits(w)    ▷ Signer’s commitment
+        // 13: w_1 ← HighBits(w)    ▷ Signer’s commitment
         let w_1: [R; K] =
             core::array::from_fn(|k| R(core::array::from_fn(|n| high_bits(gamma2, w[k].0[n]))));
+
+        // There is effectively no step 14 due to formatting error in spec
 
         // 15: c_tilde ∈ {0,1}^{2·Lambda} ← H(µ || w1Encode(w_1), 2·Lambda)     ▷ Commitment hash
         let mut w1_tilde = [0u8; W1_LEN];
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde);
-        let mut h15 = h_xof(&[&mu, &w1_tilde]);
+        let mut h15 = h256_xof(&[&mu, &w1_tilde]);
         h15.read(&mut c_tilde);
 
-        // 16: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2·Lambda-256} ← c_tilde    ▷ First 256 bits of commitment hash
-        //let c_tilde_1: [u8; 32] = core::array::from_fn(|i| c_tilde[i]);
-        // c_tilde_2 is never used!
-
-        // 17: c ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
+        // 16: c ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
         let c: R = sample_in_ball::<CTEST>(tau, &c_tilde);
 
-        // 18: c_hat ← NTT(c)
+        // 17: c_hat ← NTT(c)
         let c_hat: &T = &ntt(&[c])[0];
 
-        // 19: ⟨⟨c_s_1⟩⟩ ← NTT−1(c_hat ◦ s_hat_1)
+        // 18: ⟨⟨c_s_1⟩⟩ ← NTT−1(c_hat ◦ s_hat_1)
         let c_s_1: [R; L] = {
             let cs1_hat: [T; L] = core::array::from_fn(|l| {
                 T(core::array::from_fn(|n| {
@@ -204,7 +202,7 @@ pub(crate) fn sign_finish<
             inv_ntt(&cs1_hat)
         };
 
-        // 20: ⟨⟨c_s_2⟩⟩ ← NTT−1(c_hat ◦ s_hat_2)
+        // 19: ⟨⟨c_s_2⟩⟩ ← NTT−1(c_hat ◦ s_hat_2)
         let c_s_2: [R; K] = {
             let cs2_hat: [T; K] = core::array::from_fn(|k| {
                 T(core::array::from_fn(|n| {
@@ -214,17 +212,19 @@ pub(crate) fn sign_finish<
             inv_ntt(&cs2_hat)
         };
 
-        // 21: z ← y + ⟨⟨c_s_1⟩⟩    ▷ Signer’s response
+        // 20: z ← y + ⟨⟨c_s_1⟩⟩    ▷ Signer’s response
         z = core::array::from_fn(|l| {
             R(core::array::from_fn(|n| partial_reduce32(y[l].0[n] + c_s_1[l].0[n])))
         });
 
-        // 22: r0 ← LowBits(w − ⟨⟨c_s_2⟩⟩)
+        // 21: r0 ← LowBits(w − ⟨⟨c_s_2⟩⟩)
         let r0: [R; K] = core::array::from_fn(|k| {
             R(core::array::from_fn(|n| {
                 low_bits(gamma2, partial_reduce32(w[k].0[n] - c_s_2[k].0[n]))
             }))
         });
+
+        // There is effectively no step 22 due to formatting error in spec
 
         // 23: if ||z||∞ ≥ Gamma1 − β or ||r0||∞ ≥ Gamma2 − β then (z, h) ← ⊥    ▷ Validity checks
         let z_norm = infinity_norm(&z);
@@ -233,6 +233,7 @@ pub(crate) fn sign_finish<
         if !CTEST && ((z_norm >= (gamma1 - beta)) || (r0_norm >= (gamma2 - beta))) {
             kappa_ctr += u16::try_from(L).expect("cannot fail");
             continue;
+            //
             // 24: else  ... not needed with 'continue'
         }
 
@@ -257,7 +258,9 @@ pub(crate) fn sign_finish<
             }))
         });
 
-        // 27: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
+        // There is effectively no step 22 due to formatting error in spec
+
+        // 28: if ||⟨⟨c_t_0⟩⟩||∞ ≥ Gamma2 or the number of 1’s in h is greater than ω, then (z, h) ← ⊥
         // CTEST is used only for constant-time measurements via `dudect`
         if !CTEST
             && ((infinity_norm(&c_t_0) >= gamma2)
@@ -265,26 +268,26 @@ pub(crate) fn sign_finish<
         {
             kappa_ctr += u16::try_from(L).expect("cannot fail");
             continue;
-            // 28: end if
+            // 29: end if
         }
 
-        // 29: end if  (not needed as ⊥-related logic uses continue
+        // 30: end if  (not needed as ⊥-related logic uses continue
 
-        // 30: κ ← κ + ℓ ▷ Increment counter
+        // 31: κ ← κ + ℓ ▷ Increment counter
         // this is done just prior to each of the 'continue' statements above
 
         // if we made it here, we passed the 'continue' conditions, so have a solution
         break;
 
-        // 31: end while
+        // 32: end while
     }
 
-    // 32: σ ← sigEncode(c_tilde, z mod± q, h)
+    // 33: σ ← sigEncode(c_tilde, z mod± q, h)
     let zmodq: [R; L] =
         core::array::from_fn(|l| R(core::array::from_fn(|n| center_mod(z[l].0[n]))));
     let sig = sig_encode::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde, &zmodq, &h);
 
-    // 33: return σ
+    // 34: return σ
     Ok(sig)
 }
 
@@ -308,13 +311,13 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
     let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(rho);
 
-    // 6: tr ← H(BytesToBits(pk), 512)
-    let mut h6 = h_xof(&[pk]);
+    // 6: tr ← H(pk, 64)
+    let mut h6 = h256_xof(&[pk]);
     let mut tr = [0u8; 64];
     h6.read(&mut tr);
 
     // the last term of:
-    // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
+    // 9: 𝐰Approx ← NTT (𝐀 ∘ NTT(𝐳) − NTT(𝑐) ∘ NTT(𝐭1 ⋅ 2𝑑 ))    ▷ 𝐰Approx = 𝐀𝐳 − 𝑐𝐭1 ⋅ 2𝑑
     let t1_hat_mont: [T; K] = to_mont(&ntt(&t_1));
     let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
         T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
@@ -359,43 +362,28 @@ pub(crate) fn verify_finish<
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
     // --> calculated in verify_start()
 
-    // 6: tr ← H(BytesToBits(pk), 512)
+    // 6: tr ← H(pk, 64)
     // --> calculated in verify_start()
 
-    // // 6: µ ← H(tr || M', 512)    ▷ Compute message representative µ
-    // // We may have arrived via `HashML-DSA.Sign()`
-    // let mut h6 = if oid.len() != 0 {
-    //     // From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-    //     h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
-    // } else {
-    //     // From ML-DSA.Sign():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-    //     h_xof(&[tr, &[0x00u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
-    // };
-    // let mut mu = [0u8; 64];
-    // h6.read(&mut mu);
-
-
-    // 7: µ ← H(tr || M, 512)    ▷ Compute message representative µ
+    // 7: 𝜇 ← (H(BytesToBits(tr)||𝑀′, 64))    ▷ Compute message representative µ
+    // We may have arrived from 3 different paths
     let mut h7 = if nist {
-        h_xof(&[tr, m])
+        // 1. NIST vectors are being applied to "internal" functions
+        h256_xof(&[tr, m])
     } else if oid.is_empty() {
-        // From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+        // 2. From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+        h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
     } else {
-        // From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+        // 3. From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+        h256_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
     };
     let mut mu = [0u8; 64];
     h7.read(&mut mu);
 
-    // 8: (c_tilde_1, c_tilde_2) ∈ {0,1}^256 × {0,1}^{2λ-256} ← c_tilde
-    //let c_tilde_1 = <&[u8; 32]>::try_from(&c_tilde[0..32]).expect("cannot fail");
-    // c_tilde_2 identifier is unused...
-
-    // 9: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
+    // 8: c ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
     let c: R = sample_in_ball::<false>(tau, &c_tilde); // false, as this instance isn't pertinent to CT
 
-    // 10: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
+    // 9: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let wp_approx: [R; K] = {
         let z_hat: [T; L] = ntt(&z);
         let az_hat: [T; K] = mat_vec_mul(cap_a_hat, &z_hat);
@@ -409,15 +397,17 @@ pub(crate) fn verify_finish<
         }))
     };
 
-    // 11: w′_1 ← UseHint(h, w′_Approx)    ▷ Reconstruction of signer’s commitment
+    // 10: w′_1 ← UseHint(h, w′_Approx)    ▷ Reconstruction of signer’s commitment
     let wp_1: [R; K] = core::array::from_fn(|k| {
         R(core::array::from_fn(|n| use_hint(gamma2, h[k].0[n], wp_approx[k].0[n])))
     });
 
+    // There is effectively no step 11 due to formatting error in spec
+
     // 12: c_tilde_′ ← H(µ || w1Encode(w′_1), 2λ)     ▷ Hash it; this should match c_tilde
     let mut tmp = [0u8; W1_LEN];
     w1_encode::<K>(gamma2, &wp_1, &mut tmp);
-    let mut h12 = h_xof(&[&mu, &tmp]);
+    let mut h12 = h256_xof(&[&mu, &tmp]);
     let mut c_tilde_p = [0u8; LAMBDA_DIV4];
     h12.read(&mut c_tilde_p); // leftover to be ignored
 
@@ -448,19 +438,16 @@ pub(crate) fn key_gen_internal<
     eta: i32, xi: &[u8; 32],
 ) -> ([u8; PK_LEN], [u8; SK_LEN]) {
     //
-    // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
-    // let mut xi = [0u8; 32];
-    // rng.try_fill_bytes(&mut xi).map_err(|_| "Random number generator failed")?;
-
-    // WRONG: 2: (ρ, ρ′, K) ∈ {0,1}^{256} × {0,1}^{512} × {0,1}^{256} ← H(ξ, 1024)    ▷ Expand seed
-    // 1: (𝜌, 𝜌′, 𝐾) ∈ 𝔹32 × 𝔹64 × 𝔹32 ← H(𝜉||IntegerToBytes(𝑘, 1)||IntegerToBytes(ℓ, 1), 128)
-    let mut h2 = h_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
+    // 1: (rho, rho′, 𝐾) ∈ 𝔹32 × 𝔹64 × 𝔹32 ← H(𝜉||IntegerToBytes(𝑘, 1)||IntegerToBytes(ℓ, 1), 128)
+    let mut h2 = h256_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
     let mut rho = [0u8; 32];
     h2.read(&mut rho);
     let mut rho_prime = [0u8; 64];
     h2.read(&mut rho_prime);
     let mut cap_k = [0u8; 32];
     h2.read(&mut cap_k);
+
+    // There is effectively no step 2 due to formatting error in spec
 
     // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
     let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
@@ -472,25 +459,27 @@ pub(crate) fn key_gen_internal<
     let t: [R; K] = {
         let s_1_hat: [T; L] = ntt(&s_1);
         let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-        let t_not_reduced: [R; K] = vec_add(&inv_ntt(&as1_hat), &s_2);
+        let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
         core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
     };
 
     // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
     let (t_1, t_0): ([R; K], [R; K]) = power2round(&t);
 
-    // 7: pk ← pkEncode(ρ, t_1)
+    // There is effectively no step 7 due to formatting error in spec
+
+    // 8: pk ← pkEncode(ρ, t_1)
     let pk: [u8; PK_LEN] = pk_encode(&rho, &t_1);
 
-    // 8: tr ← H(BytesToBits(pk), 512)
+    // 9: tr ← H(BytesToBits(pk), 512)
     let mut tr = [0u8; 64];
-    let mut h8 = h_xof(&[&pk]);
+    let mut h8 = h256_xof(&[&pk]);
     h8.read(&mut tr);
 
-    // 9: sk ← skEncode(ρ, K, tr, s_1, s_2, t_0)     ▷ K and tr are for use in signing
+    // 10: sk ← skEncode(ρ, K, tr, s_1, s_2, t_0)     ▷ K and tr are for use in signing
     let sk: [u8; SK_LEN] = sk_encode(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0);
 
-    // 10: return (pk, sk)
+    // 11: return (pk, sk)
     (pk, sk)
 }
 
@@ -516,7 +505,7 @@ pub(crate) fn private_to_public<
     let t: [R; K] = {
         let s_1_hat: [T; L] = ntt(&s_1);
         let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-        let t_not_reduced: [R; K] = vec_add(&inv_ntt(&as1_hat), &s_2);
+        let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
         core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
     };
 

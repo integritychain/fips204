@@ -1,4 +1,4 @@
-// This file implements functionality from FIPS 204 section 8.2 Encodings of ML-DSA Keys and Signatures
+// This file implements functionality from FIPS 204 section 7.2 Encodings of ML-DSA Keys and Signatures
 
 use crate::conversion::{
     bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
@@ -8,9 +8,10 @@ use crate::types::{R, R0};
 use crate::{D, Q};
 
 
-/// # Algorithm 16: `pkEncode(ρ,t1)` on page 25.
-/// Encodes a public key for ML-DSA into a byte string. This is only used in `ml_dsa::key_gen()`
-/// and does not involve untrusted input.
+/// # Algorithm 22: `pkEncode(ρ,t1)` on page 33.
+/// Encodes a public key for ML-DSA into a byte string.
+///
+/// This is only used in `ml_dsa::key_gen()` and does not involve untrusted input.
 ///
 /// **Input**:  `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}-1]`. <br>
 /// **Output**: Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`.
@@ -18,34 +19,32 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     rho: &[u8; 32], t1: &[R; K],
 ) -> [u8; PK_LEN] {
     let blqd = bit_length(Q - 1) - D as usize;
-    debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 16: t1 out of range");
-    debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 17: bad pk/config size");
+    debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 22: t1 out of range");
+    debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 22: bad pk/config size");
     let mut pk = [0u8; PK_LEN];
 
-    // 1: pk ← BitsToBytes(ρ)
+    // 1: pk ← rho
     pk[0..32].copy_from_slice(rho);
 
     // 2: for i from 0 to k − 1 do
-    for i in 0..K {
-        //
-        // 3: pk ← pk || SimpleBitPack(t1[i], 2^{bitlen(q−1)−d}-1)
-        simple_bit_pack(
-            &t1[i],
-            (1 << blqd) - 1,
-            &mut pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd],
-        );
-
-        // 4: end for
-    }
+    // 3: pk ← pk || SimpleBitPack(t1[i], 2^{bitlen(q−1)−d}-1)
+    // 4: end for
+    pk[32..]
+        .chunks_mut(32 * blqd)
+        .enumerate()
+        .take(K)  // not strictly needed
+        .for_each(|(i, chunk)| simple_bit_pack(&t1[i], (1 << blqd) - 1, chunk));
 
     // 5: return pk
     pk
 }
 
 
-/// # Algorithm 17: `pkDecode(pk)` on page 25.
-/// Reverses the procedure pkEncode. Used in `verify_start()` and deserialization with
-/// untrusted input.
+/// # Algorithm 23: `pkDecode(pk)` on page 33.
+/// Reverses the procedure pkEncode.
+///
+/// Used in `verify_start()` and deserialization with untrusted input. The call to
+/// `simple_bit_unpack()` will detect malformed input -- an overly conservative (?) route for now.
 ///
 /// **Input**:  Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`. <br>
 /// **Output**: `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}−1]`).
@@ -56,36 +55,35 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     pk: &[u8; PK_LEN],
 ) -> Result<(&[u8; 32], [R; K]), &'static str> {
-    let blqd = bit_length(Q - 1) - D as usize;
-    debug_assert_eq!(pk.len(), 32 + 32 * K * blqd, "Alg 17: incorrect pk length");
-    debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 17: bad pk/config size");
+    const BLQD: usize = bit_length(Q - 1) - D as usize;
+    debug_assert_eq!(pk.len(), 32 + 32 * K * BLQD, "Alg 23: incorrect pk length");
+    debug_assert_eq!(PK_LEN, 32 + 32 * K * BLQD, "Alg 23: bad pk/config size");
 
-    // 1: (y, z_0 , . . . , z_{k−1}) ∈ B^{32} × (B^{32(bitlen(q−1)−d))^k} ← pk
+    // 1: (rho, z_0 , . . . , z_{k−1}) ∈ B^{32} × (B^{32(bitlen(q−1)−d))^k} ← pk
+    let rho = <&[u8; 32]>::try_from(&pk[0..32]).expect("Alg 23: try_from fail");
 
-    // 2: ρ ← BytesToBits(y)
-    let rho = <&[u8; 32]>::try_from(&pk[0..32]).expect("cannot fail");
-
-    // 3: for i from 0 to k − 1 do
-    let mut t1: [R; K] = [R0; K]; // tricky to get `?` inside a closure
+    // 2: for i from 0 to k − 1 do
+    let mut t1 = [R0; K]; // cannot use `?` inside a closure
     for i in 0..K {
         //
         // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1))    ▷ This is always in the correct range
         t1[i] =
-            simple_bit_unpack(&pk[32 + 32 * i * blqd..32 + 32 * (i + 1) * blqd], (1 << blqd) - 1)?;
+            simple_bit_unpack(&pk[32 + 32 * i * BLQD..32 + 32 * (i + 1) * BLQD], (1 << BLQD) - 1)?;
         //
         // 5: end for
     }
 
-    debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 17: t1 out of range");
+    debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << BLQD) - 1)), "Alg 23: t1 out of range");
 
     // 6: return (ρ, t1)
     Ok((rho, t1))
 }
 
 
-/// # Algorithm 18: `skEncode(ρ,K,tr,s1,s2,t0)` on page 26.
-/// Encodes a secret key for ML-DSA into a byte string. This is only used in `ml_dsa::key_gen()`
-/// and does not involve untrusted input.
+/// # Algorithm 24: `skEncode(ρ,K,tr,s1,s2,t0)` on page 34.
+/// Encodes a secret key for ML-DSA into a byte string.
+///
+/// This is only used in `ml_dsa::key_gen()` and does not involve untrusted input.
 ///
 /// **Input**: `ρ ∈ {0,1}^256`, `K ∈ {0,1}^256`, `tr ∈ {0,1}^512`,
 ///            `s_1 ∈ R^l` with coefficients in `[−η, η]`,
@@ -97,19 +95,19 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, rho: &[u8; 32], k: &[u8; 32], tr: &[u8; 64], s_1: &[R; L], s_2: &[R; K], t_0: &[R; K],
 ) -> [u8; SK_LEN] {
     let top = 1 << (D - 1);
-    debug_assert!((eta == 2) || (eta == 4), "Alg 18: incorrect eta");
-    debug_assert!(s_1.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s1 out of range");
-    debug_assert!(s_2.iter().all(|x| is_in_range(x, eta, eta)), "Alg 18: s2 out of range");
-    debug_assert!(t_0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg 18: t0 out of range");
+    debug_assert!((eta == 2) || (eta == 4), "Alg 24: incorrect eta");
+    debug_assert!(s_1.iter().all(|x| is_in_range(x, eta, eta)), "Alg 24: s1 out of range");
+    debug_assert!(s_2.iter().all(|x| is_in_range(x, eta, eta)), "Alg 24: s2 out of range");
+    debug_assert!(t_0.iter().all(|x| is_in_range(x, top - 1, top)), "Alg 24: t0 out of range");
     debug_assert_eq!(
         SK_LEN,
         128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
-        "Alg 18: bad sk/config size"
+        "Alg 24: bad sk/config size"
     );
 
     let mut sk = [0u8; SK_LEN];
 
-    // 1: sk ← BitsToBytes(ρ) || BitsToBytes(K) || BitsToBytes(tr)
+    // 1: sk ← rho || 𝐾 || tr
     sk[0..32].copy_from_slice(rho);
     sk[32..64].copy_from_slice(k);
     sk[64..128].copy_from_slice(tr);
@@ -147,14 +145,17 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
     }
 
     // ...just make sure we really hit the end of the sk slice
-    debug_assert_eq!(start + K * step, sk.len(), "Alg 18: length miscalc");
+    debug_assert_eq!(start + K * step, sk.len(), "Alg 24: length miscalc");
+
+    // 11: return sk
     sk
 }
 
 
-/// # Algorithm 19: `skDecode(sk)` on page 27.
-/// Reverses the procedure in `skEncode()`. Used in `sign_start()` and deserialization with
-/// untrusted input.
+/// # Algorithm 25: `skDecode(sk)` on page 34.
+/// Reverses the procedure in `skEncode()`.
+///
+/// Used in `sign_start()` and deserialization with untrusted input.
 ///
 /// **Input**:  Private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2η)+d·k)}`
 ///             Security parameter `η` (eta) must be either 2 or 4.<br>
@@ -167,70 +168,68 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
 pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<(&[u8; 32], &[u8; 32], &[u8; 64], [R; L], [R; K], [R; K]), &'static str> {
-    debug_assert!((eta == 2) || (eta == 4), "Alg 19: incorrect eta");
+    debug_assert!((eta == 2) || (eta == 4), "Alg 25: incorrect eta");
     debug_assert_eq!(
         SK_LEN,
         128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
-        "Alg 19: bad sk/config size"
+        "Alg 25: bad sk/config size"
     );
     let top = 1 << (D - 1);
     let (mut s_1, mut s_2, mut t_0) = ([R0; L], [R0; K], [R0; K]);
 
-    // 1: (f, g, h, y_0, . . . , y_{ℓ−1}, z_0, . . . , z_{k−1}, w_0, . . . , w_{k−1)}) ∈
+    // 1: (rho, 𝐾, tr, 𝑦0 , … , 𝑦ℓ−1 , 𝑧0 , … , 𝑧𝑘−1 , 𝑤0 , … , 𝑤𝑘−1 ) ∈
     //    B^32 × B^32 × B^64 × B^{32·bitlen(2η)}^l × B^{32·bitlen(2η)}^k × B^{32d}^k ← sk
+    let rho = <&[u8; 32]>::try_from(&sk[0..32]).expect("Alg 25: try_from1 fail");
+    let k = <&[u8; 32]>::try_from(&sk[32..64]).expect("Alg 25: try_from2 fail");
+    let tr = <&[u8; 64]>::try_from(&sk[64..128]).expect("Alg 25: try_from3 fail");
+    // y & z unpack is done inline below...
 
-    // 2: ρ ← BytesToBits(f)
-    let rho = <&[u8; 32]>::try_from(&sk[0..32]).expect("cannot fail");
-
-    // 3: K ← BytesToBits(g)
-    let k = <&[u8; 32]>::try_from(&sk[32..64]).expect("cannot fail");
-
-    // 4: tr ← BytesToBits(h)
-    let tr = <&[u8; 64]>::try_from(&sk[64..128]).expect("cannot fail");
-
-    // 5: for i from 0 to ℓ − 1 do
+    // 2: for i from 0 to ℓ − 1 do
     let start = 128;
     let step = 32 * bit_length(2 * eta);
     for i in 0..L {
         //
-        // 6: s1[i] ← BitUnpack(yi, η, η)   ▷ This may lie outside [−η, η], if input is malformed
+        // 3: s1[i] ← BitUnpack(yi, η, η)   ▷ This may lie outside [−η, η], if input is malformed
         s_1[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
+
+        // 4: end for
+    }
+
+    // 5: for i from 0 to k − 1 do
+    let start = start + L * step;
+    for i in 0..K {
+        //
+        // 6: s2[i] ← BitUnpack(zi, η, η) ▷ This may lie outside [−η, η], if input is malformed
+        s_2[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
 
         // 7: end for
     }
 
     // 8: for i from 0 to k − 1 do
-    let start = start + L * step;
-    for i in 0..K {
-        //
-        // 9: s2[i] ← BitUnpack(zi, η, η) ▷ This may lie outside [−η, η], if input is malformed
-        s_2[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], eta, eta)?;
-
-        // 10: end for
-    }
-
-    // 11: for i from 0 to k − 1 do
     let start = start + K * step;
     let step = 32 * D as usize;
     for i in 0..K {
         //
-        // 12: t0[i] ← BitUnpack(wi, −2^{d−1} - 1, 2^{d−1})   ▷ This is always in the correct range
+        // 9: t0[i] ← BitUnpack(wi, −2^{d−1} - 1, 2^{d−1})   ▷ This is always in the correct range
         t_0[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], top - 1, top)?;
 
-        // 13: end for
+        // 10: end for
     }
 
     // ... just make sure we hit the end of sk slice properly
-    debug_assert_eq!(start + K * step, sk.len(), "Alg 19: length miscalc");
+    debug_assert_eq!(start + K * step, sk.len(), "Alg 25: length miscalc");
 
+    // 11: return (pho, 𝐾, tr, s1, s2, t0 )
     Ok((rho, k, tr, s_1, s_2, t_0))
 }
 
 
-/// # Algorithm 20: `sigEncode(c_tilde,z,h)` on page 28.
-/// Encodes a signature into a byte string.  This is only used in `ml_dsa::sign_finish()`
-/// and is not exposed to untrusted input. The `CTEST` generic is only passed through to
-/// the `hint_bit_pack()` leaf function such that this logic becomes constant-time.
+/// # Algorithm 26: `sigEncode(c_tilde,z,h)` on page 35.
+/// Encodes a signature into a byte string.
+///
+/// This is only used in `ml_dsa::sign_finish()` and is not exposed to untrusted input.
+/// The `CTEST` generic is only passed through to the `hint_bit_pack()` leaf function
+/// such that this logic becomes constant-time.
 ///
 /// **Input**: `c_tilde ∈ {0,1}^2λ` (bits),
 ///            `z ∈ R^ℓ` with coefficients in `[−1*γ_1 + 1, γ_1]`,
@@ -245,17 +244,17 @@ pub(crate) fn sig_encode<
 >(
     gamma1: i32, omega: i32, c_tilde: &[u8; LAMBDA_DIV4], z: &[R; L], h: &[R; K],
 ) -> [u8; SIG_LEN] {
-    debug_assert!(z.iter().all(|x| is_in_range(x, gamma1 - 1, gamma1)), "Alg 20: z out of range");
-    debug_assert!(h.iter().all(|x| is_in_range(x, 0, 1)), "Alg 20: h out of range");
+    debug_assert!(z.iter().all(|x| is_in_range(x, gamma1 - 1, gamma1)), "Alg 26: z out of range");
+    debug_assert!(h.iter().all(|x| is_in_range(x, 0, 1)), "Alg 26: h out of range");
     debug_assert_eq!(
         SIG_LEN,
         LAMBDA_DIV4 + L * 32 * (1 + bit_length(gamma1 - 1)) + omega.unsigned_abs() as usize + K,
-        "Alg 20: bad sig/config size"
+        "Alg 26: bad sig/config size"
     );
 
     let mut sigma = [0u8; SIG_LEN];
 
-    // 1: σ ← BitsToBytes(c_tilde)
+    // 1: sigma ← c_tilde
     sigma[..LAMBDA_DIV4].copy_from_slice(c_tilde);
 
     // 2: for i from 0 to ℓ − 1 do
@@ -272,18 +271,20 @@ pub(crate) fn sig_encode<
     // 5: σ ← σ || HintBitPack (h)
     hint_bit_pack::<CTEST, K>(omega, h, &mut sigma[start + L * step..]);
 
+    // 6: return 𝜎
     sigma
 }
 
 
-/// # Algorithm 21: `sigDecode(σ)` on page 28.
-/// Reverses the procedure `sigEncode()`. Used in `verify_finish()` with untrusted input.
+/// # Algorithm 27: `sigDecode(σ)` on page 35.
+/// Reverses the procedure `sigEncode()`.
+///
+/// Used in `verify_finish()` with untrusted input.
 ///
 /// **Input**:  Signature, `σ ∈ B^{λ/4+ℓ·32·(1+bitlen(γ_1-1))+ω+k` <br>
-/// **Output**: `c_tilde ∈ {0,1}^2λ`,
-///             `z ∈ R^ℓ_q` with coefficients in `[−γ_1 + 1, γ_1]`,
+/// **Output**: `c_tilde ∈ B^{λ/4}`,
+///             `z ∈ R^ℓ` with coefficients in `[−γ_1 + 1, γ_1]`,
 ///             `h ∈ R^k_2` or `⊥`. <br>
-/// Note: `c_tilde` is hardcoded to 256bits since the remainder is 'soon' discarded.
 ///
 /// # Errors
 /// Returns an error when decoded coefficients fall out of range.
@@ -299,39 +300,38 @@ pub(crate) fn sig_decode<
     debug_assert_eq!(
         SIG_LEN,
         LAMBDA_DIV4 + L * 32 * (1 + bit_length(gamma1 - 1)) + omega.unsigned_abs() as usize + K,
-        "Alg 21: bad sig/config size"
+        "Alg 27: bad sig/config size"
     );
 
     let mut c_tilde = [0u8; LAMBDA_DIV4];
     let mut z: [R; L] = [R0; L];
 
     // 1: (ω, x_0, ... , x_{ℓ−1}, y) ∈ B^{λ/4} × Bℓ·32·(1+bitlen(γ_1−1))+ω+k ← σ
-
-    // 2: c_tilde ← BytesToBits(w)
     c_tilde[0..LAMBDA_DIV4].copy_from_slice(&sigma[0..LAMBDA_DIV4]);
 
-    // 3: for i from 0 to ℓ − 1 do
+    // 2: for i from 0 to ℓ − 1 do
     let start = LAMBDA_DIV4;
     let step = 32 * (bit_length(gamma1 - 1) + 1);
     for i in 0..L {
         //
-        // 4: z[i] ← BitUnpack(xi, γ1 − 1, γ1)    ▷ This is always in the correct range, as γ1 is a power of 2
+        // 3: z[i] ← BitUnpack(xi, γ1 − 1, γ1)    ▷ This is always in the correct range, as γ1 is a power of 2
         z[i] = bit_unpack(&sigma[start + i * step..start + (i + 1) * step], gamma1 - 1, gamma1)?;
 
-        // 5: end for
+        // 4: end for
     }
 
-    // 6: h ← HintBitUnpack(y)
+    // 5: h ← HintBitUnpack(y)
     let h = hint_bit_unpack::<K>(omega, &sigma[start + L * step..])?;
 
-    // 7: return (c_tilde, z, h)  -- note h is never really returned as None per result on above line
+    // 6: return (c_tilde, z, h)  -- note h is never really returned as None per result on above line
     Ok((c_tilde, z, Some(h)))
 }
 
 
-/// # Algorithm 22: `w1Encode(w1)` on page 28.
-/// Encodes a polynomial vector `w1` into a bit string. Used in `ml_dsa::sign_finish()` and
-/// `ml_dsa::verify_finish()`, and not exposed to untrusted input.
+/// # Algorithm 28: `w1Encode(w1)` on page 35.
+/// Encodes a polynomial vector `w1` into a bit string.
+///
+/// Used in `ml_dsa::sign_finish()` and `ml_dsa::verify_finish()`, and not exposed to untrusted input.
 ///
 /// **Input**: `w1 ∈ R^k` with coefficients in `[0, (q − 1)/(2γ_2) − 1]`.
 /// **Output**: A bit string representation, `w1_tilde ∈ {0,1}^{32·k·bitlen((q-1)/(2γ2)−1)}`.
@@ -340,9 +340,9 @@ pub(crate) fn w1_encode<const K: usize>(gamma2: i32, w1: &[R; K], w1_tilde: &mut
     debug_assert_eq!(
         w1_tilde.len(),
         32 * K * bit_length(qm1_d_2g_m1),
-        "Alg 22: bad w1_tilde/config size"
+        "Alg 28: bad w1_tilde/config size"
     );
-    debug_assert!(w1.iter().all(|r| is_in_range(r, 0, qm1_d_2g_m1)), "Alg 22: w1 out of range");
+    debug_assert!(w1.iter().all(|r| is_in_range(r, 0, qm1_d_2g_m1)), "Alg 28: w1 out of range");
 
     // 1: w1_tilde ← ()
 
@@ -356,7 +356,7 @@ pub(crate) fn w1_encode<const K: usize>(gamma2: i32, w1: &[R; K], w1_tilde: &mut
         // 4: end for
     }
 
-    // 5: return w^tilde_1
+    // 5: return w1_tilde
 }
 
 

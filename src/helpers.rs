@@ -4,6 +4,9 @@ use crate::{Q, ZETA};
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
 
 
+/// Algorithm 43 `BitRev8()` is not implemented; zetas are pulled from pre-computed table
+/// `ZETA_TABLE_MONT`; see below (near end)
+
 /// # Macro ensure!()
 /// If the condition is not met, return an error Result. Borrowed from the `anyhow` crate.
 macro_rules! ensure {
@@ -114,10 +117,10 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     w_hat
 }
 
-
+// Algorithm 44: `AddNTT()` and Algorithm 46 `AddVectorNTT()`
 /// Vector addition; e.g., fips 203 bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
 #[must_use]
-pub(crate) fn vec_add<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
+pub(crate) fn add_vector_ntt<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
     core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])))
 }
 

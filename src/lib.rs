@@ -13,7 +13,6 @@
 //
 #![doc = include_str!("../README.md")]
 
-// TODO: Internal code comment alignment with release spec is underway...
 
 // Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>
@@ -21,11 +20,11 @@
 // Functionality map per FIPS 204
 //
 // Algorithm 1 ML-DSA.KeyGen() on page 17                   --> lib.rs
-// Algorithm 2 ML-DSA.Sign(sk,M) on page 18                 --> lib.rs
-// Algorithm 3 ML-DSA.Verify(pk,M,s) on page 18             --> lib.rs
+// Algorithm 2 ML-DSA.Sign(sk,M,ctx) on page 18             --> lib.rs
+// Algorithm 3 ML-DSA.Verify(pk,M,s,ctx) on page 18         --> lib.rs
 // Algorithm 4 HashML-DSA.Sign(sk,M,ctx,PH) on page 20      --> lib.rs
 // Algorithm 5 HashML-DSA.Verify(sk,M,s,ctx,PH) on page 21  --> lib.rs
-// Algorithm 6 ML-DSA.KeyGen_internal(g) on page 23         --> (refactored) ml_dsa.rs
+// Algorithm 6 ML-DSA.KeyGen_internal(x) on page 23         --> (refactored) ml_dsa.rs
 // Algorithm 7 ML-DSA.Sign_internal(sk,M',rnd) on page 25   --> (refactored) ml_dsa.rs
 // Algorithm 8 ML-DSA.Verify_internal(pk,M',s) on page 27   --> (refactored) ml_dsa.rs
 // Algorithm 9 IntegerToBits(x,a) one page 28               --> (optimized away) conversion.rs
@@ -75,11 +74,11 @@
 // in any operational dataflow (so are good fuzz targets). The ensure! statements implement
 // conservative dataflow validation. Separately, functions are only generic over security
 // parameters that are directly involved in memory allocation (on the stack). Some coding
-// oddities are driven by the fact that Rust doesn't currently do well with arithmetic on
-// generic parameters.
+// oddities are driven by 'clippy pedantic' and the fact that Rust doesn't currently do well
+// with arithmetic on generic parameters.
 
 // Note that the `CTEST` generic parameter supports constant-time measurements by dudect. This
-// is done by carefully removing timing variability of non-secret data (such as the rejection
+// is done by minimally removing timing variability of non-secret data (such as the rejection
 // sampling of hash derived from rho). All normal crate functionality has this set to `false`
 // except for the single function (per namespace) `dudect_keygen_sign_with_rng()` which is only
 // exposed when the non-default `dudect` feature is enabled.
@@ -102,9 +101,9 @@ pub mod traits;
 pub use crate::types::Ph;
 
 // Applies across all security parameter sets
-const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; See https://oeis.org/A234388
-const ZETA: i32 = 1753; // See line 906 et al of FIPS 204
-const D: u32 = 13; // See table 1 page 13 second row
+const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; table 1 page 15 first row
+const ZETA: i32 = 1753; // See section 2.5 of FIPS 204; table 1 page 15 second row
+const D: u32 = 13; // See table 1 page 15 third row
 
 
 // This common functionality is injected into each security parameter set namespace, and is
@@ -157,8 +156,8 @@ macro_rules! functionality {
 
         /// Algorithm 1: Generates a public and private key pair specific to this security parameter set.
         ///
-        /// This function utilizes the **OS default** random number generator. This function operates
-        /// in constant-time relative to secret data (which specifically excludes the OS random
+        /// This function utilizes the **default OS ** random number generator. This function operates
+        /// in constant-time relative to secret data (which specifically excludes the default OS random
         /// number generator internals, the `rho` value stored in the public key, and the hash-derived
         /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values).
         /// # Errors
@@ -228,8 +227,6 @@ macro_rules! functionality {
 
 
             fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey) {
-                // let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-                // Ok((PublicKey { 0: pk }, PrivateKey { 0: sk }))
                 let (pk, sk) = ml_dsa::key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, xi);
                 (PublicKey { 0: pk }, PrivateKey { 0: sk })
             }
@@ -470,7 +467,7 @@ macro_rules! functionality {
         }
 
         #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
-        /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
+        /// As of Oct 14 2024, the NIST test vectors are applied to the **internal** functions rather than
         /// the external API.
         ///
         /// The primary difference pertains to the prepending of domain, context, OID and
@@ -492,7 +489,7 @@ macro_rules! functionality {
 
         #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
         #[must_use]
-        /// As of Sep 22 2024, the NIST test vectors are applied to the **internal** functions rather than
+        /// As of Oct 14 2024, the NIST test vectors are applied to the **internal** functions rather than
         /// the external API.
         ///
         /// The primary difference pertains to the prepending of domain, context, OID and
