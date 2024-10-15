@@ -316,8 +316,43 @@ macro_rules! functionality {
             }
 
             // Documented in traits.rs
+            #[allow(clippy::cast_lossless)]
             fn get_public_key(&self) -> Self::PublicKey {
-                unimplemented!()  // Note that ExpandedPublicKey does not currently contain Rho
+                use crate::types::{R, T};
+                use crate::ntt::{inv_ntt, ntt};
+                use crate::helpers::{add_vector_ntt, mat_vec_mul, full_reduce32, mont_reduce};
+                use crate::encodings::pk_encode;
+                use crate::high_low::power2round;
+
+                let ExpandedPrivateKey {rho, cap_k: _, tr: _, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, cap_a_hat} = &self;
+
+                let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
+                let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
+
+                let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
+                let s_2: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if s_2[k].0[n] > (Q >> 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
+
+                let t_0: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t_hat_0_mont[k].0[n] as i64))))));
+                let sk_t_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
+
+
+                // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
+                let t: [R; K] = {
+                    let s_1_hat: [T; L] = ntt(&s_1);
+                    let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+                    let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
+                    core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
+                };
+
+                // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
+                let (t_1, pk_t_0): ([R; K], [R; K]) = power2round(&t);
+                debug_assert_eq!(sk_t_0, pk_t_0); // fuzz target
+
+                // 7: pk ← pkEncode(ρ, t_1)
+                let pk: [u8; PK_LEN] = pk_encode(rho, &t_1);
+
+                // 10: return (pk) # , sk)
+                pk
             }
         }
 
@@ -507,10 +542,13 @@ macro_rules! functionality {
                     assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
 
                     let esk = KG::gen_expanded_private(&sk);
-                    assert_eq!(sk.into_bytes(), esk.unwrap().into_bytes());
+                    assert_eq!(sk.into_bytes(), esk.clone().unwrap().into_bytes());
 
                     let epk = KG::gen_expanded_public(&pk);
-                    assert_eq!(pk.into_bytes(), epk.unwrap().into_bytes());
+                    assert_eq!(pk.clone().into_bytes(), epk.unwrap().into_bytes());
+
+                    let pk2 = esk.unwrap().get_public_key();
+                    assert_eq!(pk.into_bytes(), pk2);
                 }
             }
         }
