@@ -571,9 +571,9 @@ macro_rules! functionality {
             rng: &mut impl CryptoRngCore, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-            let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
+            //let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
             let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, &[1], &[2], &[3], false
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], false
             )?;
             Ok(sig)
         }
