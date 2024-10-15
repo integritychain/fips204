@@ -75,6 +75,7 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
     let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
 
     Ok(ExpandedPrivateKey {
+        rho: *rho,
         cap_k: *cap_k,
         tr: *tr,
         s_hat_1_mont,
@@ -121,6 +122,7 @@ pub(crate) fn sign_finish<
 
     // Extract from sign_start()
     let ExpandedPrivateKey {
+        rho: _,
         cap_k,
         tr,
         s_hat_1_mont,
@@ -323,7 +325,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
         T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
     }));
 
-    Ok(ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat_mont })
+    Ok(ExpandedPublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
 }
 
 
@@ -341,7 +343,7 @@ pub(crate) fn verify_finish<
     m: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<bool, &'static str> {
     //
-    let ExpandedPublicKey { cap_a_hat, tr, t1_d2_hat_mont } = epk;
+    let ExpandedPublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
 
     // 1: (ρ, t_1) ← pkDecode(pk)
     // --> calculated in verify_start()

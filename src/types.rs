@@ -25,6 +25,7 @@ pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub struct ExpandedPrivateKey<const K: usize, const L: usize> {
+    pub(crate) rho: [u8; 32],
     pub(crate) cap_k: [u8; 32],
     pub(crate) tr: [u8; 64],
     pub(crate) s_hat_1_mont: [T; L],
@@ -47,6 +48,7 @@ pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub struct ExpandedPublicKey<const K: usize, const L: usize> {
+    pub(crate) rho: [u8; 32],
     pub(crate) cap_a_hat: [[T; L]; K],
     pub(crate) tr: [u8; 64],
     pub(crate) t1_d2_hat_mont: [T; K],

@@ -397,6 +397,18 @@ macro_rules! functionality {
 
         // ----- SERIALIZATION AND DESERIALIZATION ---
 
+        impl SerDes for PrivateKey {
+            type ByteArray = [u8; SK_LEN];
+
+            fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
+                let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
+                Ok(PrivateKey { 0: sk })
+            }
+
+            fn into_bytes(self) -> Self::ByteArray { self.0 }
+        }
+
+
         impl SerDes for PublicKey {
             type ByteArray = [u8; PK_LEN];
 
@@ -409,17 +421,66 @@ macro_rules! functionality {
         }
 
 
-        impl SerDes for PrivateKey {
+        impl SerDes for ExpandedPrivateKey {
             type ByteArray = [u8; SK_LEN];
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
                 let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
-                Ok(PrivateKey { 0: sk })
+                let sk = PrivateKey { 0: sk };
+                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
+                Ok(esk)
             }
 
-            fn into_bytes(self) -> Self::ByteArray { self.0 }
+            #[allow(clippy::cast_lossless)]
+            fn into_bytes(self) -> Self::ByteArray {
+                use crate::types::{R, T};
+                use crate::helpers::mont_reduce;
+                use crate::helpers::full_reduce32;
+                use crate::ntt::inv_ntt;
+
+                // TODO: polish needed
+                let ExpandedPrivateKey {rho, cap_k, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, ..} = &self;
+
+                let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
+                let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
+
+                let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
+                let s_2: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if s_2[k].0[n] > (Q >> 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
+
+                let t_0: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t_hat_0_mont[k].0[n] as i64))))));
+                let t_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
+
+                let sk = crate::encodings::sk_encode::<K, L, SK_LEN>(ETA, rho, cap_k, tr, &s_1, &s_2, &t_0);
+                sk
+            }
         }
 
+
+        impl SerDes for ExpandedPublicKey {
+            type ByteArray = [u8; PK_LEN];
+
+            fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
+                let epk = ml_dsa::verify_start(&pk)?;
+                Ok(epk)
+
+            }
+
+            #[allow(clippy::cast_lossless)]
+            fn into_bytes(self) -> Self::ByteArray {
+                use crate::types::{R, T};
+                use crate::helpers::mont_reduce;
+                use crate::helpers::full_reduce32;
+                use crate::ntt::inv_ntt;
+                use crate::D;
+
+                let ExpandedPublicKey {rho, cap_a_hat, tr, t1_d2_hat_mont} = &self;
+                let (_, _, _, _) = (rho, cap_a_hat, tr, t1_d2_hat_mont);
+                let t1_d2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t1_d2_hat_mont[k].0[n] as i64))))));
+                let t1: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| t1_d2[k].0[n] >> D)));
+                let pk = crate::encodings::pk_encode(rho, &t1);
+                pk
+             }
+        }
 
         #[cfg(test)]
         mod tests {
@@ -443,7 +504,13 @@ macro_rules! functionality {
                         let v = pk.hash_verify(&message1, &sig, &[], &ph);
                         assert!(v);
                     }
-                    assert_eq!(pk.into_bytes(), sk.get_public_key().into_bytes());
+                    assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
+
+                    let esk = KG::gen_expanded_private(&sk);
+                    assert_eq!(sk.into_bytes(), esk.unwrap().into_bytes());
+
+                    let epk = KG::gen_expanded_public(&pk);
+                    assert_eq!(pk.into_bytes(), epk.unwrap().into_bytes());
                 }
             }
         }
