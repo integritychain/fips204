@@ -1,7 +1,7 @@
 // This file implements functionality from FIPS 204 section 5 Key Generation, 6 Signing, 7 Verification
 
 use crate::encodings::{
-    pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, sk_encode, w1_encode,
+    pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, w1_encode,
 };
 use crate::hashing::{expand_a, expand_mask, expand_s, h256_xof, sample_in_ball};
 use crate::helpers::{
@@ -10,7 +10,7 @@ use crate::helpers::{
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
-use crate::types::{ExpandedPrivateKey, ExpandedPublicKey, R, T};
+use crate::types::{PrivateKey, PublicKey, R, T};
 use crate::{D, Q};
 use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
@@ -33,7 +33,7 @@ pub(crate) fn key_gen<
     const SK_LEN: usize,
 >(
     rng: &mut impl CryptoRngCore, eta: i32,
-) -> Result<([u8; PK_LEN], [u8; SK_LEN]), &'static str> {
+) -> Result<(PublicKey::<K,L>, PrivateKey::<K,L>), &'static str> {
     //
     // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
     let mut xi = [0u8; 32];
@@ -57,7 +57,7 @@ pub(crate) fn key_gen<
 /// Returns an error on malformed private key.
 pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
-) -> Result<ExpandedPrivateKey<K, L>, &'static str> {
+) -> Result<PrivateKey<K, L>, &'static str> {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
     let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
@@ -74,7 +74,7 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
     let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
 
-    Ok(ExpandedPrivateKey {
+    Ok(PrivateKey {
         rho: *rho,
         cap_k: *cap_k,
         tr: *tr,
@@ -102,7 +102,7 @@ pub(crate) fn sign_finish<
     const W1_LEN: usize,
 >(
     rand_gen: &mut impl CryptoRngCore, beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32,
-    esk: &ExpandedPrivateKey<K, L>, message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
+    esk: &PrivateKey<K, L>, message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<[u8; SIG_LEN], &'static str> {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
@@ -121,7 +121,7 @@ pub(crate) fn sign_finish<
     // --> calculated in sign_start()
 
     // Extract from sign_start()
-    let ExpandedPrivateKey {
+    let PrivateKey {
         rho: _,
         cap_k,
         tr,
@@ -305,7 +305,7 @@ pub(crate) fn sign_finish<
 /// Returns an error on malformed public key.
 pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
     pk: &[u8; PK_LEN],
-) -> Result<ExpandedPublicKey<K, L>, &'static str> {
+) -> Result<PublicKey<K, L>, &'static str> {
     //
     // 1: (ρ,t_1) ← pkDecode(pk)
     let (rho, t_1): (&[u8; 32], [R; K]) = pk_decode(pk)?;
@@ -325,7 +325,7 @@ pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
         T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
     }));
 
-    Ok(ExpandedPublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
+    Ok(PublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
 }
 
 
@@ -339,11 +339,11 @@ pub(crate) fn verify_finish<
     const SIG_LEN: usize,
     const W1_LEN: usize,
 >(
-    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &ExpandedPublicKey<K, L>,
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &PublicKey<K, L>,
     m: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<bool, &'static str> {
     //
-    let ExpandedPublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
+    let PublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
 
     // 1: (ρ, t_1) ← pkDecode(pk)
     // --> calculated in verify_start()
@@ -374,10 +374,10 @@ pub(crate) fn verify_finish<
         h256_xof(&[tr, m])
     } else if oid.is_empty() {
         // 2. From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m]) // TODO: OMFG! <---- CAVP VECTORS WHA!!!
+        h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])
     } else {
         // 3. From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h256_xof(&[tr, &[0x01u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+        h256_xof(&[tr, &[1u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
     };
     let mut mu = [0u8; 64];
     h7.read(&mut mu);
@@ -438,7 +438,7 @@ pub(crate) fn key_gen_internal<
     const SK_LEN: usize,
 >(
     eta: i32, xi: &[u8; 32],
-) -> ([u8; PK_LEN], [u8; SK_LEN]) {
+) -> (PublicKey::<K,L>, PrivateKey<K,L>) {
     //
     // 1: (rho, rho′, 𝐾) ∈ 𝔹32 × 𝔹64 × 𝔹32 ← H(𝜉||IntegerToBytes(𝑘, 1)||IntegerToBytes(ℓ, 1), 128)
     let mut h2 = h256_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
@@ -458,12 +458,11 @@ pub(crate) fn key_gen_internal<
     let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, &rho_prime);
 
     // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
-    let t: [R; K] = {
-        let s_1_hat: [T; L] = ntt(&s_1);
-        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-        let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
-        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
-    };
+    //let t: [R; K]
+    let s_1_hat: [T; L] = ntt(&s_1);
+    let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+    let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
+    let t: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))));
 
     // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
     let (t_1, t_0): ([R; K], [R; K]) = power2round(&t);
@@ -479,45 +478,69 @@ pub(crate) fn key_gen_internal<
     h8.read(&mut tr);
 
     // 10: sk ← skEncode(ρ, K, tr, s_1, s_2, t_0)     ▷ K and tr are for use in signing
-    let sk: [u8; SK_LEN] = sk_encode(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0);
+    //let sk: [u8; SK_LEN] = sk_encode(eta, &rho, &cap_k, &tr, &s_1, &s_2, &t_0);
+
+    // the last term of:
+    // 9: 𝐰Approx ← NTT (𝐀 ∘ NTT(𝐳) − NTT(𝑐) ∘ NTT(𝐭1 ⋅ 2𝑑 ))    ▷ 𝐰Approx = 𝐀𝐳 − 𝑐𝐭1 ⋅ 2𝑑
+    let t1_hat_mont: [T; K] = to_mont(&ntt(&t_1));
+    let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
+        T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
+    }));
+    let pk = PublicKey { rho, cap_a_hat: cap_a_hat.clone(), tr, t1_d2_hat_mont };
+
+    // 2: s_hat_1 ← NTT(s_1)
+    let s_hat_1_mont: [T; L] = to_mont(&s_1_hat); //ntt(&s_1));
+    // 3: s_hat_2 ← NTT(s_2)
+    let s_hat_2_mont: [T; K] = to_mont(&ntt(&s_2));
+    // 4: t_hat_0 ← NTT(t_0)
+    let t_hat_0_mont: [T; K] = to_mont(&ntt(&t_0));
+    let sk = PrivateKey {
+        rho,
+        cap_k,
+        tr,
+        s_hat_1_mont,
+        s_hat_2_mont,
+        t_hat_0_mont,
+        cap_a_hat,
+    };
 
     // 11: return (pk, sk)
     (pk, sk)
 }
 
 
-pub(crate) fn private_to_public<
-    const CTEST: bool,
-    const K: usize,
-    const L: usize,
-    const PK_LEN: usize,
-    const SK_LEN: usize,
->(
-    eta: i32, sk: &[u8; SK_LEN],
-) -> [u8; PK_LEN] {
-    //
-    // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
-    // Code can only arrive here from keygen or a deserialized and validated sk
-    let (rho, _cap_k, _tr, s_1, s_2, sk_t_0) = sk_decode(eta, sk).unwrap();
-
-    // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
-
-    // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
-    let t: [R; K] = {
-        let s_1_hat: [T; L] = ntt(&s_1);
-        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-        let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
-        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
-    };
-
-    // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
-    let (t_1, pk_t_0): ([R; K], [R; K]) = power2round(&t);
-    debug_assert_eq!(sk_t_0, pk_t_0); // fuzz target
-
-    // 7: pk ← pkEncode(ρ, t_1)
-    let pk: [u8; PK_LEN] = pk_encode(rho, &t_1);
-
-    // 10: return (pk) # , sk)
-    pk
-}
+// pub(crate) fn private_to_public<
+//     const CTEST: bool,
+//     const K: usize,
+//     const L: usize,
+//     const PK_LEN: usize,
+//     const SK_LEN: usize,
+// >(
+//     eta: i32, sk: &[u8; SK_LEN],
+// ) -> [u8; PK_LEN] {
+//     //
+//     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
+//     // Code can only arrive here from keygen or a deserialized and validated sk
+//     let (rho, _cap_k, _tr, s_1, s_2, sk_t_0) = sk_decode(eta, sk).unwrap();
+//
+//     // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
+//     let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
+//
+//     // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
+//     let t: [R; K] = {
+//         let s_1_hat: [T; L] = ntt(&s_1);
+//         let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+//         let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
+//         core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
+//     };
+//
+//     // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
+//     let (t_1, pk_t_0): ([R; K], [R; K]) = power2round(&t);
+//     debug_assert_eq!(sk_t_0, pk_t_0); // fuzz target
+//
+//     // 7: pk ← pkEncode(ρ, t_1)
+//     let pk: [u8; PK_LEN] = pk_encode(rho, &t_1);
+//
+//     // 10: return (pk) # , sk)
+//     pk
+// }

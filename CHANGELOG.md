@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.4.3 (2024-10-XX)
 
-- Adapted ExpandedPrivateKey into PrivateKey and ExpandedPublicKey into PublicKey, removed the former(s)
+- Adapted PrivateKey into PrivateKey and PublicKey into PublicKey, removed the former(s)
 - Internal revision to align comments with released spec
 - Revisit/revise supporting benchmarks, embedded target, dudect, fuzz and wasm functionality 
 

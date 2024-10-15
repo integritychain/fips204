@@ -6,18 +6,18 @@ use rand_core::OsRng;
 
 /// The `KeyGen` trait is defined to allow trait objects for keygen.
 pub trait KeyGen {
-    /// A public key specific to the chosen security parameter set, e.g., ml-dsa-44,
-    /// ml-dsa-65 or ml-dsa-87
-    type PublicKey;
-    /// A private (secret) key specific to the chosen security parameter set, e.g.,
-    /// ml-dsa-44, ml-dsa-65 or ml-dsa-87
-    type PrivateKey;
+    // /// A public key specific to the chosen security parameter set, e.g., ml-dsa-44,
+    // /// ml-dsa-65 or ml-dsa-87
+    // type PublicKey;
+    // /// A private (secret) key specific to the chosen security parameter set, e.g.,
+    // /// ml-dsa-44, ml-dsa-65 or ml-dsa-87
+    // type PrivateKey;
     /// An expanded public key containing precomputed elements to increase (repeated)
     /// verify performance. Derived from the public key.
-    type ExpandedPublicKey;
+    type PublicKey;
     /// An expanded private key containing precomputed elements to increase (repeated)
     /// signing performance. Derived from the private key.
-    type ExpandedPrivateKey;
+    type PrivateKey;
 
     /// Generates a public and private key pair specific to this security parameter set.
     /// This function utilizes the **OS default** random number generator. This function operates
@@ -110,26 +110,26 @@ pub trait KeyGen {
     fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey);
 
 
-    /// Generates an expanded private key from the normal/compressed private key.
-    /// This supports improved signing performance. This function operates in constant-time
-    /// relative to secret data (which specifically excludes the provided random `rho`
-    /// value as it is stored in the public key).
-    /// # Errors
-    /// This function operates on trusted data - either a private key directly from `keygen()`
-    /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
-    /// symmetry which can propagates internal errors.
-    fn gen_expanded_private(
-        sk: &Self::PrivateKey,
-    ) -> Result<Self::ExpandedPrivateKey, &'static str>;
-
-    /// Generates an expanded public key from the normal/compressed public key.
-    /// This supports improved verification performance. As this function operates on purely
-    /// public data, it need not provide constant-time assurances.
-    /// # Errors
-    /// This function operates on trusted data - either a public key directly from `keygen()`
-    /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
-    /// symmetry which can propagates internal errors.
-    fn gen_expanded_public(pk: &Self::PublicKey) -> Result<Self::ExpandedPublicKey, &'static str>;
+    // /// Generates an expanded private key from the normal/compressed private key.
+    // /// This supports improved signing performance. This function operates in constant-time
+    // /// relative to secret data (which specifically excludes the provided random `rho`
+    // /// value as it is stored in the public key).
+    // /// # Errors
+    // /// This function operates on trusted data - either a private key directly from `keygen()`
+    // /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
+    // /// symmetry which can propagates internal errors.
+    // fn gen_expanded_private(
+    //     sk: &Self::PrivateKey,
+    // ) -> Result<Self::PrivateKey, &'static str>;
+    //
+    // /// Generates an expanded public key from the normal/compressed public key.
+    // /// This supports improved verification performance. As this function operates on purely
+    // /// public data, it need not provide constant-time assurances.
+    // /// # Errors
+    // /// This function operates on trusted data - either a public key directly from `keygen()`
+    // /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
+    // /// symmetry which can propagates internal errors.
+    // fn gen_expanded_public(pk: &Self::PublicKey) -> Result<Self::PublicKey, &'static str>;
 }
 
 
@@ -163,6 +163,7 @@ pub trait Signer {
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
     /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
     /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
+    /// assert!(v);
     /// # }
     /// # Ok(())}
     /// ```
@@ -197,6 +198,7 @@ pub trait Signer {
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
     /// let sig = sk.try_sign_with_rng(&mut rng, &message, &[0])?;  // Use the secret key to generate a message signature
     /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
+    /// assert!(v);
     /// # }
     /// # Ok(())}
     /// ```
@@ -264,6 +266,7 @@ pub trait Verifier {
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
     /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
     /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
+    /// assert!(v);
     /// # }
     /// # Ok(())}
     /// ```

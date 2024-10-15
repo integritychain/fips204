@@ -12,11 +12,11 @@ pub enum Ph {
 }
 
 
-/// Correctly sized private key specific to the target security parameter set. <br>
-/// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
-#[repr(align(8))]
-pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
+// /// Correctly sized private key specific to the target security parameter set. <br>
+// /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.
+// #[derive(Clone, Zeroize, ZeroizeOnDrop)]
+// #[repr(align(8))]
+// pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 
 
 /// Expanded private key, specific to the target security parameter set, that contains <br>
@@ -24,7 +24,7 @@ pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
 /// the [`crate::traits::Signer`] trait.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
-pub struct ExpandedPrivateKey<const K: usize, const L: usize> {
+pub struct PrivateKey<const K: usize, const L: usize> {
     pub(crate) rho: [u8; 32],
     pub(crate) cap_k: [u8; 32],
     pub(crate) tr: [u8; 64],
@@ -35,11 +35,11 @@ pub struct ExpandedPrivateKey<const K: usize, const L: usize> {
 }
 
 
-/// Correctly sized public key specific to the target security parameter set. <br>
-/// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
-#[repr(align(8))]
-pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
+// /// Correctly sized public key specific to the target security parameter set. <br>
+// /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
+// #[derive(Clone, Zeroize, ZeroizeOnDrop)]
+// #[repr(align(8))]
+// pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
 
 
 /// Expanded public key, specific to the target security parameter set, that contains <br>
@@ -47,7 +47,7 @@ pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
 /// the [`crate::traits::Verifier`] traits.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
-pub struct ExpandedPublicKey<const K: usize, const L: usize> {
+pub struct PublicKey<const K: usize, const L: usize> {
     pub(crate) rho: [u8; 32],
     pub(crate) cap_a_hat: [[T; L]; K],
     pub(crate) tr: [u8; 64],

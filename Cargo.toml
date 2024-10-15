@@ -49,7 +49,7 @@ harness = false
 [profile.dev]
 debug = true
 #lto = true
-#opt-level = 3
+opt-level = 1
 #codegen-units = 1
 
 
