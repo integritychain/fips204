@@ -16,7 +16,9 @@
 
 // TODO Roadmap
 //  1. Improve docs on first/last few algorithms
-//  2. Always more testing...
+//  2. Several outstanding refactors (mostly down below in this file)
+//  3. Always more testing...
+
 
 // Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>
@@ -74,7 +76,7 @@
 // Algorithm 49 MontgomeryReduce(a) on page 50              --> helpers.rs
 // Types are in types.rs, traits are in traits.rs...
 
-// Note that debug! statements enforce correct program construction and are not involved
+// Note that debug_assert! statements enforce correct program construction and are not involved
 // in any operational dataflow (so are good fuzz targets). The ensure! statements implement
 // conservative dataflow validation. Separately, functions are only generic over security
 // parameters that are directly involved in memory allocation (on the stack). Some coding

@@ -32,7 +32,7 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     pk[32..]
         .chunks_mut(32 * blqd)
         .enumerate()
-        .take(K)  // not strictly needed
+        .take(K) // not strictly needed
         .for_each(|(i, chunk)| simple_bit_pack(&t1[i], (1 << blqd) - 1, chunk));
 
     // 5: return pk

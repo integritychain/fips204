@@ -298,7 +298,8 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
         xof.read(&mut v);
 
         // 5: y[r] ← BitUnpack(v, γ_1 − 1, γ_1)
-        y[r as usize] = bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1).expect("Alg 34: try_from2 fail");
+        y[r as usize] =
+            bit_unpack(&v[0..32 * c], gamma1 - 1, gamma1).expect("Alg 34: try_from2 fail");
 
         // 6: end for
     }
@@ -311,6 +312,7 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
     // 7: return y
     y
 }
+
 
 /// See for example, Algorithm 4 lines 10-22
 pub(crate) fn hash_message(message: &[u8], ph: &Ph, phm: &mut [u8; 64]) -> ([u8; 11], usize) {

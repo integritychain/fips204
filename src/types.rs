@@ -12,16 +12,10 @@ pub enum Ph {
 }
 
 
-// /// Correctly sized private key specific to the target security parameter set. <br>
-// /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] trait.
-// #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-// #[repr(align(8))]
-// pub struct PrivateKey<const SK_LEN: usize>(pub(crate) [u8; SK_LEN]);
-
-
-/// Expanded private key, specific to the target security parameter set, that contains <br>
-/// precomputed elements which increase (repeated) signature performance. Implements only
-/// the [`crate::traits::Signer`] trait.
+/// Private key specific to the target security parameter set that contains
+/// precomputed elements which improve signature performance.
+///
+/// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] traits.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub struct PrivateKey<const K: usize, const L: usize> {
@@ -35,16 +29,10 @@ pub struct PrivateKey<const K: usize, const L: usize> {
 }
 
 
-// /// Correctly sized public key specific to the target security parameter set. <br>
-// /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
-// #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-// #[repr(align(8))]
-// pub struct PublicKey<const PK_LEN: usize>(pub(crate) [u8; PK_LEN]);
-
-
-/// Expanded public key, specific to the target security parameter set, that contains <br>
-/// precomputed elements which increase (repeated) verification performance. Implements only
-/// the [`crate::traits::Verifier`] traits.
+/// Public key specific to the target security parameter set that contains
+/// precomputed elements which improve verification performance.
+///
+/// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 #[repr(align(8))]
 pub struct PublicKey<const K: usize, const L: usize> {

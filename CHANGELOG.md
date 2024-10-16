@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.4.3 (2024-10-XX)
+## 0.4.3 (2024-10-16)
 
-- Adapted PrivateKey into PrivateKey and PublicKey into PublicKey, removed the former(s)
-- Internal revision to align comments with released spec
+- Adapted ExpandedPrivateKey into PrivateKey and ExpandedPublicKey into PublicKey, removed the former(s)
+- Internal revision to align comments with released spec; added try_hash_sign (using OS rng)
 - Revisit/revise supporting benchmarks, embedded target, dudect, fuzz and wasm functionality 
 - Fixed a bug in verify relating to non-empty contexts; asserts on all doctests
 

@@ -58,7 +58,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("ml_dsa_44 pk verify", |b| b.iter(|| pk44.verify(&msg, &sig44, &[])));
     c.bench_function("ml_dsa_65 pk verify", |b| b.iter(|| pk65.verify(&msg, &sig65, &[])));
     c.bench_function("ml_dsa_87 pk verify", |b| b.iter(|| pk87.verify(&msg, &sig87, &[])));
-
 }
 
 criterion_group!(benches, criterion_benchmark);

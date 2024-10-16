@@ -6,12 +6,6 @@ use rand_core::OsRng;
 
 /// The `KeyGen` trait is defined to allow trait objects for keygen.
 pub trait KeyGen {
-    // /// A public key specific to the chosen security parameter set, e.g., ml-dsa-44,
-    // /// ml-dsa-65 or ml-dsa-87
-    // type PublicKey;
-    // /// A private (secret) key specific to the chosen security parameter set, e.g.,
-    // /// ml-dsa-44, ml-dsa-65 or ml-dsa-87
-    // type PrivateKey;
     /// An expanded public key containing precomputed elements to increase (repeated)
     /// verify performance. Derived from the public key.
     type PublicKey;
@@ -108,28 +102,6 @@ pub trait KeyGen {
     /// ```
     #[must_use]
     fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey);
-
-
-    // /// Generates an expanded private key from the normal/compressed private key.
-    // /// This supports improved signing performance. This function operates in constant-time
-    // /// relative to secret data (which specifically excludes the provided random `rho`
-    // /// value as it is stored in the public key).
-    // /// # Errors
-    // /// This function operates on trusted data - either a private key directly from `keygen()`
-    // /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
-    // /// symmetry which can propagates internal errors.
-    // fn gen_expanded_private(
-    //     sk: &Self::PrivateKey,
-    // ) -> Result<Self::PrivateKey, &'static str>;
-    //
-    // /// Generates an expanded public key from the normal/compressed public key.
-    // /// This supports improved verification performance. As this function operates on purely
-    // /// public data, it need not provide constant-time assurances.
-    // /// # Errors
-    // /// This function operates on trusted data - either a public key directly from `keygen()`
-    // /// or one validated during deserialization. Nonetheless, a `Result<>` is returned for
-    // /// symmetry which can propagates internal errors.
-    // fn gen_expanded_public(pk: &Self::PublicKey) -> Result<Self::PublicKey, &'static str>;
 }
 
 
@@ -218,7 +190,8 @@ pub trait Signer {
     /// Will return an error on rng failure
     #[cfg(feature = "default-rng")]
     fn try_hash_sign(
-        &self, message: &[u8], ctx: &[u8], ph: &Ph) -> Result<Self::Signature, &'static str> {
+        &self, message: &[u8], ctx: &[u8], ph: &Ph,
+    ) -> Result<Self::Signature, &'static str> {
         self.try_hash_sign_with_rng(&mut OsRng, message, ctx, ph)
     }
 

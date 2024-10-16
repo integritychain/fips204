@@ -1,12 +1,10 @@
 // This file implements functionality from FIPS 204 sections 5/6: Key Generation, Signing, Verification
 
-use crate::encodings::{
-    pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, w1_encode,
-};
+use crate::encodings::{pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, w1_encode};
 use crate::hashing::{expand_a, expand_mask, expand_s, h256_xof, sample_in_ball};
 use crate::helpers::{
-    center_mod, full_reduce32, infinity_norm, mat_vec_mul, mont_reduce, partial_reduce32, to_mont,
-    add_vector_ntt,
+    add_vector_ntt, center_mod, full_reduce32, infinity_norm, mat_vec_mul, mont_reduce,
+    partial_reduce32, to_mont,
 };
 use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
@@ -33,7 +31,7 @@ pub(crate) fn key_gen<
     const SK_LEN: usize,
 >(
     rng: &mut impl CryptoRngCore, eta: i32,
-) -> Result<(PublicKey::<K,L>, PrivateKey::<K,L>), &'static str> {
+) -> Result<(PublicKey<K, L>, PrivateKey<K, L>), &'static str> {
     //
     // 1: ξ ← {0,1}^{256}    ▷ Choose random seed
     let mut xi = [0u8; 32];
@@ -258,8 +256,6 @@ pub(crate) fn sign<
 }
 
 
-
-
 /// Continuation of `verify_start()`. The `lib.rs` wrapper around this will convert `Error()` to false.
 #[allow(clippy::too_many_arguments, clippy::similar_names)]
 pub(crate) fn verify<
@@ -270,8 +266,8 @@ pub(crate) fn verify<
     const SIG_LEN: usize,
     const W1_LEN: usize,
 >(
-    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &PublicKey<K, L>,
-    m: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &PublicKey<K, L>, m: &[u8],
+    sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<bool, &'static str> {
     //
     let PublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
@@ -369,7 +365,7 @@ pub(crate) fn key_gen_internal<
     const SK_LEN: usize,
 >(
     eta: i32, xi: &[u8; 32],
-) -> (PublicKey::<K,L>, PrivateKey<K,L>) {
+) -> (PublicKey<K, L>, PrivateKey<K, L>) {
     //
     // 1: (rho, rho′, 𝐾) ∈ 𝔹32 × 𝔹64 × 𝔹32 ← H(𝜉||IntegerToBytes(𝑘, 1)||IntegerToBytes(ℓ, 1), 128)
     let mut h2 = h256_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
@@ -393,7 +389,8 @@ pub(crate) fn key_gen_internal<
     let s_1_hat: [T; L] = ntt(&s_1);
     let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
     let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
-    let t: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))));
+    let t: [R; K] =
+        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))));
 
     // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
     let (t_1, t_0): ([R; K], [R; K]) = power2round(&t);
@@ -421,7 +418,7 @@ pub(crate) fn key_gen_internal<
 
     // 2: s_hat_1 ← NTT(s_1)
     let s_hat_1_mont: [T; L] = to_mont(&s_1_hat); //ntt(&s_1));
-    // 3: s_hat_2 ← NTT(s_2)
+                                                  // 3: s_hat_2 ← NTT(s_2)
     let s_hat_2_mont: [T; K] = to_mont(&ntt(&s_2));
     // 4: t_hat_0 ← NTT(t_0)
     let t_hat_0_mont: [T; K] = to_mont(&ntt(&t_0));
@@ -440,13 +437,16 @@ pub(crate) fn key_gen_internal<
 }
 
 
-
-
 /// Expand the private/secret key by pre-calculating some constants used in the signing process.
 /// This is only used in the `try_from_bytes()` deserialization functionality.
 /// # Errors
 /// Returns an error on malformed private key.
-pub(crate) fn expand_private<const CTEST: bool, const K: usize, const L: usize, const SK_LEN: usize>(
+pub(crate) fn expand_private<
+    const CTEST: bool,
+    const K: usize,
+    const L: usize,
+    const SK_LEN: usize,
+>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<PrivateKey<K, L>, &'static str> {
     //
