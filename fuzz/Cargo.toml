@@ -15,6 +15,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+rand_core = { version = "0.6.4", default-features = false }
 
 
 [dependencies.fips204]

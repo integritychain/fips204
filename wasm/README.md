@@ -15,7 +15,7 @@ This is a simple WASM demo for the FIPS 204 code.
    $ cd wasm    # this directory
    $ wasm-pack build
    $ cd www
-   $ npm install
+   $ npm install  # optionally followed by "npm audit fix"
    $ export NODE_OPTIONS=--openssl-legacy-provider
    $ npm run start
    

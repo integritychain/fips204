@@ -12,16 +12,19 @@ $ mkdir -p corpus/fuzz_all
 $ dd if=/dev/zero bs=1 count=6292 > corpus/fuzz_all/seed0
 $ for i in $(seq 1 2); do head -c 6292 </dev/urandom > corpus/fuzz_all/seed$i; done
 $ dd if=/dev/zero bs=1 count=6292 | tr '\0x00' '\377' > corpus/fuzz_all/seed3
-$ cargo fuzz run fuzz_all -j 4 -- -max_total_time=1000  # run twice
+$ cargo fuzz run fuzz_all -j 4 -- -max_total_time=1000  # run three times
 
-#1054: cov: 13559 ft: 10028 corp: 102 exec/s 0 oom/timeout/crash: 0/0/0 time: 899s job: 60 dft_time: 0
-#1084: cov: 13559 ft: 10028 corp: 102 exec/s 0 oom/timeout/crash: 0/0/0 time: 913s job: 61 dft_time: 0
-#1124: cov: 13559 ft: 10028 corp: 102 exec/s 0 oom/timeout/crash: 0/0/0 time: 936s job: 62 dft_time: 0
-#1170: cov: 13559 ft: 10134 corp: 104 exec/s 0 oom/timeout/crash: 0/0/0 time: 954s job: 63 dft_time: 0
-#1207: cov: 13559 ft: 10135 corp: 105 exec/s 0 oom/timeout/crash: 0/0/0 time: 970s job: 64 dft_time: 0
-#1240: cov: 13559 ft: 10135 corp: 105 exec/s 0 oom/timeout/crash: 0/0/0 time: 985s job: 65 dft_time: 0
-INFO: fuzzed for 1001 seconds, wrapping up soon
-INFO: exiting: 0 time: 1004s
+#1020: cov: 13306 ft: 9885 corp: 153 exec/s 0 oom/timeout/crash: 0/0/0 time: 867s job: 50 dft_time: 0
+#1046: cov: 13306 ft: 9910 corp: 155 exec/s 0 oom/timeout/crash: 0/0/0 time: 883s job: 51 dft_time: 0
+#1096: cov: 13306 ft: 9912 corp: 156 exec/s 0 oom/timeout/crash: 0/0/0 time: 905s job: 52 dft_time: 0
+#1132: cov: 13306 ft: 9912 corp: 156 exec/s 0 oom/timeout/crash: 0/0/0 time: 914s job: 53 dft_time: 0
+#1184: cov: 13306 ft: 9913 corp: 157 exec/s 0 oom/timeout/crash: 0/0/0 time: 927s job: 54 dft_time: 0
+#1245: cov: 13306 ft: 9985 corp: 160 exec/s 1 oom/timeout/crash: 0/0/0 time: 945s job: 55 dft_time: 0
+#1270: cov: 13306 ft: 9985 corp: 160 exec/s 0 oom/timeout/crash: 0/0/0 time: 964s job: 56 dft_time: 0
+#1297: cov: 13306 ft: 9990 corp: 162 exec/s 0 oom/timeout/crash: 0/0/0 time: 979s job: 57 dft_time: 0
+#1331: cov: 13306 ft: 9997 corp: 164 exec/s 0 oom/timeout/crash: 0/0/0 time: 996s job: 58 dft_time: 0
+INFO: fuzzed for 1005 seconds, wrapping up soon
+INFO: exiting: 0 time: 1019s
 ~~~
 
 Coverage status of ml_dsa_44 is robust, see:

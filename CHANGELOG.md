@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adapted PrivateKey into PrivateKey and PublicKey into PublicKey, removed the former(s)
 - Internal revision to align comments with released spec
 - Revisit/revise supporting benchmarks, embedded target, dudect, fuzz and wasm functionality 
+- Fixed a bug in verify relating to non-empty contexts; asserts on all doctests
 
 ## 0.4.2 (2024-10-05)
 

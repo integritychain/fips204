@@ -1,9 +1,9 @@
 Figure-of-merit only; no particular care has been taken to disable turbo-boost etc.
 Note that constant-time restrictions on the implementation do impact performance.
 
-Additional performance optimizations will follow the next update to FIPS 204.
-Near-obvious uplift can be had with more careful modular multiplication & addition
-using fewer reductions. Also, 'u16' arithmetic has a performance penalty.
+Additional performance optimizations are on the roadmap. Near-obvious uplift can be 
+had with more careful modular multiplication & addition using fewer reductions. Also, 
+'u16' arithmetic has an x86 performance penalty.
 
 ~~~
 October 15, 2024

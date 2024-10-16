@@ -1,4 +1,4 @@
-// This file implements functionality from FIPS 204 section 5 Key Generation, 6 Signing, 7 Verification
+// This file implements functionality from FIPS 204 sections 5/6: Key Generation, Signing, Verification
 
 use crate::encodings::{
     pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, w1_encode,
@@ -48,42 +48,6 @@ pub(crate) fn key_gen<
 // with the top level try_sign* API in lib.rs. This is due to the support for a precomputed
 // private key that is able to sign with higher performance.
 
-/// TKTK Generates a signature for a message M. Intuitive flow `result = sign_finish(sign_start())`
-///
-/// **Input**:  Private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2·η)+d·k)}` and the message `M` ∈ {0,1}^∗ <br>
-/// **Output**: Expanded private key, then Signature, `σ ∈ B^{32+ℓ·32·(1+bitlen(gamma_1−1))+ω+k}`
-///
-/// # Errors
-/// Returns an error on malformed private key.
-pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, const SK_LEN: usize>(
-    eta: i32, sk: &[u8; SK_LEN],
-) -> Result<PrivateKey<K, L>, &'static str> {
-    //
-    // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
-    let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
-
-    // 2: s_hat_1 ← NTT(s_1)
-    let s_hat_1_mont: [T; L] = to_mont(&ntt(&s_1));
-
-    // 3: s_hat_2 ← NTT(s_2)
-    let s_hat_2_mont: [T; K] = to_mont(&ntt(&s_2));
-
-    // 4: t_hat_0 ← NTT(t_0)
-    let t_hat_0_mont: [T; K] = to_mont(&ntt(&t_0));
-
-    // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
-
-    Ok(PrivateKey {
-        rho: *rho,
-        cap_k: *cap_k,
-        tr: *tr,
-        s_hat_1_mont,
-        s_hat_2_mont,
-        t_hat_0_mont,
-        cap_a_hat,
-    })
-}
 
 /// Continuation of `sign_start()`
 #[allow(
@@ -92,7 +56,7 @@ pub(crate) fn sign_start<const CTEST: bool, const K: usize, const L: usize, cons
     clippy::too_many_arguments,
     clippy::too_many_lines
 )]
-pub(crate) fn sign_finish<
+pub(crate) fn sign<
     const CTEST: bool,
     const K: usize,
     const L: usize,
@@ -106,21 +70,21 @@ pub(crate) fn sign_finish<
 ) -> Result<[u8; SIG_LEN], &'static str> {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
-    // --> calculated in sign_start()
+    // --> calculated in expand_private()
     //
     // 2: s_hat_1 ← NTT(s_1)
-    // --> calculated in sign_start()
+    // --> calculated in expand_private()
     //
     // 3: s_hat_2 ← NTT(s_2)
-    // --> calculated in sign_start()
+    // --> calculated in expand_private()
     //
     // 4: t_hat_0 ← NTT(t_0)
-    // --> calculated in sign_start()
+    // --> calculated in expand_private()
     //
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    // --> calculated in sign_start()
+    // --> calculated in expand_private()
 
-    // Extract from sign_start()
+    // Extract from expand_private()
     let PrivateKey {
         rho: _,
         cap_k,
@@ -294,44 +258,11 @@ pub(crate) fn sign_finish<
 }
 
 
-/// Algorithm 3: `ML-DSA.Verify(pk,M,σ)` on page 19.
-/// Verifies a signature `σ` for a message `M`. Intuitive flow `result = verify_finish(verify_start())`
-///
-/// **Input**:  Public key, `pk ∈ B^{32+32·k·(bitlen(q−1)−d)` and message `M` ∈ {0,1}∗. <br>
-///             Signature, `σ ∈ B^{32+ℓ·32·(1+bitlen(γ_1−1))+ω+k}`. <br>
-/// **Output**: Expanded public key, then boolean result
-///
-/// # Errors
-/// Returns an error on malformed public key.
-pub(crate) fn verify_start<const K: usize, const L: usize, const PK_LEN: usize>(
-    pk: &[u8; PK_LEN],
-) -> Result<PublicKey<K, L>, &'static str> {
-    //
-    // 1: (ρ,t_1) ← pkDecode(pk)
-    let (rho, t_1): (&[u8; 32], [R; K]) = pk_decode(pk)?;
-
-    // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
-    let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(rho);
-
-    // 6: tr ← H(pk, 64)
-    let mut h6 = h256_xof(&[pk]);
-    let mut tr = [0u8; 64];
-    h6.read(&mut tr);
-
-    // the last term of:
-    // 9: 𝐰Approx ← NTT (𝐀 ∘ NTT(𝐳) − NTT(𝑐) ∘ NTT(𝐭1 ⋅ 2𝑑 ))    ▷ 𝐰Approx = 𝐀𝐳 − 𝑐𝐭1 ⋅ 2𝑑
-    let t1_hat_mont: [T; K] = to_mont(&ntt(&t_1));
-    let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
-        T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
-    }));
-
-    Ok(PublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
-}
 
 
 /// Continuation of `verify_start()`. The `lib.rs` wrapper around this will convert `Error()` to false.
 #[allow(clippy::too_many_arguments, clippy::similar_names)]
-pub(crate) fn verify_finish<
+pub(crate) fn verify<
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
@@ -346,7 +277,7 @@ pub(crate) fn verify_finish<
     let PublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
 
     // 1: (ρ, t_1) ← pkDecode(pk)
-    // --> calculated in verify_start()
+    // --> calculated in expand_public()
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
     let (c_tilde, z, h): ([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>) =
@@ -362,10 +293,10 @@ pub(crate) fn verify_finish<
     debug_assert!(infinity_norm(&z) <= gamma1, "Alg 3: i_norm out of range"); // TODO: consider revising
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
-    // --> calculated in verify_start()
+    // --> calculated in expand_public()
 
     // 6: tr ← H(pk, 64)
-    // --> calculated in verify_start()
+    // --> calculated in expand_public()
 
     // 7: 𝜇 ← (H(BytesToBits(tr)||𝑀′, 64))    ▷ Compute message representative µ
     // We may have arrived from 3 different paths
@@ -389,7 +320,7 @@ pub(crate) fn verify_finish<
     let wp_approx: [R; K] = {
         let z_hat: [T; L] = ntt(&z);
         let az_hat: [T; K] = mat_vec_mul(cap_a_hat, &z_hat);
-        // NTT(t_1 · 2^d) --> calculated in verify_start()
+        // NTT(t_1 · 2^d) --> calculated in expand_public()
         let c_hat: &T = &ntt(&[c])[0];
         inv_ntt(&core::array::from_fn(|k| {
             T(core::array::from_fn(|n| {
@@ -509,38 +440,68 @@ pub(crate) fn key_gen_internal<
 }
 
 
-// pub(crate) fn private_to_public<
-//     const CTEST: bool,
-//     const K: usize,
-//     const L: usize,
-//     const PK_LEN: usize,
-//     const SK_LEN: usize,
-// >(
-//     eta: i32, sk: &[u8; SK_LEN],
-// ) -> [u8; PK_LEN] {
-//     //
-//     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
-//     // Code can only arrive here from keygen or a deserialized and validated sk
-//     let (rho, _cap_k, _tr, s_1, s_2, sk_t_0) = sk_decode(eta, sk).unwrap();
-//
-//     // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-//     let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
-//
-//     // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
-//     let t: [R; K] = {
-//         let s_1_hat: [T; L] = ntt(&s_1);
-//         let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-//         let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
-//         core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
-//     };
-//
-//     // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
-//     let (t_1, pk_t_0): ([R; K], [R; K]) = power2round(&t);
-//     debug_assert_eq!(sk_t_0, pk_t_0); // fuzz target
-//
-//     // 7: pk ← pkEncode(ρ, t_1)
-//     let pk: [u8; PK_LEN] = pk_encode(rho, &t_1);
-//
-//     // 10: return (pk) # , sk)
-//     pk
-// }
+
+
+/// Expand the private/secret key by pre-calculating some constants used in the signing process.
+/// This is only used in the `try_from_bytes()` deserialization functionality.
+/// # Errors
+/// Returns an error on malformed private key.
+pub(crate) fn expand_private<const CTEST: bool, const K: usize, const L: usize, const SK_LEN: usize>(
+    eta: i32, sk: &[u8; SK_LEN],
+) -> Result<PrivateKey<K, L>, &'static str> {
+    //
+    // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
+    let (rho, cap_k, tr, s_1, s_2, t_0) = sk_decode(eta, sk)?;
+
+    // 2: s_hat_1 ← NTT(s_1)
+    let s_hat_1_mont: [T; L] = to_mont(&ntt(&s_1));
+
+    // 3: s_hat_2 ← NTT(s_2)
+    let s_hat_2_mont: [T; K] = to_mont(&ntt(&s_2));
+
+    // 4: t_hat_0 ← NTT(t_0)
+    let t_hat_0_mont: [T; K] = to_mont(&ntt(&t_0));
+
+    // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
+    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
+
+    Ok(PrivateKey {
+        rho: *rho,
+        cap_k: *cap_k,
+        tr: *tr,
+        s_hat_1_mont,
+        s_hat_2_mont,
+        t_hat_0_mont,
+        cap_a_hat,
+    })
+}
+
+
+/// Expand the public key by pre-calculating some constants used in the signing process.
+/// This is only used in the `try_from_bytes()` deserialization functionality.
+/// # Errors
+/// Returns an error on malformed public key.
+pub(crate) fn expand_public<const K: usize, const L: usize, const PK_LEN: usize>(
+    pk: &[u8; PK_LEN],
+) -> Result<PublicKey<K, L>, &'static str> {
+    //
+    // 1: (ρ,t_1) ← pkDecode(pk)
+    let (rho, t_1): (&[u8; 32], [R; K]) = pk_decode(pk)?;
+
+    // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
+    let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(rho);
+
+    // 6: tr ← H(pk, 64)
+    let mut h6 = h256_xof(&[pk]);
+    let mut tr = [0u8; 64];
+    h6.read(&mut tr);
+
+    // the last term of:
+    // 9: 𝐰Approx ← NTT (𝐀 ∘ NTT(𝐳) − NTT(𝑐) ∘ NTT(𝐭1 ⋅ 2𝑑 ))    ▷ 𝐰Approx = 𝐀𝐳 − 𝑐𝐭1 ⋅ 2𝑑
+    let t1_hat_mont: [T; K] = to_mont(&ntt(&t_1));
+    let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
+        T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
+    }));
+
+    Ok(PublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
+}

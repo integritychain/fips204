@@ -207,6 +207,23 @@ pub trait Signer {
     ) -> Result<Self::Signature, &'static str>;
 
     /// Attempt to sign the hash of the given message, returning a digital signature on success,
+    /// or an error if something went wrong. This function utilizes the **default OS** random number
+    /// generator and allows for several hash algorithms. This function operates in constant-time
+    /// relative to secret data (which specifically excludes the provided random number generator
+    /// internals, the `rho` value (also) stored in the public key, the hash-derived `rho_prime`
+    /// value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values, and the
+    /// main signing rejection loop as noted in section 5.5 of
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// # Errors
+    /// Will return an error on rng failure
+    #[cfg(feature = "default-rng")]
+    fn try_hash_sign(
+        &self, message: &[u8], ctx: &[u8], ph: &Ph) -> Result<Self::Signature, &'static str> {
+        self.try_hash_sign_with_rng(&mut OsRng, message, ctx, ph)
+    }
+
+
+    /// Attempt to sign the hash of the given message, returning a digital signature on success,
     /// or an error if something went wrong. This function utilizes the **provided** random number
     /// generator and allows for several hash algorithms. This function operates in constant-time
     /// relative to secret data (which specifically excludes the provided random number generator

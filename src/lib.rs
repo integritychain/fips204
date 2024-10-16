@@ -1,6 +1,6 @@
 #![no_std]
 #![deny(clippy::pedantic, warnings, missing_docs, unsafe_code)]
-// Most of the 'allow' category...
+// Almost all of the 'allow' category...
 #![deny(absolute_paths_not_starting_with_crate, dead_code)]
 #![deny(elided_lifetimes_in_paths, explicit_outlives_requirements, keyword_idents)]
 #![deny(let_underscore_drop, macro_use_extern_crate, meta_variable_misuse, missing_abi)]
@@ -13,6 +13,10 @@
 //
 #![doc = include_str!("../README.md")]
 
+
+// TODO Roadmap
+//  1. Improve docs on first/last few algorithms
+//  2. Always more testing...
 
 // Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
 // See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>
@@ -120,47 +124,45 @@ macro_rules! functionality {
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
         const W1_LEN: usize = 32 * K * bit_length((Q - 1) / (2 * GAMMA2) - 1);
-        const CTEST: bool = false; // when true, the logic goes into CT test mode
+        const CTEST: bool = false; // When true, the logic goes into CT test mode
+
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
-//        /// Correctly sized private key specific to the target security parameter set. <br>
-//        /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] traits.
-//        pub type PrivateKey = crate::types::PrivateKey<SK_LEN>;
+        /// Empty struct to enable `KeyGen` trait objects across security parameter
+        /// sets. Implements the [`crate::traits::KeyGen`] trait.
+        #[derive(Zeroize, ZeroizeOnDrop)]
+        pub struct KG();
 
-        /// Expanded private key, specific to the target security parameter set, that contains <br>
-        /// precomputed elements which increase (repeated) signature performance.
+        /// Private key specific to the target security parameter set that contains
+        /// precomputed elements which improves signature performance.
         ///
-        /// Implements only
-        /// the [`crate::traits::Signer`] trait. Derived from the `PrivateKey`.
+        /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] traits.
+        //  #[derive(Zeroize, ZeroizeOnDrop)] is implemented on the underlying type.
         pub type PrivateKey = crate::types::PrivateKey<K, L>;
 
-//        /// Correctly sized public key specific to the target security parameter set. <br>
-//        /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
-//        pub type PublicKey = crate::types::PublicKey<PK_LEN>;
-
-        /// Expanded public key, specific to the target security parameter set, that contains <br>
-        /// precomputed elements which increase (repeated) verification performance.
+        /// Public key specific to the target security parameter set that contains
+        /// precomputed elements which improves verification performance.
         ///
-        /// Implements only
-        /// the [`crate::traits::Verifier`] traits. Derived from the `PublicKey`.
+        /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
+        //  #[derive(Zeroize, ZeroizeOnDrop)] is implemented on the underlying type.
         pub type PublicKey = crate::types::PublicKey<K, L>;
 
-        /// Empty struct to enable `KeyGen` trait objects across security parameter sets. <br>
-        /// Implements the [`crate::traits::KeyGen`] trait.
-        #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-        pub struct KG(); // Arguable how useful an empty struct+trait is...
+        // Note: (public) Signature is just a vanilla fixed-size byte array
+
 
         // ----- PRIMARY FUNCTIONS ---
 
-        /// Algorithm 1: Generates a public and private key pair specific to this security parameter set.
+        /// Algorithm 1: Generates a public and private key pair specific to this security
+        /// parameter set.
         ///
-        /// This function utilizes the **default OS ** random number generator. This function operates
-        /// in constant-time relative to secret data (which specifically excludes the default OS random
-        /// number generator internals, the `rho` value stored in the public key, and the hash-derived
-        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+        /// This function utilizes the **default OS ** random number generator. It operates
+        /// in constant-time relative to secret data (which specifically excludes the
+        /// random number generator internals, the `rho` value stored in the public key,
+        /// and the hash-derived `rho_prime` value that is rejection-sampled/expanded into
+        /// the internal `s_1` and `s_2` values).
         /// # Errors
-        /// Returns an error if/when the random number generator fails.
+        /// Returns an error if the random number generator fails.
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -181,14 +183,16 @@ macro_rules! functionality {
         pub fn try_keygen() -> Result<(PublicKey, PrivateKey), &'static str> { KG::try_keygen() }
 
 
-        /// Algorithm 1: Generates a public and private key pair specific to this security parameter set.
+        /// Algorithm 1: Generates a public and private key pair specific to this security
+        /// parameter set.
         ///
-        /// This function utilizes the **provided** random number generator. This function operates
-        /// in constant-time relative to secret data (which specifically excludes the provided random
-        /// number generator internals, the `rho` value stored in the public key, and the hash-derived
-        /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+        /// This function utilizes the **provided** random number generator. It operates
+        /// in constant-time relative to secret data (which specifically excludes the
+        /// random number generator internals, the `rho` value stored in the public key,
+        /// and the hash-derived `rho_prime` value that is rejection-sampled/expanded into
+        /// the internal `s_1` and `s_2` values).
         /// # Errors
-        /// Returns an error when the random number generator fails.
+        /// Returns an error if the random number generator fails.
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -215,8 +219,7 @@ macro_rules! functionality {
         impl KeyGen for KG {
             type PrivateKey = PrivateKey;
             type PublicKey = PublicKey;
-//            type PrivateKey = PrivateKey;
-//            type PublicKey = PublicKey;
+
 
             // Algorithm 1 in KeyGen trait
             fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
@@ -229,90 +232,39 @@ macro_rules! functionality {
                 let (pk, sk) = ml_dsa::key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, xi);
                 (pk, sk)
             }
-
-//            // A portion of algorithm 1 in KeyGen trait -- expanded private key for faster signing
-//            fn gen_expanded_private(sk: &PrivateKey) -> Result<Self::PrivateKey, &'static str> {
-//                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
-//                Ok(esk)
-//            }
-
-//            // A portion of algorithm 1 in KeyGen trait -- expanded public key for faster verification
-//            fn gen_expanded_public(pk: &PublicKey) -> Result<Self::PublicKey, &'static str> {
-//                let epk = ml_dsa::verify_start(&pk.0)?;
-//                Ok(epk)
-//            }
         }
-
-
-        // impl Signer for PrivateKey {
-        //     type Signature = [u8; SIG_LEN];
-        //     type PublicKey = PublicKey;
-        //
-        //     // Algorithm 2 in Signer trait.
-        //     fn try_sign_with_rng(
-        //         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
-        //     ) -> Result<Self::Signature, &'static str> {
-        //         ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
-        //         let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
-        //         let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-        //             rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &[], &[], false
-        //         )?;
-        //         Ok(sig)
-        //     }
-        //
-        //     // Algorithm 4 in Signer trait.
-        //     fn try_hash_sign_with_rng(
-        //         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
-        //     ) -> Result<Self::Signature, &'static str> {
-        //         ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
-        //         let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &self.0)?;
-        //         let mut phm = [0u8; 64];  // hashers don't all play well with each other
-        //         let (oid, phm_len) = hash_message(message, ph, &mut phm);
-        //         let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-        //             rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &esk, message, ctx, &oid, &phm[0..phm_len], false
-        //         )?;
-        //         Ok(sig)
-        //     }
-        //
-        //     // Documented in traits.rs
-        //     fn get_public_key(&self) -> Self::PublicKey {
-        //         let pk = crate::ml_dsa::private_to_public::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, &self.0);
-        //         PublicKey { 0: pk }
-        //     }
-        // }
 
 
         impl Signer for PrivateKey {
             type Signature = [u8; SIG_LEN];
-            type PublicKey = PublicKey; //[u8; PK_LEN];
+            type PublicKey = PublicKey;
 
-            // Algorithm 2 in Signer trait. Rather than an external+internal split, this split of
-            // start+finish enables the ability of signing with a pre-computeed expanded private
-            // key for performance.
+
+            // Algorithm 2 in Signer trait.
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
-                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                let sig = ml_dsa::sign::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                     rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], false
                 )?;
                 Ok(sig)
             }
 
-            // Algorithm 4 in Signer trait. Rather than an external+internal split, this split of
-            // start+finish enables the ability of signing with a pre-computeed expanded private
-            // key for performance.
+
+            // Algorithm 4 in Signer trait.
             fn try_hash_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
             ) -> Result<Self::Signature, &'static str> {
                 ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                let sig = ml_dsa::sign::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                     rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], false
                 )?;
                 Ok(sig)
             }
+
 
             // Documented in traits.rs
             #[allow(clippy::cast_lossless)]
@@ -324,17 +276,14 @@ macro_rules! functionality {
                 use crate::helpers::to_mont;
                 use crate::D;
 
+                // TODO: refactor
                 let PrivateKey {rho, cap_k: _, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, cap_a_hat} = &self;
-
                 let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
                 let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
-
                 let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
                 let s_2: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if s_2[k].0[n] > (Q >> 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
-
                 let t_0: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t_hat_0_mont[k].0[n] as i64))))));
                 let sk_t_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
-
 
                 // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
                 let t: [R; K] = {
@@ -364,53 +313,12 @@ macro_rules! functionality {
         }
 
 
-        // impl Verifier for PublicKey {
-        //     type Signature = [u8; SIG_LEN];
-        //
-        //     // Algorithm 3 in Verifier trait.
-        //     fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
-        //         if ctx.len() > 255 {
-        //             return false;
-        //         };
-        //         let Ok(epk) = ml_dsa::verify_start(&self.0) else {
-        //             return false;
-        //         };
-        //         let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-        //             BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message, &sig, ctx, &[], &[], false
-        //         ) else {
-        //             return false;
-        //         };
-        //         res
-        //     }
-        //
-        //     // Algorithm 5 in Verifier trait.
-        //     fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool {
-        //         if ctx.len() > 255 {
-        //             return false;
-        //         };
-        //         let Ok(epk) = ml_dsa::verify_start(&self.0) else {
-        //             return false;
-        //         };
-        //         let mut phm = [0u8; 64];  // hashers don't all play well with each other
-        //         let (oid, phm_len) = hash_message(message, ph, &mut phm);
-        //         let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-        //             BETA, GAMMA1, GAMMA2, OMEGA, TAU, &epk, &message,  &sig, ctx, &oid, &phm[0..phm_len], false
-        //         ) else {
-        //             return false;
-        //         };
-        //         res
-        //     }
-        // }
-
-
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            // Algorithm 3 in Verifier trait. Rather than an external+internal split, this split of
-            // start+finish enables the ability of verifing with a pre-computeed expanded public
-            // key for performance.
+            // Algorithm 3 in Verifier trait.
             fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
-                let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                let Ok(res) = ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[], false
                 ) else {
                     return false;
@@ -418,16 +326,14 @@ macro_rules! functionality {
                 res
             }
 
-            // Algorithm 5 in Verifier trait. Rather than an external+internal split, this split of
-            // start+finish enables the ability of verifing with a pre-computeed expanded public
-            // key for performance.
+            // Algorithm 5 in Verifier trait.
             fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool {
                 if ctx.len() > 255 {
                     return false;
                 };
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                let Ok(res) = ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
                 ) else {
                     return false;
@@ -439,39 +345,15 @@ macro_rules! functionality {
 
         // ----- SERIALIZATION AND DESERIALIZATION ---
 
-        // impl SerDes for PrivateKey {
-        //     type ByteArray = [u8; SK_LEN];
-        //
-        //     fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-        //         let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
-        //         Ok(PrivateKey { 0: sk })
-        //     }
-        //
-        //     fn into_bytes(self) -> Self::ByteArray { self.0 }
-        // }
-
-
-        // impl SerDes for PublicKey {
-        //     type ByteArray = [u8; PK_LEN];
-        //
-        //     fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
-        //         let _unused = pk_decode::<K, PK_LEN>(&pk).map_err(|_e| "Public key deserialization failed");
-        //         Ok(PublicKey { 0: pk })
-        //     }
-        //
-        //     fn into_bytes(self) -> Self::ByteArray { self.0 }
-        // }
-
-
         impl SerDes for PrivateKey {
             type ByteArray = [u8; SK_LEN];
 
+
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                // let _unused = sk_decode::<K, L, SK_LEN>(ETA, &sk).map_err(|_e| "Private key deserialization failed");
-                // let sk = PrivateKey { 0: sk };
-                let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk)?;
+                let esk = ml_dsa::expand_private::<CTEST, K, L, SK_LEN>(ETA, &sk)?;
                 Ok(esk)
             }
+
 
             #[allow(clippy::cast_lossless)]
             fn into_bytes(self) -> Self::ByteArray {
@@ -480,18 +362,14 @@ macro_rules! functionality {
                 use crate::helpers::full_reduce32;
                 use crate::ntt::inv_ntt;
 
-                // TODO: polish needed
+                // TODO: refactor
                 let PrivateKey {rho, cap_k, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, ..} = &self;
-
                 let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
                 let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
-
                 let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
                 let s_2: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if s_2[k].0[n] > (Q >> 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
-
                 let t_0: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t_hat_0_mont[k].0[n] as i64))))));
                 let t_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
-
                 let sk = crate::encodings::sk_encode::<K, L, SK_LEN>(ETA, rho, cap_k, tr, &s_1, &s_2, &t_0);
                 sk
             }
@@ -501,11 +379,13 @@ macro_rules! functionality {
         impl SerDes for PublicKey {
             type ByteArray = [u8; PK_LEN];
 
+
             fn try_from_bytes(pk: Self::ByteArray) -> Result<Self, &'static str> {
-                let epk = ml_dsa::verify_start(&pk)?;
+                let epk = ml_dsa::expand_public(&pk)?;
                 Ok(epk)
 
             }
+
 
             #[allow(clippy::cast_lossless)]
             fn into_bytes(self) -> Self::ByteArray {
@@ -515,6 +395,7 @@ macro_rules! functionality {
                 use crate::ntt::inv_ntt;
                 use crate::D;
 
+                // TODO: refactor
                 let PublicKey {rho, cap_a_hat, tr, t1_d2_hat_mont} = &self;
                 let (_, _, _, _) = (rho, cap_a_hat, tr, t1_d2_hat_mont);
                 let t1_d2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t1_d2_hat_mont[k].0[n] as i64))))));
@@ -523,6 +404,7 @@ macro_rules! functionality {
                 pk
              }
         }
+
 
         #[cfg(test)]
         mod tests {
@@ -547,18 +429,10 @@ macro_rules! functionality {
                         assert!(v);
                     }
                     assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
-
-                    // let esk = KG::gen_expanded_private(&sk);
-                    // assert_eq!(sk.into_bytes(), esk.clone().unwrap().into_bytes());
-                    //
-                    // let epk = KG::gen_expanded_public(&pk);
-                    // assert_eq!(pk.clone().into_bytes(), epk.unwrap().into_bytes());
-
-                    // let pk2 = esk.unwrap().get_public_key();
-                    // assert_eq!(pk.into_bytes(), pk2);
                 }
             }
         }
+
 
         // ----- SUPPORT FOR DUDECT CONSTANT TIME MEASUREMENTS ---
 
@@ -571,9 +445,8 @@ macro_rules! functionality {
             rng: &mut impl CryptoRngCore, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-            //let esk = ml_dsa::sign_start::<true, K, L, SK_LEN>(ETA, &sk)?;
-            let sig = ml_dsa::sign_finish::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], false
+            let sig = ml_dsa::sign::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], true
             )?;
             Ok(sig)
         }
@@ -592,8 +465,7 @@ macro_rules! functionality {
             sk: &PrivateKey, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
-            //let esk = ml_dsa::sign_start::<CTEST, K, L, SK_LEN>(ETA, &sk.0)?;
-            let sig = ml_dsa::sign_finish::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+            let sig = ml_dsa::sign::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                 rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, sk, message, ctx, &[], &[], true
             )?;
             Ok(sig)
@@ -612,10 +484,7 @@ macro_rules! functionality {
             if ctx.len() > 255 {
                 return false;
             };
-            // let Ok(epk) = ml_dsa::verify_start(&pk.0) else {
-            //     return false;
-            // };
-            let Ok(res) = ml_dsa::verify_finish::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+            let Ok(res) = ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                 BETA, GAMMA1, GAMMA2, OMEGA, TAU, pk, &message, &sig, ctx, &[], &[], true
             ) else {
                 return false;
