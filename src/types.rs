@@ -25,7 +25,7 @@ pub struct PrivateKey<const K: usize, const L: usize> {
     pub(crate) s_hat_1_mont: [T; L],
     pub(crate) s_hat_2_mont: [T; K],
     pub(crate) t_hat_0_mont: [T; K],
-    pub(crate) cap_a_hat: [[T; L]; K],
+//    pub(crate) cap_a_hat: [[T; L]; K],
 }
 
 
@@ -37,7 +37,7 @@ pub struct PrivateKey<const K: usize, const L: usize> {
 #[repr(align(8))]
 pub struct PublicKey<const K: usize, const L: usize> {
     pub(crate) rho: [u8; 32],
-    pub(crate) cap_a_hat: [[T; L]; K],
+//    pub(crate) cap_a_hat: [[T; L]; K],
     pub(crate) tr: [u8; 64],
     pub(crate) t1_d2_hat_mont: [T; K],
 }

@@ -15,9 +15,9 @@
 
 
 // TODO Roadmap
+//  0. Code clean-up, more carefully shrink stack
 //  1. Improve docs on first/last few algorithms
-//  2. Several outstanding refactors (mostly down below in this file)
-//  3. Always more testing...
+//  2. Always more testing...
 
 
 // Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
@@ -277,9 +277,11 @@ macro_rules! functionality {
                 use crate::high_low::power2round;
                 use crate::helpers::to_mont;
                 use crate::D;
+                use crate::hashing::expand_a;
 
                 // TODO: refactor
-                let PrivateKey {rho, cap_k: _, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, cap_a_hat} = &self;
+                let PrivateKey {rho, cap_k: _, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont} = &self;
+                let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(&rho);
                 let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
                 let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
                 let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
@@ -307,7 +309,8 @@ macro_rules! functionality {
                 let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
                     T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
                 }));
-                let pk = PublicKey { rho: *rho, cap_a_hat: cap_a_hat.clone(), tr: *tr, t1_d2_hat_mont};
+                //let pk = PublicKey { rho: *rho, cap_a_hat: cap_a_hat.clone(), tr: *tr, t1_d2_hat_mont};
+                let pk = PublicKey { rho: *rho, tr: *tr, t1_d2_hat_mont};
 
                 // 10: return pk
                 pk
@@ -320,7 +323,7 @@ macro_rules! functionality {
 
             // Algorithm 3 in Verifier trait.
             fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
-                let Ok(res) = ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                let Ok(res) = ml_dsa::verify::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[], false
                 ) else {
                     return false;
@@ -335,7 +338,7 @@ macro_rules! functionality {
                 };
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let Ok(res) = ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                let Ok(res) = ml_dsa::verify::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
                 ) else {
                     return false;
@@ -396,9 +399,11 @@ macro_rules! functionality {
                 use crate::helpers::full_reduce32;
                 use crate::ntt::inv_ntt;
                 use crate::D;
+                use crate::hashing::expand_a;
 
                 // TODO: refactor
-                let PublicKey {rho, cap_a_hat, tr, t1_d2_hat_mont} = &self;
+                let PublicKey {rho, tr, t1_d2_hat_mont} = &self;
+                let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(&rho);
                 let (_, _, _, _) = (rho, cap_a_hat, tr, t1_d2_hat_mont);
                 let t1_d2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t1_d2_hat_mont[k].0[n] as i64))))));
                 let t1: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| t1_d2[k].0[n] >> D)));
@@ -486,7 +491,7 @@ macro_rules! functionality {
             if ctx.len() > 255 {
                 return false;
             };
-            let Ok(res) = ml_dsa::verify::<K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+            let Ok(res) = ml_dsa::verify::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                 BETA, GAMMA1, GAMMA2, OMEGA, TAU, pk, &message, &sig, ctx, &[], &[], true
             ) else {
                 return false;

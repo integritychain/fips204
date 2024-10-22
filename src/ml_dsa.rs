@@ -84,14 +84,16 @@ pub(crate) fn sign<
 
     // Extract from expand_private()
     let PrivateKey {
-        rho: _,
+        rho,
         cap_k,
         tr,
         s_hat_1_mont,
         s_hat_2_mont,
         t_hat_0_mont,
-        cap_a_hat,
+        //cap_a_hat,
     } = esk;
+
+    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
 
     // 6: 𝜇 ← H(BytesToBits(𝑡𝑟)||𝑀 , 64)    ▷ Compute message representative µ
     // We may have arrived from 3 different paths
@@ -134,7 +136,7 @@ pub(crate) fn sign<
         // 12: w ← NTT−1(cap_a_hat ◦ NTT(y))
         let w: [R; K] = {
             let y_hat: [T; L] = ntt(&y);
-            let ay_hat: [T; K] = mat_vec_mul(cap_a_hat, &y_hat);
+            let ay_hat: [T; K] = mat_vec_mul(&cap_a_hat, &y_hat);
             inv_ntt(&ay_hat)
         };
 
@@ -259,6 +261,7 @@ pub(crate) fn sign<
 /// Continuation of `verify_start()`. The `lib.rs` wrapper around this will convert `Error()` to false.
 #[allow(clippy::too_many_arguments, clippy::similar_names)]
 pub(crate) fn verify<
+    const CTEST: bool,
     const K: usize,
     const L: usize,
     const LAMBDA_DIV4: usize,
@@ -270,7 +273,8 @@ pub(crate) fn verify<
     sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
 ) -> Result<bool, &'static str> {
     //
-    let PublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
+    //let PublicKey { rho: _, cap_a_hat, tr, t1_d2_hat_mont } = epk;
+    let PublicKey { rho, tr, t1_d2_hat_mont } = epk;
 
     // 1: (ρ, t_1) ← pkDecode(pk)
     // --> calculated in expand_public()
@@ -314,8 +318,10 @@ pub(crate) fn verify<
 
     // 9: w′_Approx ← invNTT(cap_A_hat ◦ NTT(z) - NTT(c) ◦ NTT(t_1 · 2^d)    ▷ w′_Approx = Az − ct1·2^d
     let wp_approx: [R; K] = {
+        // hardcode CTEST as false since everything is public here
+        let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
         let z_hat: [T; L] = ntt(&z);
-        let az_hat: [T; K] = mat_vec_mul(cap_a_hat, &z_hat);
+        let az_hat: [T; K] = mat_vec_mul(&cap_a_hat, &z_hat);
         // NTT(t_1 · 2^d) --> calculated in expand_public()
         let c_hat: &T = &ntt(&[c])[0];
         inv_ntt(&core::array::from_fn(|k| {
@@ -378,22 +384,22 @@ pub(crate) fn key_gen_internal<
 
     // There is effectively no step 2 due to formatting error in spec
 
-    // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
-
     // 4: (s_1, s_2) ← ExpandS(ρ′)
     let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, &rho_prime);
 
+    // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
     // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
-    //let t: [R; K]
-    let s_1_hat: [T; L] = ntt(&s_1);
-    let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-    let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
-    let t: [R; K] =
-        core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))));
-
     // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
-    let (t_1, t_0): ([R; K], [R; K]) = power2round(&t);
+
+    let (t_1, t_0): ([R; K], [R; K]) = {
+        let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
+        let s_1_hat: [T; L] = ntt(&s_1);
+        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
+        let t: [R; K] =
+            core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))));
+        power2round(&t)
+    };
 
     // There is effectively no step 7 due to formatting error in spec
 
@@ -414,10 +420,12 @@ pub(crate) fn key_gen_internal<
     let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
         T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
     }));
-    let pk = PublicKey { rho, cap_a_hat: cap_a_hat.clone(), tr, t1_d2_hat_mont };
+    //let pk = PublicKey { rho, cap_a_hat: cap_a_hat.clone(), tr, t1_d2_hat_mont };
+    let pk = PublicKey { rho, tr, t1_d2_hat_mont };
 
     // 2: s_hat_1 ← NTT(s_1)
-    let s_hat_1_mont: [T; L] = to_mont(&s_1_hat); //ntt(&s_1));
+    //let s_hat_1_mont: [T; L] = to_mont(&s_1_hat); //ntt(&s_1));
+    let s_hat_1_mont: [T; L] = to_mont(&ntt(&s_1));
                                                   // 3: s_hat_2 ← NTT(s_2)
     let s_hat_2_mont: [T; K] = to_mont(&ntt(&s_2));
     // 4: t_hat_0 ← NTT(t_0)
@@ -429,7 +437,7 @@ pub(crate) fn key_gen_internal<
         s_hat_1_mont,
         s_hat_2_mont,
         t_hat_0_mont,
-        cap_a_hat,
+        // cap_a_hat,
     };
 
     // 11: return (pk, sk)
@@ -463,7 +471,7 @@ pub(crate) fn expand_private<
     let t_hat_0_mont: [T; K] = to_mont(&ntt(&t_0));
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
-    let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
+    //let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
 
     Ok(PrivateKey {
         rho: *rho,
@@ -472,7 +480,7 @@ pub(crate) fn expand_private<
         s_hat_1_mont,
         s_hat_2_mont,
         t_hat_0_mont,
-        cap_a_hat,
+        //cap_a_hat,
     })
 }
 
@@ -489,7 +497,7 @@ pub(crate) fn expand_public<const K: usize, const L: usize, const PK_LEN: usize>
     let (rho, t_1): (&[u8; 32], [R; K]) = pk_decode(pk)?;
 
     // 5: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as cap_A_hat
-    let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(rho);
+    //let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(rho);
 
     // 6: tr ← H(pk, 64)
     let mut h6 = h256_xof(&[pk]);
@@ -503,5 +511,6 @@ pub(crate) fn expand_public<const K: usize, const L: usize, const PK_LEN: usize>
         T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
     }));
 
-    Ok(PublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
+    //Ok(PublicKey { rho: *rho, cap_a_hat, tr, t1_d2_hat_mont })
+    Ok(PublicKey { rho: *rho, tr, t1_d2_hat_mont })
 }
