@@ -25,7 +25,7 @@
 
 // Functionality map per FIPS 204
 //
-// Algorithm 1 ML-DSA.KeyGen() on page 17                   --> lib.rs
+// Algorithm 1 ML-DSA.KeyGen() on page 17                   --> ml_dsa.rs (from lib.rs)
 // Algorithm 2 ML-DSA.Sign(sk,M,ctx) on page 18             --> lib.rs
 // Algorithm 3 ML-DSA.Verify(pk,M,s,ctx) on page 18         --> lib.rs
 // Algorithm 4 HashML-DSA.Sign(sk,M,ctx,PH) on page 20      --> lib.rs
@@ -116,16 +116,18 @@ const D: u32 = 13; // See table 1 page 15 third row
 // largely a lightweight wrapper into the ml_dsa functions.
 macro_rules! functionality {
     () => {
-        use crate::hashing::hash_message;
-        use crate::helpers::{bit_length, ensure};
+        use crate::encodings;
+        use crate::hashing;
+        use crate::helpers;
         use crate::ml_dsa;
+        use crate::ntt;
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
-        use crate::types::Ph;
+        use crate::types;
         use rand_core::CryptoRngCore;
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         const LAMBDA_DIV4: usize = LAMBDA / 4;
-        const W1_LEN: usize = 32 * K * bit_length((Q - 1) / (2 * GAMMA2) - 1);
+        const W1_LEN: usize = 32 * K * helpers::bit_length((Q - 1) / (2 * GAMMA2) - 1);
         const CTEST: bool = false; // When true, the logic goes into CT test mode
 
 
@@ -229,7 +231,7 @@ macro_rules! functionality {
                 Ok((pk, sk))
             }
 
-
+            // Algorithm 1 in KeyGen trait
             fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey) {
                 let (pk, sk) = ml_dsa::key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, xi);
                 (pk, sk)
@@ -241,29 +243,89 @@ macro_rules! functionality {
             type Signature = [u8; SIG_LEN];
             type PublicKey = PublicKey;
 
-
-            // Algorithm 2 in Signer trait.
+            /// Algorithm 2: ML-DSA.Sign(𝑠𝑘, 𝑀 , 𝑐𝑡𝑥)
+            /// Generates an ML-DSA signature.
+            ///
+            /// **Input**:  Private key `𝑠𝑘 ∈ 𝔹^{32+32+64+32⋅((ℓ+𝑘)⋅bitlen(2𝜂)+𝑑𝑘)}`,
+            ///             message `𝑀 ∈ {0, 1}∗`,
+            ///             context string ctx (a byte string of 255 or fewer bytes). <br>
+            /// **Output**: Signature `𝜎 ∈ 𝔹𝜆/4+ℓ⋅32⋅(1+bitlen (𝛾1 −1))+𝜔+𝑘`.
+            ///
+            /// # Errors
+            /// Returns an error when the random number generator fails or context too long.
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
-                ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
-                let sig = ml_dsa::sign::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], false
-                )?;
+                // 1: if |ctx| > 255 then
+                // 2:   return ⊥    ▷ return an error indication if the context string is too long
+                // 3: end if
+                helpers::ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+
+                // 4:  (blank line in spec)
+
+                // 5: rnd ← 𝔹^{32}     ▷ for the optional deterministic variant, substitute rnd ← {0}^32
+                // 6: if rnd = NULL then
+                // 7:   return ⊥    ▷ return an error indication if random bit generation failed
+                // 8: end if
+                let mut rnd = [0u8; 32];
+                rng.try_fill_bytes(&mut rnd).map_err(|_| "ML-DSA.Sign: random number generator failed")?;
+
+                // 9:  (blank line in spec)
+
+                // Note: step 10 is done within sign_internal() and 'below'
+                // 10: 𝑀 ′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+                // 11: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
+                let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], rnd, false
+                );
+
+                // 12: return 𝜎
                 Ok(sig)
             }
 
 
-            // Algorithm 4 in Signer trait.
+            /// Algorithm 4: HashML-DSA.Sign(𝑠𝑘, 𝑀 , 𝑐𝑡𝑥, PH) on page 20.
+            /// Generate a “pre-hash” ML-DSA signature.
+            ///
+            /// **Input**:  Private key `sk ∈ 𝔹^{32+32+64+32⋅((ℓ+𝑘)⋅bitlen(2𝜂)+𝑑𝑘)}`,
+            ///             message `𝑀 ∈ {0, 1}∗`,
+            ///             context string ctx (a byte string of 255 or fewer bytes),
+            ///             pre-hash function PH. <br>
+            /// **Output**: ML-DSA signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}`.
+            ///
+            /// # Errors
+            /// Returns an error when the random number generator fails or context too long.
             fn try_hash_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
+                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &types::Ph,
             ) -> Result<Self::Signature, &'static str> {
-                ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
+                // 1: if |ctx| > 255 then
+                // 2:   return ⊥    ▷ return an error indication if the context string is too long
+                // 3: end if
+                helpers::ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
+
+                // 4:  (blank line in spec)
+
+                // 5: rnd ← 𝔹^{32}     ▷ for the optional deterministic variant, substitute rnd ← {0}^32
+                // 6: if rnd = NULL then
+                // 7:   return ⊥    ▷ return an error indication if random bit generation failed
+                // 8: end if
+                let mut rnd = [0u8; 32];
+                rng.try_fill_bytes(&mut rnd).map_err(|_| "HashML-DSA.Sign: random number generator failed")?;
+
+                // 9:  (blank line in spec)
+
+                // Note: steps 10-22 are performed within `hash_message()` below
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
-                let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let sig = ml_dsa::sign::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], false
-                )?;
+                let (oid, phm_len) = hashing::hash_message(message, ph, &mut phm);
+
+                // Note: step 23 is performed within `sign_internal()` and below.
+                // 23: 𝑀 ′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+                // 24: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
+                let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], rnd, false
+                );
+
+                // 25: return 𝜎
                 Ok(sig)
             }
 
@@ -271,49 +333,7 @@ macro_rules! functionality {
             // Documented in traits.rs
             #[allow(clippy::cast_lossless)]
             fn get_public_key(&self) -> Self::PublicKey {
-                use crate::types::{R, T};
-                use crate::ntt::{inv_ntt, ntt};
-                use crate::helpers::{add_vector_ntt, mat_vec_mul, full_reduce32, mont_reduce};
-                use crate::high_low::power2round;
-                use crate::helpers::to_mont;
-                use crate::D;
-                use crate::hashing::expand_a;
-
-                // TODO: refactor
-                let PrivateKey {rho, cap_k: _, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont} = &self;
-                let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(&rho);
-                let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
-                let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
-                let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
-                let s_2: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if s_2[k].0[n] > (Q >> 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
-                let t_0: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t_hat_0_mont[k].0[n] as i64))))));
-                let sk_t_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
-
-                // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
-                let t: [R; K] = {
-                    let s_1_hat: [T; L] = ntt(&s_1);
-                    let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
-                    let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
-                    core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
-                };
-
-                // 6: (t_1, t_0) ← Power2Round(t, d)    ▷ Compress t
-                let (t_1, pk_t_0): ([R; K], [R; K]) = power2round(&t);
-                debug_assert_eq!(sk_t_0, pk_t_0); // fuzz target
-
-                // 7: pk ← pkEncode(ρ, t_1)
-                //let pk: [u8; PK_LEN] = pk_encode(rho, &t_1);
-                // the last term of:
-                // 9: 𝐰Approx ← NTT (𝐀 ∘ NTT(𝐳) − NTT(𝑐) ∘ NTT(𝐭1 ⋅ 2𝑑 ))    ▷ 𝐰Approx = 𝐀𝐳 − 𝑐𝐭1 ⋅ 2𝑑
-                let t1_hat_mont: [T; K] = to_mont(&ntt(&t_1));
-                let t1_d2_hat_mont: [T; K] = to_mont(&core::array::from_fn(|k| {
-                    T(core::array::from_fn(|n| mont_reduce(i64::from(t1_hat_mont[k].0[n]) << D)))
-                }));
-                //let pk = PublicKey { rho: *rho, cap_a_hat: cap_a_hat.clone(), tr: *tr, t1_d2_hat_mont};
-                let pk = PublicKey { rho: *rho, tr: *tr, t1_d2_hat_mont};
-
-                // 10: return pk
-                pk
+                ml_dsa::private_to_public_key(&self)
             }
         }
 
@@ -321,29 +341,63 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            // Algorithm 3 in Verifier trait.
+            /// Algorithm 3: ML-DSA.Verify(pk, 𝑀, 𝜎, ctx) on page 18.
+            /// Verifies a signature 𝜎 for a message 𝑀.
+            ///
+            /// **Input**:  Public key 𝑝𝑘 ∈ 𝔹^{32+32𝑘(bitlen(𝑞−1)−𝑑)},
+            ///             message 𝑀 ∈ {0, 1}∗,
+            ///             signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1−1))+𝜔+𝑘},
+            ///             context string ctx (a byte string of 255 or fewer bytes). <br>
+            /// **Output**: Boolean.
             fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
-                let Ok(res) = ml_dsa::verify::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[], false
-                ) else {
-                    return false;
-                };
-                res
-            }
-
-            // Algorithm 5 in Verifier trait.
-            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool {
+                // 1: if |ctx| > 255 then
+                // 2:   return ⊥    ▷ return an error indication if the context string is too long
+                // 3: end if
                 if ctx.len() > 255 {
                     return false;
                 };
-                let mut phm = [0u8; 64];  // hashers don't all play well with each other
-                let (oid, phm_len) = hash_message(message, ph, &mut phm);
-                let Ok(res) = ml_dsa::verify::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
-                ) else {
+
+                // 4:  (blank line in spec)
+
+                // Note: step 5 is performed within `verify_internal()` and below.
+                // 5: 𝑀′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx) ∥ 𝑀
+                // 6: return ML-DSA.Verify_internal(pk, 𝑀′, 𝜎)
+                ml_dsa::verify_internal::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[], false
+                )
+            }
+
+            /// Algorithm 5: HashML-DSA.Verify(pk, 𝑀 , 𝜎, ctx, PH) on page 21.
+            /// Verifies a pre-hash HashML-DSA signature.
+            ///
+            /// **Input**:  Public key 𝑝𝑘 ∈ 𝔹^{32+32𝑘(bitlen(𝑞−1)−𝑑)},
+            ///             message 𝑀 ∈ {0, 1}∗,
+            ///             signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘},
+            ///             context string ctx (a byte string of 255 or fewer bytes),
+            ///             pre-hash function PH. <br>
+            /// **Output**: Boolean.
+            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &types::Ph) -> bool {
+                // 1: if |ctx| > 255 then
+                // 2:   return ⊥    ▷ return an error indication if the context string is too long
+                // 3: end if
+                if ctx.len() > 255 {
                     return false;
                 };
-                res
+
+                // 4:  (blank line in spec)
+
+                // Note: steps 5-17 are performed within `hash_message()` below
+                let mut phm = [0u8; 64];  // hashers don't all play well with each other
+                let (oid, phm_len) = hashing::hash_message(message, ph, &mut phm);
+
+                // Note: step 18 is pe
+                //
+                // performed within `verify_internal()` and below.
+                // 18: 𝑀′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx ∥ OID ∥ PH𝑀 )
+                // 19: return ML-DSA.Verify_internal(𝑝𝑘, 𝑀′ , 𝜎)
+                ml_dsa::verify_internal::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
+                )
             }
         }
 
@@ -360,23 +414,42 @@ macro_rules! functionality {
             }
 
 
-            #[allow(clippy::cast_lossless)]
             fn into_bytes(self) -> Self::ByteArray {
-                use crate::types::{R, T};
-                use crate::helpers::mont_reduce;
-                use crate::helpers::full_reduce32;
-                use crate::ntt::inv_ntt;
-
-                // TODO: refactor
+                // Extract the pre-computes
                 let PrivateKey {rho, cap_k, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, ..} = &self;
-                let s_1: [R; L] = inv_ntt(&core::array::from_fn(|l| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_1_mont[l].0[n] as i64))))));
-                let s_1: [R; L] = core::array::from_fn(|l| R(core::array::from_fn(|n| if s_1[l].0[n] > (Q >> 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
-                let s_2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(s_hat_2_mont[k].0[n] as i64))))));
-                let s_2: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if s_2[k].0[n] > (Q >> 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
-                let t_0: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t_hat_0_mont[k].0[n] as i64))))));
-                let t_0: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
-                let sk = crate::encodings::sk_encode::<K, L, SK_LEN>(ETA, rho, cap_k, tr, &s_1, &s_2, &t_0);
-                sk
+
+                // mont->norm each n coeff, of L entries of T, then inverse NTT
+                let s_1: [types::R; L] = ntt::inv_ntt(
+                    &core::array::from_fn(|l|
+                        types::T(core::array::from_fn(|n|
+                            helpers::mont_reduce(i64::from(s_hat_1_mont[l].0[n]))))));
+                // correct each coeff such that they are centered around 0
+                let s_1: [types::R; L] =
+                    core::array::from_fn(|l|
+                        types::R(core::array::from_fn(|n|
+                            if s_1[l].0[n] > (Q / 2) {s_1[l].0[n] - Q} else {s_1[l].0[n]})));
+
+                let s_2: [types::R; K] = ntt::inv_ntt(
+                    &core::array::from_fn(|k|
+                        types::T(core::array::from_fn(|n|
+                            helpers::mont_reduce(i64::from(s_hat_2_mont[k].0[n]))))));
+                let s_2: [types::R; K] =
+                    core::array::from_fn(|k|
+                        types::R(core::array::from_fn(|n|
+                            if s_2[k].0[n] > (Q / 2) {s_2[k].0[n] - Q} else {s_2[k].0[n]})));
+
+
+                let t_0: [types::R; K] = ntt::inv_ntt(
+                    &core::array::from_fn(|k|
+                        types::T(core::array::from_fn(|n|
+                            helpers::mont_reduce(i64::from(t_hat_0_mont[k].0[n]))))));
+                let t_0: [types::R; K] =
+                    core::array::from_fn(|k|
+                        types::R(core::array::from_fn(|n|
+                            if t_0[k].0[n] > (Q / 2) {t_0[k].0[n] - Q} else {t_0[k].0[n]})));
+
+                // Encode and return
+                encodings::sk_encode::<K, L, SK_LEN>(ETA, rho, cap_k, tr, &s_1, &s_2, &t_0)
             }
         }
 
@@ -392,23 +465,20 @@ macro_rules! functionality {
             }
 
 
-            #[allow(clippy::cast_lossless)]
             fn into_bytes(self) -> Self::ByteArray {
-                use crate::types::{R, T};
-                use crate::helpers::mont_reduce;
-                use crate::helpers::full_reduce32;
-                use crate::ntt::inv_ntt;
-                use crate::D;
-                use crate::hashing::expand_a;
+                // Extract the pre-computes
+                let PublicKey {rho, tr: _tr, t1_d2_hat_mont} = &self;
 
-                // TODO: refactor
-                let PublicKey {rho, tr, t1_d2_hat_mont} = &self;
-                let cap_a_hat: [[T; L]; K] = expand_a::<false, K, L>(&rho);
-                let (_, _, _, _) = (rho, cap_a_hat, tr, t1_d2_hat_mont);
-                let t1_d2: [R; K] = inv_ntt(&core::array::from_fn(|k| T(core::array::from_fn(|n| full_reduce32(mont_reduce(t1_d2_hat_mont[k].0[n] as i64))))));
-                let t1: [R; K] = core::array::from_fn(|k| R(core::array::from_fn(|n| t1_d2[k].0[n] >> D)));
-                let pk = crate::encodings::pk_encode(rho, &t1);
-                pk
+                let t1_d2: [types::R; K] = ntt::inv_ntt(
+                    &core::array::from_fn(|k|
+                        types::T(core::array::from_fn(|n|
+                            helpers::mont_reduce(i64::from(t1_d2_hat_mont[k].0[n]))))));
+
+                let t1: [types::R; K] = core::array::from_fn(|k|
+                    types::R(core::array::from_fn(|n|
+                        t1_d2[k].0[n] >> crate::D)));
+
+                encodings::pk_encode(rho, &t1)
              }
         }
 
@@ -452,9 +522,11 @@ macro_rules! functionality {
             rng: &mut impl CryptoRngCore, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-            let sig = ml_dsa::sign::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], true
-            )?;
+            let mut rnd = [0u8; 32];
+            rng.try_fill_bytes(&mut rnd).map_err(|_| "Random number generator failed")?;
+            let sig = ml_dsa::sign_internal::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], rnd, true
+            );
             Ok(sig)
         }
 
@@ -469,12 +541,12 @@ macro_rules! functionality {
         /// # Errors
         /// Propagate errors from the `sign_finish()` function (for failing RNG).
         pub fn _internal_sign(
-            sk: &PrivateKey, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
+            sk: &PrivateKey, message: &[u8], ctx: &[u8], rnd: [u8; 32]
         ) -> Result<[u8; SIG_LEN], &'static str> {
-            ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
-            let sig = ml_dsa::sign::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                rng, BETA, GAMMA1, GAMMA2, OMEGA, TAU, sk, message, ctx, &[], &[], true
-            )?;
+            helpers::ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+            let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                BETA, GAMMA1, GAMMA2, OMEGA, TAU, sk, message, ctx, &[], &[], rnd, true
+            );
             Ok(sig)
         }
 
@@ -491,12 +563,9 @@ macro_rules! functionality {
             if ctx.len() > 255 {
                 return false;
             };
-            let Ok(res) = ml_dsa::verify::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+            ml_dsa::verify_internal::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                 BETA, GAMMA1, GAMMA2, OMEGA, TAU, pk, &message, &sig, ctx, &[], &[], true
-            ) else {
-                return false;
-            };
-            res
+            )
         }
     };
 }
