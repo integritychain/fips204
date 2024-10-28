@@ -67,7 +67,7 @@
 // Algorithm 40 UseHint(h,r) on page 41                     --> high_low.rs
 // Algorithm 41 NTT(w) on page 43                           --> ntt.rs
 // Algorithm 42 NTT−1(wˆ) on page 44                        --> ntt.rs
-// Algorithm 43 BitRev8(m) on page 44                       --> helpers.rs
+// Algorithm 43 BitRev8(m) on page 44                       --> not needed to to zeta table
 // Algorithm 44 AddNTT(a,b)̂ on page 45                      --> helpers.rs
 // Algorithm 45 MultiplyNTT(a,b)̂ on page 45                 --> helpers.rs
 // Algorithm 46 AddVectorNTT(v,w) on page 45                --> helpers.rs

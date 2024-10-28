@@ -53,15 +53,15 @@ jobs:
 
 
 # TODO: Temp 'fix' for Rust 1.80/1.81 problem involving 'time'; to be unwound...
-#  cargo_outdated:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#      - uses: dtolnay/rust-toolchain@stable
-#      - name: Install cargo outdated
-#        run: cargo install --locked cargo-outdated
-#      - name: Run cargo outdated
-#        run: cargo outdated -R
+  cargo_outdated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo outdated
+        run: cargo install --locked cargo-outdated
+      - name: Run cargo outdated
+        run: cargo outdated -R
 
 
   clippy:

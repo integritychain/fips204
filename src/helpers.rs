@@ -117,11 +117,17 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     w_hat
 }
 
-// Algorithm 44: `AddNTT()` and Algorithm 46 `AddVectorNTT()`
-/// Vector addition; e.g., fips 203 bottom of page 9, second row: `z_hat` = `u_hat` + `v_hat`
+
+// Note Algorithm 44 has been dissolved into its place of use(s)
+
+/// Algorithm 46: `AddVectorNTT(v_hat, w_hat)` on page 45.
+/// Computes the sum `v_hat + w_hat` of two vectors `v_hat`, `w_hat` over `𝑇_𝑞`.
+///
+/// **Input**:  `ℓ ∈ ℕ, v_hat ∈ 𝑇_𝑞^ℓ , w_hat ∈ 𝑇_𝑞^ℓ`. <br>
+/// **Output**: `u_hat ∈ 𝑇_𝑞^ℓ`.
 #[must_use]
-pub(crate) fn add_vector_ntt<const K: usize>(vec_a: &[R; K], vec_b: &[R; K]) -> [R; K] {
-    core::array::from_fn(|k| R(core::array::from_fn(|n| vec_a[k].0[n] + vec_b[k].0[n])))
+pub(crate) fn add_vector_ntt<const K: usize>(v_hat: &[R; K], w_hat: &[R; K]) -> [R; K] {
+    core::array::from_fn(|k| R(core::array::from_fn(|n| v_hat[k].0[n] + w_hat[k].0[n])))
 }
 
 
@@ -145,6 +151,11 @@ pub(crate) fn infinity_norm<const ROW: usize>(w: &[R; ROW]) -> i32 {
 }
 
 
+/// Algorithm 49: MontgomeryReduce(𝑎) on page 50.
+/// Computes 𝑎 ⋅ 2−32 mod 𝑞.
+///
+/// **Input**:  Integer 𝑎 with −231 𝑞 ≤ 𝑎 ≤ 231 𝑞.
+/// **Output**: 𝑟 ≡ 𝑎 ⋅ 2−32 mod 𝑞.
 #[allow(clippy::cast_possible_truncation)] // a as i32, res as i32
 pub(crate) const fn mont_reduce(a: i64) -> i32 {
     const QINV: i32 = 58_728_449; // (Q * QINV) % 2**32 = 1
