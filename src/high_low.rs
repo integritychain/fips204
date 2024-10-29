@@ -155,6 +155,7 @@ pub(crate) fn make_hint(gamma2: i32, z: Zq, r: Zq) -> bool {
 pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     //
     // 1: m ← (q− 1)/(2*γ_2)
+    // dissolved into steps 3 and 4 below
 
     // 2: (r1, r0) ← Decompose(r)
     let (r1, r0) = decompose(gamma2, r);

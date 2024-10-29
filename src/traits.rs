@@ -9,17 +9,21 @@ pub trait KeyGen {
     /// An expanded public key containing precomputed elements to increase (repeated)
     /// verify performance. Derived from the public key.
     type PublicKey;
+
     /// An expanded private key containing precomputed elements to increase (repeated)
     /// signing performance. Derived from the private key.
     type PrivateKey;
+
 
     /// Generates a public and private key pair specific to this security parameter set.
     /// This function utilizes the **OS default** random number generator. This function operates
     /// in constant-time relative to secret data (which specifically excludes the OS random
     /// number generator internals, the `rho` value stored in the public key, and the hash-derived
     /// `rho_prime` values that are rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    ///
     /// # Errors
     /// Returns an error when the random number generator fails.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -41,13 +45,16 @@ pub trait KeyGen {
         Self::try_keygen_with_rng(&mut OsRng)
     }
 
+
     /// Generates a public and private key pair specific to this security parameter set.
     /// This function utilizes the **provided** random number generator. This function operates
     /// in constant-time relative to secret data (which specifically excludes the provided random
     /// number generator internals, the `rho` value stored in the public key, and the hash-derived
     /// `rho_prime` values that are rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    ///
     /// # Errors
     /// Returns an error when the random number generator fails.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -70,11 +77,13 @@ pub trait KeyGen {
         rng: &mut impl CryptoRngCore,
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
+
     /// Generates an public and private key key pair specific to this security parameter set
     /// based on a provided seed. <br>
     /// This function operates in constant-time relative to secret data (which specifically excludes
     /// the the `rho` value stored in the public key and the hash-derived `rho_prime` values that are
     /// rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -109,8 +118,10 @@ pub trait KeyGen {
 pub trait Signer {
     /// The signature is specific to the chosen security parameter set, e.g., ml-dsa-44, ml-dsa-65 or ml-dsa-87
     type Signature;
+
     /// The public key that corresponds to the private/secret key
     type PublicKey;
+
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **OS default** random number generator.
@@ -119,8 +130,10 @@ pub trait Signer {
     /// key, the hash-derived `rho_prime` values that are rejection-sampled/expanded into the internal
     /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>).
+    ///
     /// # Errors
     /// Returns an error when the random number generator fails; propagates internal errors.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -152,8 +165,10 @@ pub trait Signer {
     /// key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the internal
     /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    ///
     /// # Errors
     /// Returns an error when the random number generator fails; propagates internal errors.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -178,6 +193,7 @@ pub trait Signer {
         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 
+    ///
     /// Attempt to sign the hash of the given message, returning a digital signature on success,
     /// or an error if something went wrong. This function utilizes the **default OS** random number
     /// generator and allows for several hash algorithms. This function operates in constant-time
@@ -186,6 +202,7 @@ pub trait Signer {
     /// value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values, and the
     /// main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    ///
     /// # Errors
     /// Will return an error on rng failure
     #[cfg(feature = "default-rng")]
@@ -204,6 +221,7 @@ pub trait Signer {
     /// value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values, and the
     /// main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    ///
     /// # Errors
     /// Will return an error on rng failure
     fn try_hash_sign_with_rng(
@@ -212,6 +230,7 @@ pub trait Signer {
 
 
     /// Retrieves the public key associated with this private/secret key
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -242,6 +261,7 @@ pub trait Verifier {
 
     /// Verifies a digital signature on a message with respect to a `PublicKey`. As this function
     /// operates on purely public data, it need/does not provide constant-time assurances.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -262,6 +282,7 @@ pub trait Verifier {
     /// ```
     fn verify(&self, message: &[u8], signature: &Self::Signature, ctx: &[u8]) -> bool;
 
+
     /// Verifies a digital signature on the hash of a message with respect to a `PublicKey`. As this
     /// function operates on purely public data, it need/does not provide constant-time assurances.
     fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool;
@@ -279,7 +300,9 @@ pub trait SerDes {
     /// The fixed-size byte array to be serialized or deserialized
     type ByteArray;
 
+
     /// Produces a byte array of fixed-size specific to the struct being serialized.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
@@ -299,9 +322,12 @@ pub trait SerDes {
     /// ```
     fn into_bytes(self) -> Self::ByteArray;
 
+
     /// Consumes a byte array of fixed-size specific to the struct being deserialized; performs validation
+    ///
     /// # Errors
     /// Returns an error on malformed input.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;

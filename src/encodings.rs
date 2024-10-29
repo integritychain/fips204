@@ -13,14 +13,14 @@ use crate::{D, Q};
 ///
 /// This is only used in `ml_dsa::key_gen()` and does not involve untrusted input.
 ///
-/// **Input**:  `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}-1]`. <br>
+/// **Input**:  `ρ ∈ B^{32}`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}-1]`. <br>
 /// **Output**: Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`.
 pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     rho: &[u8; 32], t1: &[R; K],
 ) -> [u8; PK_LEN] {
-    let blqd = bit_length(Q - 1) - D as usize;
-    debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << blqd) - 1)), "Alg 22: t1 out of range");
-    debug_assert_eq!(PK_LEN, 32 + 32 * K * blqd, "Alg 22: bad pk/config size");
+    const BLQD: usize = bit_length(Q - 1) - D as usize;
+    debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << BLQD) - 1)), "Alg 22: t1 out of range");
+    debug_assert_eq!(PK_LEN, 32 + 32 * K * BLQD, "Alg 22: bad pk/config size");
     let mut pk = [0u8; PK_LEN];
 
     // 1: pk ← rho
@@ -30,10 +30,10 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     // 3: pk ← pk || SimpleBitPack(t1[i], 2^{bitlen(q−1)−d}-1)
     // 4: end for
     pk[32..]
-        .chunks_mut(32 * blqd)
+        .chunks_mut(32 * BLQD)
         .enumerate()
         .take(K) // not strictly needed
-        .for_each(|(i, chunk)| simple_bit_pack(&t1[i], (1 << blqd) - 1, chunk));
+        .for_each(|(i, chunk)| simple_bit_pack(&t1[i], (1 << BLQD) - 1, chunk));
 
     // 5: return pk
     pk
@@ -47,7 +47,7 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
 /// `simple_bit_unpack()` will detect malformed input -- an overly conservative (?) route for now.
 ///
 /// **Input**:  Public key `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`. <br>
-/// **Output**: `ρ ∈ {0,1}^256`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}−1]`).
+/// **Output**: `ρ ∈ B^{32}`, `t1 ∈ R^k` with coefficients in `[0, 2^{bitlen(q−1)−d}−1]`).
 ///
 /// # Errors
 /// Returns an error when the internal `simple_bit_unpack()` invocation finds an element of
@@ -85,7 +85,7 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
 ///
 /// This is only used in `ml_dsa::key_gen()` and does not involve untrusted input.
 ///
-/// **Input**: `ρ ∈ {0,1}^256`, `K ∈ {0,1}^256`, `tr ∈ {0,1}^512`,
+/// **Input**: `ρ ∈ B^{32}`, `K ∈ B^{32}`, `tr ∈ B^{64}`,
 ///            `s_1 ∈ R^l` with coefficients in `[−η, η]`,
 ///            `s_2 ∈ R^k` with coefficients in `[−η, η]`,
 ///            `t_0 ∈ R^k` with coefficients in `[−2^{d-1}+1, 2^{d-1}]`.
@@ -159,7 +159,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
 ///
 /// **Input**:  Private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2η)+d·k)}`
 ///             Security parameter `η` (eta) must be either 2 or 4.<br>
-/// **Output**: `ρ ∈ {0,1}^256`, `K ∈ {0,1}^256`, `tr ∈ {0,1}^512`,
+/// **Output**: `ρ ∈ B^{32}`, `K ∈ B^{32}`, `tr ∈ B^{64}`,
 ///             `s_1 ∈ R^ℓ`, `s_2 ∈ R^k`, `t_0 ∈ R^k` with coefficients in `[−2^{d−1}+1, 2^{d−1}]`.
 ///
 /// # Errors
@@ -168,13 +168,13 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
 pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
 ) -> Result<(&[u8; 32], &[u8; 32], &[u8; 64], [R; L], [R; K], [R; K]), &'static str> {
+    const TOP: i32 = 1 << (D - 1);
     debug_assert!((eta == 2) || (eta == 4), "Alg 25: incorrect eta");
     debug_assert_eq!(
         SK_LEN,
         128 + 32 * ((K + L) * bit_length(2 * eta) + D as usize * K),
         "Alg 25: bad sk/config size"
     );
-    let top = 1 << (D - 1);
     let (mut s_1, mut s_2, mut t_0) = ([R0; L], [R0; K], [R0; K]);
 
     // 1: (rho, 𝐾, tr, 𝑦0 , … , 𝑦ℓ−1 , 𝑧0 , … , 𝑧𝑘−1 , 𝑤0 , … , 𝑤𝑘−1 ) ∈
@@ -211,7 +211,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     for i in 0..K {
         //
         // 9: t0[i] ← BitUnpack(wi, −2^{d−1} - 1, 2^{d−1})   ▷ This is always in the correct range
-        t_0[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], top - 1, top)?;
+        t_0[i] = bit_unpack(&sk[start + i * step..start + (i + 1) * step], TOP - 1, TOP)?;
 
         // 10: end for
     }
@@ -231,7 +231,7 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
 /// The `CTEST` generic is only passed through to the `hint_bit_pack()` leaf function
 /// such that this logic becomes constant-time.
 ///
-/// **Input**: `c_tilde ∈ {0,1}^2λ` (bits),
+/// **Input**: `c_tilde ∈ B^{λ/4}`,
 ///            `z ∈ R^ℓ` with coefficients in `[−1*γ_1 + 1, γ_1]`,
 ///            `h ∈ R^k_2`. <br>
 /// **Output**: Signature, `σ ∈ B^{λ/4+l·32·(1+bitlen(γ_1-1)+ω+k}`

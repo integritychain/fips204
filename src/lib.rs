@@ -25,14 +25,14 @@
 
 // Functionality map per FIPS 204
 //
-// Algorithm 1 ML-DSA.KeyGen() on page 17                   --> ml_dsa.rs (from lib.rs)
+// Algorithm 1 ML-DSA.KeyGen() on page 17                   --> from lib.rs to ml_dsa.rs
 // Algorithm 2 ML-DSA.Sign(sk,M,ctx) on page 18             --> lib.rs
 // Algorithm 3 ML-DSA.Verify(pk,M,s,ctx) on page 18         --> lib.rs
 // Algorithm 4 HashML-DSA.Sign(sk,M,ctx,PH) on page 20      --> lib.rs
 // Algorithm 5 HashML-DSA.Verify(sk,M,s,ctx,PH) on page 21  --> lib.rs
-// Algorithm 6 ML-DSA.KeyGen_internal(x) on page 23         --> (refactored) ml_dsa.rs
-// Algorithm 7 ML-DSA.Sign_internal(sk,M',rnd) on page 25   --> (refactored) ml_dsa.rs
-// Algorithm 8 ML-DSA.Verify_internal(pk,M',s) on page 27   --> (refactored) ml_dsa.rs
+// Algorithm 6 ML-DSA.KeyGen_internal(x) on page 23         --> ml_dsa.rs
+// Algorithm 7 ML-DSA.Sign_internal(sk,M',rnd) on page 25   --> ml_dsa.rs
+// Algorithm 8 ML-DSA.Verify_internal(pk,M',s) on page 27   --> ml_dsa.rs
 // Algorithm 9 IntegerToBits(x,a) one page 28               --> (optimized away) conversion.rs
 // Algorithm 10 BitsToInteger(y,a) on page 28               --> (optimized away) conversion.rs
 // Algorithm 11 IntegerToBytes(x,a) on page 28              --> (optimized away) conversion.rs
@@ -68,26 +68,26 @@
 // Algorithm 41 NTT(w) on page 43                           --> ntt.rs
 // Algorithm 42 NTT−1(wˆ) on page 44                        --> ntt.rs
 // Algorithm 43 BitRev8(m) on page 44                       --> not needed to to zeta table
-// Algorithm 44 AddNTT(a,b)̂ on page 45                      --> helpers.rs
+// Algorithm 44 AddNTT(a,b)̂ on page 45                      --> helpers.rs within 46:AddVectorNTT
 // Algorithm 45 MultiplyNTT(a,b)̂ on page 45                 --> helpers.rs
 // Algorithm 46 AddVectorNTT(v,w) on page 45                --> helpers.rs
-// Algorithm 47 ScalarVectorNTT(c,v)̂ on page 46             --> helpers.rs
-// Algorithm 48 MatrixVectorNTT(M,v) on page 46             --> helpers.rs
+// Algorithm 47 ScalarVectorNTT(c,v)̂ on page 46             --> not implemented standalone
+// Algorithm 48 MatrixVectorNTT(M,v) on page 46             --> not implemented standalone
 // Algorithm 49 MontgomeryReduce(a) on page 50              --> helpers.rs
 // Types are in types.rs, traits are in traits.rs...
 
 // Note that debug_assert! statements enforce correct program construction and are not involved
 // in any operational dataflow (so are good fuzz targets). The ensure! statements implement
-// conservative dataflow validation. Separately, functions are only generic over security
-// parameters that are directly involved in memory allocation (on the stack). Some coding
-// oddities are driven by 'clippy pedantic' and the fact that Rust doesn't currently do well
-// with arithmetic on generic parameters.
+// conservative dataflow validation and do not panic. Separately, functions are only generic
+// over security parameters that are directly involved in memory allocation (on the stack).
+// Some coding oddities are driven by 'clippy pedantic' and the fact that Rust doesn't currently
+// do well with arithmetic on generic parameters.
 
 // Note that the `CTEST` generic parameter supports constant-time measurements by dudect. This
 // is done by minimally removing timing variability of non-secret data (such as the rejection
-// sampling of hash derived from rho). All normal crate functionality has this set to `false`
-// except for the single function (per namespace) `dudect_keygen_sign_with_rng()` which is only
-// exposed when the non-default `dudect` feature is enabled.
+// sampling of hash derived from rho). All normal crate functionality has this disabled (set to
+// `false`) except for the single function (per namespace) `dudect_keygen_sign_with_rng()`
+// which is only exposed when the non-default `dudect` feature is enabled.
 
 /// The `rand_core` types are re-exported so that users of fips204 do not
 /// have to worry about using the exact correct version of `rand_core`.
@@ -107,9 +107,9 @@ pub mod traits;
 pub use crate::types::Ph;
 
 // Applies across all security parameter sets
-const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; table 1 page 15 first row
-const ZETA: i32 = 1753; // See section 2.5 of FIPS 204; table 1 page 15 second row
-const D: u32 = 13; // See table 1 page 15 third row
+const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; page 15 table 1 first row
+const ZETA: i32 = 1753; // See section 2.5 of FIPS 204; page 15 table 1 second row
+const D: u32 = 13; // See page 15 table 1 third row
 
 
 // This common functionality is injected into each security parameter set namespace, and is
@@ -126,6 +126,8 @@ macro_rules! functionality {
         use rand_core::CryptoRngCore;
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
+        use crate::{D, Q};
+        const BETA: i32 = TAU * ETA;
         const LAMBDA_DIV4: usize = LAMBDA / 4;
         const W1_LEN: usize = 32 * K * helpers::bit_length((Q - 1) / (2 * GAMMA2) - 1);
         const CTEST: bool = false; // When true, the logic goes into CT test mode
@@ -138,35 +140,42 @@ macro_rules! functionality {
         #[derive(Zeroize, ZeroizeOnDrop)]
         pub struct KG();
 
+
         /// Private key specific to the target security parameter set that contains
         /// precomputed elements which improves signature performance.
         ///
         /// Implements the [`crate::traits::Signer`] and [`crate::traits::SerDes`] traits.
-        //  #[derive(Zeroize, ZeroizeOnDrop)] is implemented on the underlying type.
+        // Note: #[derive(Zeroize, ZeroizeOnDrop)] is implemented on the underlying struct.
         pub type PrivateKey = crate::types::PrivateKey<K, L>;
+
 
         /// Public key specific to the target security parameter set that contains
         /// precomputed elements which improves verification performance.
         ///
         /// Implements the [`crate::traits::Verifier`] and [`crate::traits::SerDes`] traits.
-        //  #[derive(Zeroize, ZeroizeOnDrop)] is implemented on the underlying type.
+        // Note: #[derive(Zeroize, ZeroizeOnDrop)] is implemented on the underlying struct.
         pub type PublicKey = crate::types::PublicKey<K, L>;
+
 
         // Note: (public) Signature is just a vanilla fixed-size byte array
 
 
         // ----- PRIMARY FUNCTIONS ---
 
-        /// Algorithm 1: Generates a public and private key pair specific to this security
-        /// parameter set.
+        /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
+        /// Generates a public-private key pair specific to this security parameter set.
         ///
         /// This function utilizes the **default OS ** random number generator. It operates
         /// in constant-time relative to secret data (which specifically excludes the
         /// random number generator internals, the `rho` value stored in the public key,
         /// and the hash-derived `rho_prime` value that is rejection-sampled/expanded into
         /// the internal `s_1` and `s_2` values).
+        ///
+        /// **Output**: Public key struct and private key struct.
+        ///
         /// # Errors
         /// Returns an error if the random number generator fails.
+        ///
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -187,16 +196,20 @@ macro_rules! functionality {
         pub fn try_keygen() -> Result<(PublicKey, PrivateKey), &'static str> { KG::try_keygen() }
 
 
-        /// Algorithm 1: Generates a public and private key pair specific to this security
-        /// parameter set.
+        /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
+        /// Generates a public and private key pair specific to this security parameter set.
         ///
         /// This function utilizes the **provided** random number generator. It operates
         /// in constant-time relative to secret data (which specifically excludes the
         /// random number generator internals, the `rho` value stored in the public key,
         /// and the hash-derived `rho_prime` value that is rejection-sampled/expanded into
         /// the internal `s_1` and `s_2` values).
+        ///
+        /// **Output**: Public key struct and private key struct.
+        ///
         /// # Errors
         /// Returns an error if the random number generator fails.
+        ///
         /// # Examples
         /// ```rust
         /// # use std::error::Error;
@@ -225,13 +238,13 @@ macro_rules! functionality {
             type PublicKey = PublicKey;
 
 
-            // Algorithm 1 in KeyGen trait
+            /// # Algorithm 1 in `KeyGen` trait
             fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((pk, sk))
             }
 
-            // Algorithm 1 in KeyGen trait
+            /// # Algorithm 1 in `KeyGen` trait
             fn keygen_from_seed(xi: &[u8; 32]) -> (Self::PublicKey, Self::PrivateKey) {
                 let (pk, sk) = ml_dsa::key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(ETA, xi);
                 (pk, sk)
@@ -243,13 +256,13 @@ macro_rules! functionality {
             type Signature = [u8; SIG_LEN];
             type PublicKey = PublicKey;
 
-            /// Algorithm 2: ML-DSA.Sign(𝑠𝑘, 𝑀 , 𝑐𝑡𝑥)
+            /// # Algorithm 2: `ML-DSA.Sign(sk, 𝑀 , ctx)` on page 18.
             /// Generates an ML-DSA signature.
             ///
-            /// **Input**:  Private key `𝑠𝑘 ∈ 𝔹^{32+32+64+32⋅((ℓ+𝑘)⋅bitlen(2𝜂)+𝑑𝑘)}`,
+            /// **Input**:  Implemented on private key struct,
             ///             message `𝑀 ∈ {0, 1}∗`,
-            ///             context string ctx (a byte string of 255 or fewer bytes). <br>
-            /// **Output**: Signature `𝜎 ∈ 𝔹𝜆/4+ℓ⋅32⋅(1+bitlen (𝛾1 −1))+𝜔+𝑘`.
+            ///             context string `ctx` (a byte string of 255 or fewer bytes). <br>
+            /// **Output**: Signature `𝜎 ∈ 𝔹𝜆/4+ℓ⋅32⋅(1+bitlen (𝛾1−1))+𝜔+𝑘`.
             ///
             /// # Errors
             /// Returns an error when the random number generator fails or context too long.
@@ -284,13 +297,13 @@ macro_rules! functionality {
             }
 
 
-            /// Algorithm 4: HashML-DSA.Sign(𝑠𝑘, 𝑀 , 𝑐𝑡𝑥, PH) on page 20.
+            /// # Algorithm 4: `HashML-DSA.Sign(𝑠𝑘, 𝑀 , 𝑐𝑡𝑥, PH)` on page 20.
             /// Generate a “pre-hash” ML-DSA signature.
             ///
-            /// **Input**:  Private key `sk ∈ 𝔹^{32+32+64+32⋅((ℓ+𝑘)⋅bitlen(2𝜂)+𝑑𝑘)}`,
+            /// **Input**:  Implemented on private key struct,
             ///             message `𝑀 ∈ {0, 1}∗`,
-            ///             context string ctx (a byte string of 255 or fewer bytes),
-            ///             pre-hash function PH. <br>
+            ///             context string `ctx` (a byte string of 255 or fewer bytes),
+            ///             pre-hash function `PH`. <br>
             /// **Output**: ML-DSA signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}`.
             ///
             /// # Errors
@@ -341,13 +354,13 @@ macro_rules! functionality {
         impl Verifier for PublicKey {
             type Signature = [u8; SIG_LEN];
 
-            /// Algorithm 3: ML-DSA.Verify(pk, 𝑀, 𝜎, ctx) on page 18.
+            /// # Algorithm 3: `ML-DSA.Verify(pk, 𝑀, 𝜎, ctx)` on page 18.
             /// Verifies a signature 𝜎 for a message 𝑀.
             ///
-            /// **Input**:  Public key 𝑝𝑘 ∈ 𝔹^{32+32𝑘(bitlen(𝑞−1)−𝑑)},
-            ///             message 𝑀 ∈ {0, 1}∗,
-            ///             signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1−1))+𝜔+𝑘},
-            ///             context string ctx (a byte string of 255 or fewer bytes). <br>
+            /// **Input**:  Implemented on public key struct,
+            ///             message `𝑀 ∈ {0, 1}∗`,
+            ///             signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1−1))+𝜔+𝑘}`,
+            ///             context string `ctx` (a byte string of 255 or fewer bytes). <br>
             /// **Output**: Boolean.
             fn verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8]) -> bool {
                 // 1: if |ctx| > 255 then
@@ -362,19 +375,19 @@ macro_rules! functionality {
                 // Note: step 5 is performed within `verify_internal()` and below.
                 // 5: 𝑀′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx) ∥ 𝑀
                 // 6: return ML-DSA.Verify_internal(pk, 𝑀′, 𝜎)
-                ml_dsa::verify_internal::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[], false
                 )
             }
 
-            /// Algorithm 5: HashML-DSA.Verify(pk, 𝑀 , 𝜎, ctx, PH) on page 21.
+            /// # Algorithm 5: `HashML-DSA.Verify(pk, 𝑀, 𝜎, ctx, PH)` on page 21.
             /// Verifies a pre-hash HashML-DSA signature.
             ///
-            /// **Input**:  Public key 𝑝𝑘 ∈ 𝔹^{32+32𝑘(bitlen(𝑞−1)−𝑑)},
-            ///             message 𝑀 ∈ {0, 1}∗,
-            ///             signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘},
-            ///             context string ctx (a byte string of 255 or fewer bytes),
-            ///             pre-hash function PH. <br>
+            /// **Input**:  Implemented on public key struct,
+            ///             message `𝑀 ∈ {0, 1}∗`,
+            ///             signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}`,
+            ///             context string `ctx` (a byte string of 255 or fewer bytes),
+            ///             pre-hash function `PH`. <br>
             /// **Output**: Boolean.
             fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &types::Ph) -> bool {
                 // 1: if |ctx| > 255 then
@@ -390,12 +403,10 @@ macro_rules! functionality {
                 let mut phm = [0u8; 64];  // hashers don't all play well with each other
                 let (oid, phm_len) = hashing::hash_message(message, ph, &mut phm);
 
-                // Note: step 18 is pe
-                //
-                // performed within `verify_internal()` and below.
+                // Note: step 18 is performed within `verify_internal()` and below.
                 // 18: 𝑀′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx ∥ OID ∥ PH𝑀 )
                 // 19: return ML-DSA.Verify_internal(𝑝𝑘, 𝑀′ , 𝜎)
-                ml_dsa::verify_internal::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
                 )
             }
@@ -409,14 +420,14 @@ macro_rules! functionality {
 
 
             fn try_from_bytes(sk: Self::ByteArray) -> Result<Self, &'static str> {
-                let esk = ml_dsa::expand_private::<CTEST, K, L, SK_LEN>(ETA, &sk)?;
+                let esk = ml_dsa::expand_private::<K, L, SK_LEN>(ETA, &sk)?;
                 Ok(esk)
             }
 
 
             fn into_bytes(self) -> Self::ByteArray {
                 // Extract the pre-computes
-                let PrivateKey {rho, cap_k, tr, s_hat_1_mont, s_hat_2_mont, t_hat_0_mont, ..} = &self;
+                let PrivateKey {rho, cap_k, tr, s_1_hat_mont: s_hat_1_mont, s_2_hat_mont: s_hat_2_mont, t_0_hat_mont: t_hat_0_mont, ..} = &self;
 
                 // mont->norm each n coeff, of L entries of T, then inverse NTT
                 let s_1: [types::R; L] = ntt::inv_ntt(
@@ -469,6 +480,7 @@ macro_rules! functionality {
                 // Extract the pre-computes
                 let PublicKey {rho, tr: _tr, t1_d2_hat_mont} = &self;
 
+                // reconstruct t1_d2 then t1
                 let t1_d2: [types::R; K] = ntt::inv_ntt(
                     &core::array::from_fn(|k|
                         types::T(core::array::from_fn(|n|
@@ -476,7 +488,7 @@ macro_rules! functionality {
 
                 let t1: [types::R; K] = core::array::from_fn(|k|
                     types::R(core::array::from_fn(|n|
-                        t1_d2[k].0[n] >> crate::D)));
+                        t1_d2[k].0[n] >> D)));
 
                 encodings::pk_encode(rho, &t1)
              }
@@ -515,8 +527,10 @@ macro_rules! functionality {
 
         /// This function supports the dudect constant-time measurement framework, and
         /// is only exposed with the `dudect` feature is enabled.
+        ///
         /// # Errors
         /// Returns an error when the random number generator fails; propagates internal errors.
+        #[deprecated = "Function for constant-time testing; do not use elsewhere"]
         #[cfg(feature = "dudect")]
         pub fn dudect_keygen_sign_with_rng(
             rng: &mut impl CryptoRngCore, message: &[u8],
@@ -531,7 +545,7 @@ macro_rules! functionality {
         }
 
         #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
-        /// As of Oct 14 2024, the NIST test vectors are applied to the **internal** functions rather than
+        /// As of Oct 30 2024, the NIST test vectors are applied to the **internal** functions rather than
         /// the external API.
         ///
         /// The primary difference pertains to the prepending of domain, context, OID and
@@ -543,7 +557,7 @@ macro_rules! functionality {
         pub fn _internal_sign(
             sk: &PrivateKey, message: &[u8], ctx: &[u8], rnd: [u8; 32]
         ) -> Result<[u8; SIG_LEN], &'static str> {
-            helpers::ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
+            helpers::ensure!(ctx.len() < 256, "_internal_sign: ctx too long");
             let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                 BETA, GAMMA1, GAMMA2, OMEGA, TAU, sk, message, ctx, &[], &[], rnd, true
             );
@@ -552,7 +566,7 @@ macro_rules! functionality {
 
         #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
         #[must_use]
-        /// As of Oct 14 2024, the NIST test vectors are applied to the **internal** functions rather than
+        /// As of Oct 30 2024, the NIST test vectors are applied to the **internal** functions rather than
         /// the external API.
         ///
         /// The primary difference pertains to the prepending of domain, context, OID and
@@ -563,7 +577,7 @@ macro_rules! functionality {
             if ctx.len() > 255 {
                 return false;
             };
-            ml_dsa::verify_internal::<false, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+            ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
                 BETA, GAMMA1, GAMMA2, OMEGA, TAU, pk, &message, &sig, ctx, &[], &[], true
             )
         }
@@ -571,7 +585,7 @@ macro_rules! functionality {
 }
 
 
-/// Functionality for the **ML-DSA-44** security parameter set.
+/// # Functionality for the **ML-DSA-44** security parameter set.
 ///
 /// This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-44
@@ -594,7 +608,6 @@ macro_rules! functionality {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-44")]
 pub mod ml_dsa_44 {
-    use super::Q;
     const TAU: i32 = 39;
     const LAMBDA: usize = 128;
     const GAMMA1: i32 = 1 << 17;
@@ -602,7 +615,6 @@ pub mod ml_dsa_44 {
     const K: usize = 4;
     const L: usize = 4;
     const ETA: i32 = 2;
-    const BETA: i32 = TAU * ETA;
     const OMEGA: i32 = 80;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 2560;
@@ -615,7 +627,7 @@ pub mod ml_dsa_44 {
 }
 
 
-/// Functionality for the **ML-DSA-65** security parameter set.
+/// # Functionality for the **ML-DSA-65** security parameter set.
 ///
 /// This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-65
@@ -638,7 +650,6 @@ pub mod ml_dsa_44 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
-    use super::Q;
     const TAU: i32 = 49;
     const LAMBDA: usize = 192;
     const GAMMA1: i32 = 1 << 19;
@@ -646,7 +657,6 @@ pub mod ml_dsa_65 {
     const K: usize = 6;
     const L: usize = 5;
     const ETA: i32 = 4;
-    const BETA: i32 = TAU * ETA;
     const OMEGA: i32 = 55;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 4032;
@@ -659,7 +669,7 @@ pub mod ml_dsa_65 {
 }
 
 
-/// Functionality for the **ML-DSA-87** security parameter set.
+/// # Functionality for the **ML-DSA-87** security parameter set.
 ///
 /// This includes specific sizes for the
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-87
@@ -682,7 +692,6 @@ pub mod ml_dsa_65 {
 /// See the top-level [crate] documentation for example code that implements the above flow.
 #[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
-    use super::Q;
     const TAU: i32 = 60;
     const LAMBDA: usize = 256;
     const GAMMA1: i32 = 1 << 19;
@@ -690,7 +699,6 @@ pub mod ml_dsa_87 {
     const K: usize = 8;
     const L: usize = 7;
     const ETA: i32 = 2;
-    const BETA: i32 = TAU * ETA;
     const OMEGA: i32 = 75;
     /// Private (secret) key length in bytes.
     pub const SK_LEN: usize = 4896;

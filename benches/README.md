@@ -3,7 +3,9 @@ Note that constant-time restrictions on the implementation do impact performance
 
 Additional performance optimizations are on the roadmap. Near-obvious uplift can be 
 had with more careful modular multiplication & addition using fewer reductions. Also, 
-'u16' arithmetic has an x86 performance penalty.
+'u16' arithmetic has an x86 performance penalty. The `cap_a_hat` pre-compute can be
+put into both PublicKey and PrivateKey structs, but current causes stack overflows on
+Windows with unoptimized dev builds...this will be investigated further.
 
 ~~~
 October 15, 2024

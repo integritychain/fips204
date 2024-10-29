@@ -1,4 +1,4 @@
-// This file implements functionality from FIPS 204 section 8.5 `NTT` and `invNTT`
+// This file implements functionality from FIPS 204 section 7.5 `NTT` and `invNTT`
 
 use crate::helpers::{full_reduce32, mont_reduce, ZETA_TABLE_MONT};
 use crate::types::{R, T};

@@ -4,7 +4,7 @@ use crate::{Q, ZETA};
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
 
 
-/// Algorithm 43 `BitRev8()` is not implemented; zetas are pulled from pre-computed table
+/// # Algorithm 43 `BitRev8()` is not implemented; zetas are pulled from pre-computed table
 /// `ZETA_TABLE_MONT`; see below (near end)
 
 /// # Macro ensure!()
@@ -44,8 +44,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 }
 
 
-// TODO: need to experiment a little with `mul_red(32, 32)`
-#[allow(dead_code)]
+#[allow(dead_code)]  // I may come back to this and experiment more
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
     const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
@@ -86,9 +85,9 @@ pub(crate) const fn bit_length(x: i32) -> usize { x.ilog2() as usize + 1 }
 
 
 /// Mod +/- see definition on page 6.
-/// If α is a positive integer and m ∈ Z or m ∈ `Z_α` , then m mod± α denotes the unique
-/// element m′ ∈ Z in the range −α/2 < m′ ≤ α/2 such that m and m′ are congruent
-/// modulo α.  'ready to optimize'
+/// If `α` is a positive integer and `m ∈ Z` or `m ∈ Z_α` , then m mod± α denotes the unique
+/// element `m′ ∈ Z` in the range `−α/2 < m′ ≤ α/2` such that `m` and `m′` are congruent
+/// modulo `α`.  'ready to optimize'
 pub(crate) fn center_mod(m: i32) -> i32 {
     debug_assert!(m.abs() < 2_143_289_344, "center_mod input"); // for clarity; caught in full_reduce32
     let t = full_reduce32(m);
@@ -120,7 +119,7 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
 
 // Note Algorithm 44 has been dissolved into its place of use(s)
 
-/// Algorithm 46: `AddVectorNTT(v_hat, w_hat)` on page 45.
+/// # Algorithm 46: `AddVectorNTT(v_hat, w_hat)` on page 45.
 /// Computes the sum `v_hat + w_hat` of two vectors `v_hat`, `w_hat` over `𝑇_𝑞`.
 ///
 /// **Input**:  `ℓ ∈ ℕ, v_hat ∈ 𝑇_𝑞^ℓ , w_hat ∈ 𝑇_𝑞^ℓ`. <br>
@@ -151,7 +150,7 @@ pub(crate) fn infinity_norm<const ROW: usize>(w: &[R; ROW]) -> i32 {
 }
 
 
-/// Algorithm 49: MontgomeryReduce(𝑎) on page 50.
+/// # Algorithm 49: MontgomeryReduce(𝑎) on page 50.
 /// Computes 𝑎 ⋅ 2−32 mod 𝑞.
 ///
 /// **Input**:  Integer 𝑎 with −231 𝑞 ≤ 𝑎 ≤ 231 𝑞.

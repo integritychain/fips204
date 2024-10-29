@@ -52,7 +52,6 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v1
 
 
-# TODO: Temp 'fix' for Rust 1.80/1.81 problem involving 'time'; to be unwound...
   cargo_outdated:
     runs-on: ubuntu-latest
     steps:

@@ -26,7 +26,7 @@ impl CryptoRng for TestRng {}
 #[repr(align(8))]
 pub struct AlignedBytes<const BYTE_LEN: usize>(pub(crate) [u8; BYTE_LEN]);
 
-
+#[allow(deprecated)] // calling dudect fn below in inner loop
 fn keygen_and_sign(runner: &mut CtRunner, mut _rng: &mut BenchRng) {
     const ITERATIONS_INNER: usize = 5;
     const ITERATIONS_OUTER: usize = 2_usize.pow(20); // 2**20 = 1_048_576

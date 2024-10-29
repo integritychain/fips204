@@ -22,9 +22,9 @@ pub struct PrivateKey<const K: usize, const L: usize> {
     pub(crate) rho: [u8; 32],
     pub(crate) cap_k: [u8; 32],
     pub(crate) tr: [u8; 64],
-    pub(crate) s_hat_1_mont: [T; L],
-    pub(crate) s_hat_2_mont: [T; K],
-    pub(crate) t_hat_0_mont: [T; K],
+    pub(crate) s_1_hat_mont: [T; L],
+    pub(crate) s_2_hat_mont: [T; K],
+    pub(crate) t_0_hat_mont: [T; K],
 }
 
 

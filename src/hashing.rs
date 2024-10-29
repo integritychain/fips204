@@ -7,7 +7,6 @@ use sha2::{Digest, Sha256, Sha512};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
 
-
 /// # Function H(v,d) of section 3.7 item 1 at bottom of page 14.
 /// Takes a reference to a list of byte-slice references and runs them through Shake256.
 /// Returns a xof reader for extracting extendable output.
@@ -86,7 +85,7 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8]) -> R {
         // 13: end for
     }
 
-    // slightly redundant...
+    // slightly redundant, but fuzz target
     debug_assert!(
         c.0.iter().map(|&e| usize::from(e != 0)).sum::<usize>() == tau,
         "Alg 29: bad hamming weight (a)"
@@ -124,10 +123,10 @@ pub(crate) fn rej_ntt_poly<const CTEST: bool>(rhos: &[&[u8]]) -> T {
     while j < 256 {
         //
         // 5: (ctx, 𝑠) ← G.Squeeze(ctx, 3)
-        // 6: a_hat[j] ← CoefFromThreeBytes(H128(ρ)[[c]], H128(ρ)[[c + 1]], H128(ρ)[[c + 2]])
-        let mut h128pc = [0u8; 3];
-        xof.read(&mut h128pc); // implicit c += 3
-        let a_hat_j = coeff_from_three_bytes::<CTEST>(h128pc); // gets a result
+        // 6: 𝑎[𝑗] ← CoeffFromThreeBytes(𝑠[0], 𝑠[1], 𝑠[2])
+        let mut h5 = [0u8; 3];
+        xof.read(&mut h5); // implicit c += 3
+        let a_hat_j = coeff_from_three_bytes::<CTEST>(h5); // gets a result
 
         // 7: if a_hat[j] != ⊥ then
         if let Ok(res) = a_hat_j {
@@ -154,7 +153,7 @@ pub(crate) fn rej_ntt_poly<const CTEST: bool>(rhos: &[&[u8]]) -> T {
 /// The `CTEST` generic is only passed through to the `coef_from_half_byte()` leaf function such
 /// that this logic becomes constant-time.
 ///
-/// **Input**: A seed `ρ ∈B^66`. <br>
+/// **Input**: A seed `ρ ∈B^{66}`. <br>
 /// **Output**: A polynomial `a ∈ Rq`.
 pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R {
     debug_assert_eq!(rhos.iter().map(|&i| i.len()).sum::<usize>(), 528 / 8, "Alg 31: bad rho size");
@@ -221,7 +220,7 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
 /// such that this logic becomes constant-time.
 ///
 /// **Input**: `ρ ∈ B^{32}`. <br>
-/// **Output**: Matrix `cap_a_hat ∈ (𝑇𝑞)^{𝑘×ℓ}`
+/// **Output**: Matrix `cap_a_hat ∈ 𝑇_𝑞^{𝑘×ℓ}`
 #[allow(clippy::cast_possible_truncation)] // s and r as u8
 pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(
     rho: &[u8; 32],
@@ -247,7 +246,7 @@ pub(crate) fn expand_a<const CTEST: bool, const K: usize, const L: usize>(
 /// The `CTEST` generic is only passed through to the `rej_bounded_poly()` leaf function
 /// such that this logic becomes constant-time.
 ///
-/// **Input**: `ρ ∈ B^64` <br>
+/// **Input**: `ρ ∈ B^{64}` <br>
 /// **Output**: Vectors `s1`, `s2` of polynomials in `R_q`.
 #[allow(clippy::cast_possible_truncation)] // r and r+L
 pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
@@ -267,8 +266,8 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
         core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]));
 
     // 7: return (s_1 , s_2)
-    debug_assert!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Alg 27: s1 out of range");
-    debug_assert!(s2.iter().all(|r| is_in_range(r, eta, eta)), "Alg 27: s2 out of range");
+    debug_assert!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Alg 33: s1 out of range");
+    debug_assert!(s2.iter().all(|r| is_in_range(r, eta, eta)), "Alg 33: s2 out of range");
     (s1, s2)
 }
 
@@ -277,8 +276,8 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
 /// Samples a vector `s ∈ R^ℓ_q` such that each polynomial `s_j` has coefficients
 /// between `−γ_1 + 1` and `γ_1`. This function is not exposed to untrusted input.
 ///
-/// **Input**: A bit string `ρ ∈ {0,1}^512` and a non-negative integer `µ`. <br>
-/// **Output**: Vector `y ∈ R^ℓ_q`.
+/// **Input**: A bit string `ρ ∈ B^{64}` and a non-negative integer `µ`. <br>
+/// **Output**: Vector `y ∈ R^ℓ`.
 pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) -> [R; L] {
     let mut y = [R0; L];
     let mut v = [0u8; 32 * 20]; // leaving a few bytes on the table
