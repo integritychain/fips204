@@ -15,8 +15,8 @@ without any unsafe code. All three security parameter sets are fully functional 
 key- and signature-generation functionality operates in constant-time, does not require the standard library, e.g. 
 `#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes the `RNG` so it is suitable for the full 
 range of applications down to the bare-metal. The API is stabilized and the code is heavily biased towards safety 
-and correctness; further performance optimizations will be implemented as the standard matures. This crate will 
-quickly follow any changes to FIPS 204 as they become available.
+and correctness; further performance optimizations will be implemented over time. This crate will quickly follow 
+any changes related to FIPS 204 as they become available (e.g., pick up more test vectors).
 
 See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf> for a full description of the target functionality.
 
@@ -58,12 +58,12 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
-* **BEWARE:** As of September 27, 2024 NIST has not released external/hash test vectors!
+* **BEWARE:** As of October 29, 2024 NIST has not released external/hash test vectors!
 * Constant-time assurances target the source-code level only, with confirmation via
-  manual review/inspection, the embedded target, and the `dudect` dynamic tests.
-* Note that FIPS 204 places specific requirements on randomness per section 3.5.1, hence the exposed `RNG`.
+  manual review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
+* Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
 * Requires Rust **1.70** or higher. The minimum supported Rust version may be changed in the future, but 
-  it will be done with a minor version bump (when the major version is larger than 0).
+  it will be done with a minor version bump (once the major version is larger than 0).
 * All on-by-default features of this library are covered by `SemVer`.
 * The FIPS 204 standard and this software should be considered experimental -- USE AT YOUR OWN RISK!
 

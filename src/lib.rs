@@ -15,9 +15,8 @@
 
 
 // TODO Roadmap
-//  0. Code clean-up, more carefully shrink stack
-//  1. Improve docs on first/last few algorithms
-//  2. Always more testing...
+//  1. Always more testing...
+//  2. Performance optimizations
 
 
 // Implements FIPS 204 Module-Lattice-Based Digital Signature Standard.
