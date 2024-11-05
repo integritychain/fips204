@@ -190,7 +190,7 @@ pub(crate) fn sign_internal<
         h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
     } else {
         // 6c. From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h256_xof(&[tr, &[1u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+        h256_xof(&[tr, &[1u8], &[ctx.len().to_le_bytes()[0]], ctx, oid, phm])
     };
     let mut mu = [0u8; 64];
     h6.read(&mut mu);
@@ -391,7 +391,7 @@ pub(crate) fn verify_internal<
         h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])
     } else {
         // 7c. From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h256_xof(&[tr, &[1u8], &[oid.len().to_le_bytes()[0]], ctx, oid, phm])
+        h256_xof(&[tr, &[1u8], &[ctx.len().to_le_bytes()[0]], ctx, oid, phm])
     };
     let mut mu = [0u8; 64];
     h7.read(&mut mu);
