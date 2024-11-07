@@ -1,6 +1,6 @@
 [package]
 name = "fips204-fuzz"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
 description = "Fuzz harness for FIPS 204 (draft) ML-DSA"
 edition = "2021"
@@ -16,6 +16,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 rand_core = { version = "0.6.4", default-features = false }
+rand_chacha = "0.3.1"
 
 
 [dependencies.fips204]
@@ -37,5 +38,17 @@ overflow-checks = true
 [[bin]]
 name = "fuzz_all"
 path = "fuzz_targets/fuzz_all.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_verify"
+path = "fuzz_targets/fuzz_verify.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_sign"
+path = "fuzz_targets/fuzz_sign.rs"
 test = false
 doc = false
