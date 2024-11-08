@@ -200,8 +200,8 @@ mod tests {
     fn test_partial_reduce64b() {
         // Test with various input values
         assert_eq!(partial_reduce64b(0), 0);
-        assert_eq!(partial_reduce64b(Q as i64), partial_reduce64(Q as i64));
-        assert_eq!(partial_reduce64b(-Q as i64), partial_reduce64b(-Q as i64));
+        assert_eq!(partial_reduce64b(i64::from(Q)), partial_reduce64(i64::from(Q)));
+        assert_eq!(partial_reduce64b(i64::from(-Q)), partial_reduce64b(i64::from(-Q)));
 
         // Test with large positive and negative values
         let large_pos = i64::MAX / 64;
@@ -210,7 +210,7 @@ mod tests {
         assert!(partial_reduce64b(large_neg).abs() < 2 * Q);
 
         // Test with some specific values
-        assert_eq!(partial_reduce64b(12345678), partial_reduce64(12345678));
-        assert_eq!(partial_reduce64b(-12345678), partial_reduce64(-12345678));
+        assert_eq!(partial_reduce64b(12_345_678), partial_reduce64(12_345_678));
+        assert_eq!(partial_reduce64b(-12_345_678), partial_reduce64(-12_345_678));
     }
 }
