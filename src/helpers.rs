@@ -46,7 +46,6 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
 #[allow(dead_code, clippy::cast_possible_truncation)]  // I may come back to this and experiment more
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
     const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
-    debug_assert!(a < (i64::MAX / 64), "partial_reduce64b input"); // actually, works for all 64b inputs!!
     let q = (a as i128 * MM as i128) >> 64; // only top half is relevant
     let res = a - (q as i64 * Q as i64);
     debug_assert!(res.abs() < 2 * Q as i64, "partial_reduce64b output");
@@ -192,9 +191,26 @@ mod tests {
     #[test]
     fn check_zeta() {
         let val = gen_zeta_table_mont();
-        assert_eq!(val[0], 4193792);
-        assert_eq!(val[1], 25847);
-        assert_eq!(val[2], 5771523);
+        assert_eq!(val[0], 4_193_792);
+        assert_eq!(val[1], 25_847);
+        assert_eq!(val[2], 5_771_523);
+    }
 
+    #[test]
+    fn test_partial_reduce64b() {
+        // Test with various input values
+        assert_eq!(partial_reduce64b(0), 0);
+        assert_eq!(partial_reduce64b(Q as i64), partial_reduce64(Q as i64));
+        assert_eq!(partial_reduce64b(-Q as i64), partial_reduce64b(-Q as i64));
+
+        // Test with large positive and negative values
+        let large_pos = i64::MAX / 64;
+        let large_neg = -i64::MAX / 64;
+        assert!(partial_reduce64b(large_pos).abs() < 2 * Q);
+        assert!(partial_reduce64b(large_neg).abs() < 2 * Q);
+
+        // Test with some specific values
+        assert_eq!(partial_reduce64b(12345678), partial_reduce64(12345678));
+        assert_eq!(partial_reduce64b(-12345678), partial_reduce64(-12345678));
     }
 }

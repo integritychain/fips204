@@ -8,7 +8,7 @@
 
 [FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure/safe Rust for server, 
 desktop, browser and embedded applications. The source repository includes examples demonstrating benchmarking,
-an embedded target, constant-time statistical measurements, fuzzing, and WASM execution.
+an embedded target, constant-time statistical measurements, fuzzing, WASM execution, and robust test coverage.
 
 This crate implements the FIPS 204 **released** standard in pure Rust with minimal and mainstream dependencies, and
 without any unsafe code. All three security parameter sets are fully functional and tested. The implementation's 
@@ -58,7 +58,7 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
-* **BEWARE:** As of October 29, 2024 NIST has not released external/hash test vectors!
+* **BEWARE:** As of November 8, 2024 NIST has not released top-level/external/hash test vectors!
 * Constant-time assurances target the source-code level only, with confirmation via
   manual review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
