@@ -528,4 +528,95 @@ mod tests {
         simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         // no panic is good news
     }
+
+    #[test]
+    #[should_panic(expected = "Alg 16: b out of range")]
+    fn test_simple_bit_pack_b_range() {
+        let w = R0; //([0i32; 256]);
+        let mut bytes = [0u8; 32];
+        simple_bit_pack(&w, 0, &mut bytes); // b must be positive
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 16: w out of range")]
+    fn test_simple_bit_pack_w_range() {
+        let mut w = R0; //([0i32; 256]);
+        w.0[0] = 5;
+        let mut bytes = [0u8; 32];
+        simple_bit_pack(&w, 3, &mut bytes); // w coefficient > b
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 16: incorrect size of output bytes")]
+    fn test_simple_bit_pack_output_size() {
+        let w = R0; //([0i32; 256]);
+        let mut bytes = [0u8; 65]; // Wrong output size
+        simple_bit_pack(&w, 2, &mut bytes);
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 17: a out of range")]
+    fn test_bit_pack_a_range() {
+        let w = R0; //([0i32; 256]);
+        let mut bytes = [0u8; 32];
+        bit_pack(&w, -1, 2, &mut bytes); // a must be non-negative
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 17: b out of range")]
+    fn test_bit_pack_b_range() {
+        let w = R0; //([0i32; 256]);
+        let mut bytes = [0u8; 32];
+        bit_pack(&w, 0, 0, &mut bytes); // b must be positive
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 17: w out of range")]
+    fn test_bit_pack_w_range() {
+        let mut w = R0; //([0i32; 256]);
+        w.0[0] = 10;
+        let mut bytes = [0u8; 32];
+        bit_pack(&w, 2, 5, &mut bytes); // w coefficient outside [-a,b] range
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 18: b out of range")]
+    fn test_simple_bit_unpack_b_range() {
+        let bytes = [0u8; 32];
+        let _unused = simple_bit_unpack(&bytes, 0); // b must be positive
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 18: bad output size")]
+    fn test_simple_bit_unpack_input_size() {
+        let bytes = [0u8; 65]; // Wrong input size
+        let _unused = simple_bit_unpack(&bytes, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 20: omega+K out of range")]
+    fn test_hint_bit_pack_omega_k_range() {
+        const K: usize = 255;
+        let h = [R0; K];
+        let mut y_bytes = [0u8; 256];
+        hint_bit_pack::<false, K>(2, &h, &mut y_bytes); // omega + K must be < 256
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 20: h not 0/1")]
+    fn test_hint_bit_pack_h_range() {
+        const K: usize = 2;
+        let mut h = [R0; K];
+        h[0].0[0] = 2; // h must contain only 0s and 1s
+        let mut y_bytes = [0u8; 4];
+        hint_bit_pack::<false, K>(2, &h, &mut y_bytes);
+    }
+
+    #[test]
+    #[should_panic(expected = "Alg 21: omega+K too large")]
+    fn test_hint_bit_unpack_omega_k_range() {
+        const K: usize = 255;
+        let y_bytes = [0u8; 256];
+        let _unused = hint_bit_unpack::<K>(2, &y_bytes); // omega + K must be < 256
+    }
 }

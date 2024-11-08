@@ -43,9 +43,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     res as i32
 }
 
-
-#[allow(dead_code)]  // I may come back to this and experiment more
-#[allow(clippy::cast_possible_truncation)]
+#[allow(dead_code, clippy::cast_possible_truncation)]  // I may come back to this and experiment more
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
     const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
     debug_assert!(a < (i64::MAX / 64), "partial_reduce64b input"); // actually, works for all 64b inputs!!
@@ -185,3 +183,18 @@ const fn gen_zeta_table_mont() -> [i32; 256] {
 
 
 pub(crate) static ZETA_TABLE_MONT: [i32; 256] = gen_zeta_table_mont();
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_zeta() {
+        let val = gen_zeta_table_mont();
+        assert_eq!(val[0], 4193792);
+        assert_eq!(val[1], 25847);
+        assert_eq!(val[2], 5771523);
+
+    }
+}

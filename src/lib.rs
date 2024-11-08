@@ -518,6 +518,31 @@ macro_rules! functionality {
                     }
                     assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
                 }
+
+                let (pk, sk) = try_keygen().unwrap();
+                let sig = sk.try_sign(&message1, &[]).unwrap();
+                assert!(pk.verify(&message1, &sig, &[]));
+                assert!(!pk.verify(&message2, &sig, &[]));
+                assert!(!pk.verify(&message1, &sig, &[0u8; 257]));
+                assert!(sk.try_sign(&message1, &[0u8; 257]).is_err());
+
+                for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
+                    let sig = sk.try_hash_sign(&message1, &[], &ph).unwrap();
+                    let v = pk.hash_verify(&message1, &sig, &[], &ph);
+                    assert!(v);
+                }
+                assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
+
+                let (pk, _) = KG::keygen_from_seed(&[0x11u8; 32]);
+                let pk_bytes = pk.into_bytes();
+                if pk_bytes.len() == 1312 { assert_eq!(pk_bytes[0], 197) }
+                if pk_bytes.len() == 1952 { assert_eq!(pk_bytes[0], 177) }
+                if pk_bytes.len() == 2592 { assert_eq!(pk_bytes[0], 16) }
+
+                #[cfg(feature = "dudect")]
+                #[allow(deprecated)] {
+                assert!(dudect_keygen_sign_with_rng(&mut rng, &[0]).is_ok())
+                }
             }
         }
 
