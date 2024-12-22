@@ -4,8 +4,8 @@ use crate::{Q, ZETA};
 // Some arith routines leverage dilithium https://github.com/PQClean/PQClean/tree/master/crypto_sign
 
 
-/// # Algorithm 43 `BitRev8()` is not implemented; zetas are pulled from pre-computed table
-/// `ZETA_TABLE_MONT`; see below (near end)
+// # Algorithm 43 `BitRev8()` is not implemented; zetas are pulled from pre-computed table
+// `ZETA_TABLE_MONT`; see below (near end)
 
 /// # Macro ensure!()
 /// If the condition is not met, return an error Result. Borrowed from the `anyhow` crate.
