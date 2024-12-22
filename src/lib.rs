@@ -533,7 +533,12 @@ macro_rules! functionality {
                 }
                 assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
 
-                let (pk, _) = KG::keygen_from_seed(&[0x11u8; 32]);
+                let (pk, sk) = KG::keygen_from_seed(&[0x11u8; 32]);
+                let sig = sk.try_sign_with_seed(&[12u8; 32], &message1, &[]).unwrap();
+                assert!(pk.verify(&message1, &sig, &[]));
+                let sig = sk.try_hash_sign_with_seed(&[34u8; 32], &message1, &[], &Ph::SHA256).unwrap();
+                assert!(pk.hash_verify(&message1, &sig, &[], &Ph::SHA256));
+
                 let pk_bytes = pk.into_bytes();
                 if pk_bytes.len() == 1312 { assert_eq!(pk_bytes[0], 197) }
                 if pk_bytes.len() == 1952 { assert_eq!(pk_bytes[0], 177) }

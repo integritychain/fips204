@@ -1,5 +1,5 @@
 use crate::types::Ph;
-use rand_core::CryptoRngCore;
+use rand_core::{CryptoRng, CryptoRngCore, RngCore};
 #[cfg(feature = "default-rng")]
 use rand_core::OsRng;
 
@@ -132,7 +132,7 @@ pub trait Signer {
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>).
     ///
     /// # Errors
-    /// Returns an error when the random number generator fails; propagates internal errors.
+    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     ///
     /// # Examples
     /// ```rust
@@ -167,7 +167,7 @@ pub trait Signer {
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
-    /// Returns an error when the random number generator fails; propagates internal errors.
+    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     ///
     /// # Examples
     /// ```rust
@@ -193,7 +193,45 @@ pub trait Signer {
         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 
+
+    /// Attempt to sign the given message, returning a digital signature on success, or an error if
+    /// something went wrong. This function utilizes the **provided seed to support (less common)
+    /// deterministic signatures**. This function operates in constant-time relative to secret data
+    /// (which specifically excludes the `rho` value stored in the public key, the hash-derived
+    /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values,
+    /// and the main signing rejection loop as noted in section 5.5 of
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
+    /// # Errors
+    /// Returns an error when the `ctx` is longer than 255 bytes; propagates internal errors.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(feature = "ml-dsa-65")] {
+    /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    /// use rand_chacha::rand_core::SeedableRng;
+    ///
+    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    /// let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
+    ///
+    /// // Generate key pair and signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
+    /// let sig = sk.try_sign_with_seed(&[0u8;32], &message, &[0])?;  // Use the secret key to generate a message signature
+    /// let v = pk.verify(&message, &sig, &[0]); // Use the public to verify message signature
+    /// assert!(v);
+    /// # }
+    /// # Ok(())}
+    /// ```
+    fn try_sign_with_seed(
+        &self, seed: &[u8; 32], message: &[u8], ctx: &[u8],
+    ) -> Result<Self::Signature, &'static str> {
+        self.try_sign_with_rng(&mut DummyRng {data: *seed}, message, ctx)
+    }
+
+
     /// Attempt to sign the hash of the given message, returning a digital signature on success,
     /// or an error if something went wrong. This function utilizes the **default OS** random number
     /// generator and allows for several hash algorithms. This function operates in constant-time
@@ -204,7 +242,7 @@ pub trait Signer {
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
-    /// Will return an error on rng failure
+    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     #[cfg(feature = "default-rng")]
     fn try_hash_sign(
         &self, message: &[u8], ctx: &[u8], ph: &Ph,
@@ -223,10 +261,27 @@ pub trait Signer {
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
-    /// Will return an error on rng failure
+    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     fn try_hash_sign_with_rng(
         &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
     ) -> Result<Self::Signature, &'static str>;
+
+
+    /// Attempt to sign the hash of the given message, returning a digital signature on success,
+    /// something went wrong. This function utilizes the **provided seed to support (less common)
+    /// deterministic signatures**. This function operates in constant-time relative to secret data
+    /// (which specifically excludes the `rho` value stored in the public key, the hash-derived
+    /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values,
+    /// and the main signing rejection loop as noted in section 5.5 of
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    ///
+    /// # Errors
+    /// Returns an error when the `ctx` is longer than 255 bytes; propagates internal errors.
+    fn try_hash_sign_with_seed(
+        &self, seed: &[u8;32], message: &[u8], ctx: &[u8], ph: &Ph,
+    ) -> Result<Self::Signature, &'static str> {
+        self.try_hash_sign_with_rng(&mut DummyRng {data: *seed}, message, ctx, ph)
+    }
 
 
     /// Retrieves the public key associated with this private/secret key
@@ -251,6 +306,24 @@ pub trait Signer {
     /// ```
     fn get_public_key(&self) -> Self::PublicKey;
 }
+
+// This is for the deterministic signing functions; will be refactored more nicely
+struct DummyRng { data: [u8; 32] }
+
+impl RngCore for DummyRng {
+    fn next_u32(&mut self) -> u32 { unimplemented!() }
+
+    fn next_u64(&mut self) -> u64 { unimplemented!() }
+
+    fn fill_bytes(&mut self, _out: &mut [u8]) { unimplemented!() }
+
+    fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
+        out.copy_from_slice(&self.data);
+        Ok(())
+    }
+}
+
+impl CryptoRng for DummyRng {}
 
 
 /// The Verifier trait is implemented for `PublicKey` on each of the security parameter sets.
