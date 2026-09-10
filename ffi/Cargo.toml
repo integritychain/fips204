@@ -1,0 +1,26 @@
+[package]
+name = "fips204-ffi"
+version = "0.4.6"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "C shared library exposing FIPS 204: Module-Lattice-Based Digital Signature"
+authors = ["Daniel Kahn Gillmor <dkg@fifthhorseman.net>"]
+documentation = "https://docs.rs/fips204"
+categories = ["cryptography"]
+repository = "https://github.com/integritychain/fips204"
+keywords = ["FIPS204", "lattice", "dilithium", "signature"]
+rust-version = "1.70"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+bench = false
+name = "fips204"
+
+
+[dependencies]
+rand_core = { version = "0.6.4" }
+paste = { version = "1" }
+
+[dependencies.fips204]
+path = ".."
+version = "0.4.6"
