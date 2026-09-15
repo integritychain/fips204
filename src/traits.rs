@@ -290,6 +290,7 @@ pub trait Signer {
     /// ```rust
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(feature = "ml-dsa-65")] {
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
     /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     ///
@@ -301,6 +302,7 @@ pub trait Signer {
     /// // The public key can be derived from the secret key
     /// let pk2 = sk.get_public_key();
     /// assert_eq!(pk1.into_bytes(), pk2.into_bytes());
+    /// # }
     /// # Ok(())
     /// # }
     /// ```
