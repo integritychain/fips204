@@ -86,6 +86,23 @@ macro_rules! parameter_set {
                 ret::OK
             }
 
+            pub fn get_public_key(
+                private: Option<&mut c_private_key>,
+                public_out: Option<&mut c_public_key>,
+            ) -> u8 {
+                use fips204::traits::{Signer, SerDes};
+
+                let (Some(public_out), Some(private)) = (public_out, private) else {
+                    return ret::NULL_PTR_ERROR;
+                };
+                let Ok(privkey) = fips204::$pc::PrivateKey::try_from_bytes(private.data) else {
+                    return ret::DESERIALIZATION_ERROR;
+                };
+                let pubkey = privkey.get_public_key();
+
+                public_out.data = pubkey.into_bytes();
+                ret::OK
+            }
 
             pub fn sign(
                 private: Option<&c_private_key>,
@@ -175,6 +192,15 @@ macro_rules! parameter_set {
             };
             $pc::keygen(Some(seed), public_out, private_out)
         }
+
+        #[no_mangle]
+        pub extern "C" fn [<$pc _get_public_key>] (
+            private: Option<&mut $pc::c_private_key>,
+            public_out: Option<&mut $pc::c_public_key>,
+        ) -> u8 {
+            $pc::get_public_key(private, public_out)
+        }
+
 
         #[no_mangle]
         pub extern "C" fn [<$pc _sign>] (

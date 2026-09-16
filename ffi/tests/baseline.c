@@ -7,6 +7,7 @@ int main(int argc, const char **argv) {
   MLDSA_private_key priv;
   MLDSA_public_key pub_2;
   MLDSA_private_key priv_2;
+  MLDSA_public_key otherpub;
   MLDSA_signature sig;
   MLDSA_signature sig_2;
   ml_dsa_seed seed;
@@ -47,11 +48,21 @@ int main(int argc, const char **argv) {
   for (int n = 0; n < sizeof(pub.data); n++)
     printf ("%02x ", pub.data[n]);
   printf("\n");
-  
+
   printf("Private (%d): ", MLDSA_size);
   for (int n = 0; n < sizeof(priv.data); n++)
     printf ("%02x ", priv.data[n]);
   printf("\n");
+
+  if ((err = MLDSA_get_public_key(&priv, &otherpub))) {
+    fprintf(stderr, "failed to extract public key from private key (err: %d)\n", err);
+    return 9;
+  }
+
+  if (memcmp(&pub, &otherpub, sizeof(pub))) {
+    fprintf(stderr, "get_public_key() output failed to match keygen() output\n");
+    return 10;
+  }
 
   if (MLDSA_sign (&priv, msg, msglen, ctx, ctxlen, &sig))
     return 2;

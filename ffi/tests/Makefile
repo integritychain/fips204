@@ -8,7 +8,7 @@
 #  (cd tests && make AS_INSTALLED=true)
 
 SIZES = 44 65 87
-FRAMES = sign signature verify public_key private_key keygen keygen_from_seed
+FRAMES = sign signature verify public_key private_key keygen keygen_from_seed get_public_key
 # should derive SONAME somehow, e.g. from CARGO_PKG_VERSION_MAJOR
 SONAME = libfips204.$(SO_EXT)
 
