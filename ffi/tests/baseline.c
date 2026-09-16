@@ -16,8 +16,12 @@ int main(int argc, const char **argv) {
 
   const uint8_t msg[] = "wfwfwf";
   const uint8_t ctx[] = "testing";
+  const uint8_t badmsg[] = "ffffff";
+  const uint8_t badctx[] = "badctx";
   const size_t msglen = 6;
   const size_t ctxlen = 7;
+  const size_t badctxlen = 6;
+  const size_t badmsglen = 6;
 
   memset (&seed, 0, sizeof(seed));
 
@@ -108,6 +112,24 @@ int main(int argc, const char **argv) {
   if (MLDSA_sign (&priv, msg, msglen, NULL, 0, &sig_2)) {
     fprintf (stderr, "sign should have succeeded with NULL and empty ctx\n");
     return 1;
+  }
+
+  if ((err = MLDSA_verify(&pub, &sig, msg, msglen, ctx, ctxlen))) {
+    fprintf (stderr, "verify should have succeeeded! (got %d)\n", err);
+    return 3;
+  }
+  if (! MLDSA_verify(&pub, &sig, msg, msglen, badctx, badctxlen)) {
+    fprintf (stderr, "verify should have failed if the context changed\n");
+    return 4;
+  }
+  if (! MLDSA_verify(&pub, &sig, badmsg, badmsglen, ctx, ctxlen)) {
+    fprintf (stderr, "verify should have failed if the message changed\n");
+    return 5;
+  }
+  sig.data[3]++;
+  if (! MLDSA_verify(&pub, &sig, msg, msglen, ctx, ctxlen)) {
+    fprintf (stderr, "verify should have failed if the signature was tampered with\n");
+    return 6;
   }
 
   /* this ought to fail if BitUnpack aborts in skDecode, but it doesn't seem to.
