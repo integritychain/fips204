@@ -47,5 +47,5 @@ $ python3
 >>> (public_key, private_key) = ML_DSA_44.keygen()
 >>> msg = b'this is the message'
 >>> sig = private_key.sign(msg)
->>> assert(public_key.verify(sig, msg)
+>>> assert(public_key.verify(sig, msg))
 ~~~
