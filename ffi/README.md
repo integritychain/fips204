@@ -28,6 +28,7 @@ non-goals are:
 - better internal error handling
 - testing!
 - reduce symbol visibility in shared object
+- export hash_sign and hash_verify
 
 # Paths considered but discarded
 
