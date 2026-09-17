@@ -128,7 +128,7 @@ macro_rules! parameter_set {
                     return ret::DESERIALIZATION_ERROR;
                 };
                 let ans = if deterministic {
-                    let s: [u8; 32] = [ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ];
+                    let s = [ 0u8; 32 ];
                     privkey.try_sign_with_seed(&s, msg, ctx)
                 } else {
                     privkey.try_sign(msg, ctx)
