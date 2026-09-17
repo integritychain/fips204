@@ -16,7 +16,7 @@ use fips204::ml_dsa_65;
 #[cfg(feature = "ml-dsa-87")]
 use fips204::ml_dsa_87;
 
-use fips204::traits::SerDes;
+use fips204::traits::{SerDes,KeyGen};
 
 
 // ----- CUSTOM RNG TO REPLAY VALUES -----
@@ -61,29 +61,28 @@ fn test_keygen() {
 
     for test_group in v["testGroups"].as_array().unwrap().iter() {
         for test in test_group["tests"].as_array().unwrap().iter() {
-            let seed = decode(test["seed"].as_str().unwrap()).unwrap();
+            let seedvec = decode(test["seed"].as_str().unwrap()).unwrap();
+            let seed = seedvec.as_array::<32>().unwrap();
             let pk_exp = decode(test["pk"].as_str().unwrap()).unwrap();
             let sk_exp = decode(test["sk"].as_str().unwrap()).unwrap();
-            let mut rnd = TestRng::new();
-            rnd.push(&seed);
 
             #[cfg(feature = "ml-dsa-44")]
             if test_group["parameterSet"] == "ML-DSA-44" {
-                let (pk_act, sk_act) = ml_dsa_44::try_keygen_with_rng(&mut rnd).unwrap();
+                let (pk_act, sk_act) = ml_dsa_44::KG::keygen_from_seed(&seed);
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
 
             #[cfg(feature = "ml-dsa-65")]
             if test_group["parameterSet"] == "ML-DSA-65" {
-                let (pk_act, sk_act) = ml_dsa_65::try_keygen_with_rng(&mut rnd).unwrap();
+                let (pk_act, sk_act) = ml_dsa_65::KG::keygen_from_seed(&seed);
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
 
             #[cfg(feature = "ml-dsa-87")]
             if test_group["parameterSet"] == "ML-DSA-87" {
-                let (pk_act, sk_act) = ml_dsa_87::try_keygen_with_rng(&mut rnd).unwrap();
+                let (pk_act, sk_act) = ml_dsa_87::KG::keygen_from_seed(&seed);
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
