@@ -1,4 +1,4 @@
-workspace = { exclude = ["ct_cm4", "dudect", "fuzz", "wasm"] }
+workspace = { members = ['ffi'], exclude = ["ct_cm4", "dudect", "fuzz", "wasm"] }
 
 [package]
 name = "fips204"
