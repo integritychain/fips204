@@ -160,7 +160,7 @@ pub(crate) fn sign_internal<
     const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, esk: &PrivateKey<K, L>,
-    message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8], rnd: [u8; 32], nist: bool,
+    message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8], rnd: [u8; 32],
 ) -> [u8; SIG_LEN] {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
@@ -182,10 +182,7 @@ pub(crate) fn sign_internal<
 
     // 6: 𝜇 ← H(BytesToBits(𝑡𝑟)||𝑀 , 64)    ▷ Compute message representative µ
     // Calculate mu based on which of the three different paths led us here
-    let mut h6 = if nist {
-        // 6a. NIST vectors are being applied to "internal" functions
-        h256_xof(&[tr, message])
-    } else if oid.is_empty() {
+    let mut h6 = if oid.is_empty() {
         // 6b. From ML-DSA.Sign():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
         h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
     } else {
@@ -358,7 +355,7 @@ pub(crate) fn verify_internal<
     const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &PublicKey<K, L>, m: &[u8],
-    sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8], nist: bool,
+    sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8],
 ) -> bool {
     //
     // 1: (ro, t_1) ← pkDecode(pk)  pull out pre-computed elements
@@ -383,10 +380,7 @@ pub(crate) fn verify_internal<
 
     // 7: 𝜇 ← (H(BytesToBits(tr)||𝑀′, 64))    ▷ Compute message representative µ
     // Calculate mu based on which of the three different paths led us here
-    let mut h7 = if nist {
-        // 7a. NIST vectors are being applied to "internal" functions
-        h256_xof(&[tr, m])
-    } else if oid.is_empty() {
+    let mut h7 = if oid.is_empty() {
         // 7b. From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
         h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])
     } else {

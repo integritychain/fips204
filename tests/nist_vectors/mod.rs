@@ -1,7 +1,7 @@
 // This file applies the NIST ACVP vectors.
-//   from: https://github.com/usnistgov/ACVP-Server/blob/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-DSA-keyGen-FIPS204/internalProjection.json
-//   from: https://github.com/usnistgov/ACVP-Server/blob/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-DSA-sigGen-FIPS204/internalProjection.json
-//   from: https://github.com/usnistgov/ACVP-Server/blob/65370b861b96efd30dfe0daae607bde26a78a5c8/gen-val/json-files/ML-DSA-sigVer-FIPS204/internalProjection.json
+//   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-keyGen-FIPS204/internalProjection.json
+//   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-sigGen-FIPS204/internalProjection.json
+//   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-sigVer-FIPS204/internalProjection.json
 
 
 use hex::decode;
@@ -16,8 +16,9 @@ use fips204::ml_dsa_65;
 #[cfg(feature = "ml-dsa-87")]
 use fips204::ml_dsa_87;
 
-use fips204::traits::SerDes;
+use fips204::traits::{SerDes,KeyGen,Verifier,Signer};
 
+use fips204::Ph;
 
 // ----- CUSTOM RNG TO REPLAY VALUES -----
 struct TestRng {
@@ -51,6 +52,14 @@ impl TestRng {
     }
 }
 
+fn get_ph(hashname: &str) -> Result<Ph, &'static str> {
+    match hashname {
+        "SHA2-256" => Ok(Ph::SHA256),
+        "SHA2-512" => Ok(Ph::SHA512),
+        "SHAKE-128" => Ok(Ph::SHAKE128),
+        &_ => Err("unknown digest algorithm"),
+    }
+}
 
 #[test]
 fn test_keygen() {
@@ -61,29 +70,28 @@ fn test_keygen() {
 
     for test_group in v["testGroups"].as_array().unwrap().iter() {
         for test in test_group["tests"].as_array().unwrap().iter() {
-            let seed = decode(test["seed"].as_str().unwrap()).unwrap();
+            let seedvec = decode(test["seed"].as_str().unwrap()).unwrap();
+            let seed = seedvec.as_array::<32>().unwrap();
             let pk_exp = decode(test["pk"].as_str().unwrap()).unwrap();
             let sk_exp = decode(test["sk"].as_str().unwrap()).unwrap();
-            let mut rnd = TestRng::new();
-            rnd.push(&seed);
 
             #[cfg(feature = "ml-dsa-44")]
             if test_group["parameterSet"] == "ML-DSA-44" {
-                let (pk_act, sk_act) = ml_dsa_44::try_keygen_with_rng(&mut rnd).unwrap();
+                let (pk_act, sk_act) = ml_dsa_44::KG::keygen_from_seed(&seed);
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
 
             #[cfg(feature = "ml-dsa-65")]
             if test_group["parameterSet"] == "ML-DSA-65" {
-                let (pk_act, sk_act) = ml_dsa_65::try_keygen_with_rng(&mut rnd).unwrap();
+                let (pk_act, sk_act) = ml_dsa_65::KG::keygen_from_seed(&seed);
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
 
             #[cfg(feature = "ml-dsa-87")]
             if test_group["parameterSet"] == "ML-DSA-87" {
-                let (pk_act, sk_act) = ml_dsa_87::try_keygen_with_rng(&mut rnd).unwrap();
+                let (pk_act, sk_act) = ml_dsa_87::KG::keygen_from_seed(&seed);
                 assert_eq!(pk_exp, pk_act.into_bytes());
                 assert_eq!(sk_exp, sk_act.into_bytes());
             }
@@ -98,48 +106,76 @@ fn test_siggen() {
             .expect("Unable to read file");
     let v: Value = serde_json::from_str(&vectors).unwrap();
 
-    #[allow(clippy::unnecessary_unwrap, deprecated)]
+    #[allow(clippy::unnecessary_unwrap)]
     for test_group in v["testGroups"].as_array().unwrap().iter() {
-        for test in test_group["tests"].as_array().unwrap().iter() {
-            let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
-            let message = decode(test["message"].as_str().unwrap()).unwrap();
-            let sig_exp = decode(test["signature"].as_str().unwrap()).unwrap();
-            let seed = test["rnd"].as_str();
-            let seed = if seed.is_none() {
-                [0u8; 32]
-            } else {
-                decode(seed.unwrap()).unwrap().try_into().unwrap()
-            };
-            let mut rnd = TestRng::new();
-            rnd.push(&seed);
+        let tg_deterministic = test_group["deterministic"].as_bool().unwrap();
+        // Skip tests for internal interfaces.
+        if test_group["signatureInterface"] == "external" {
+            for test in test_group["tests"].as_array().unwrap().iter() {
+                let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
+                let pk_bytes = decode(test["pk"].as_str().unwrap()).unwrap();
+                let message = decode(test["message"].as_str().unwrap()).unwrap();
+                let context = decode(test["context"].as_str().unwrap()).unwrap();
+                let sig_exp = decode(test["signature"].as_str().unwrap()).unwrap();
+                let test_id = test["tcId"].as_i64().unwrap();
+                let seed = test["rnd"].as_str();
+                assert_eq!((test_id, seed.is_none()),
+                           (test_id, tg_deterministic));
+                let seed = if seed.is_none() {
+                    [0u8; 32]
+                } else {
+                    decode(seed.unwrap()).unwrap().try_into().unwrap()
+                };
+                let mut rnd = TestRng::new();
+                rnd.push(&seed);
 
-            #[cfg(feature = "ml-dsa-44")]
-            if test_group["parameterSet"] == "ML-DSA-44" {
-                let sk =
-                    ml_dsa_44::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
-                        .unwrap();
-                //let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
-                let sig_act = ml_dsa_44::_internal_sign(&sk, &message, &[], seed).unwrap();
-                assert_eq!(sig_exp, sig_act);
-            }
+                macro_rules! runtest {
+                    ($pc:ident) => {
+                        let sk =
+                            $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
+                            .unwrap();
+                        let sig_act = if test_group["preHash"] == "preHash" {
+                            // skip tests with an unknown hash algorithm
+                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
+                                sk.try_hash_sign_with_rng(&mut rnd, &message, &context, &hash).unwrap()
+                            } else {
+                                sig_exp.clone().try_into().unwrap()
+                            }
+                        } else {
+                            sk.try_sign_with_rng(&mut rnd, &message, &context).unwrap()
+                        };
+                        assert_eq!(sig_exp, sig_act);
+                        let pk2 = sk.get_public_key();
+                        assert_eq!(pk_bytes, pk2.into_bytes());
+                        let pk1 = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap()).unwrap();
+                        if test_group["preHash"] == "preHash" {
+                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
+                                assert_eq!((test_id,
+                                            pk1.hash_verify(&message, &sig_exp.clone().try_into().unwrap(), &context, &hash)),
+                                           (test_id, true));
+                            }
+                        } else {
+                            assert_eq!((test_id,
+                                        pk1.verify(&message, &sig_exp.clone().try_into().unwrap(), &context)),
+                                       (test_id, true));
+                        };
+                    }
+                }
 
-            #[cfg(feature = "ml-dsa-65")]
-            if test_group["parameterSet"] == "ML-DSA-65" {
-                let sk =
-                    ml_dsa_65::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
-                        .unwrap();
-                //let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
-                let sig_act = ml_dsa_65::_internal_sign(&sk, &message, &[], seed).unwrap();
-                assert_eq!(sig_exp, sig_act);
-            }
+                #[cfg(feature = "ml-dsa-44")]
+                if test_group["parameterSet"] == "ML-DSA-44" {
+                    runtest!(ml_dsa_44);
+                }
 
-            #[cfg(feature = "ml-dsa-87")]
-            if test_group["parameterSet"] == "ML-DSA-87" {
-                let sk =
-                    ml_dsa_87::PrivateKey::try_from_bytes(sk_bytes.try_into().unwrap()).unwrap();
-                //let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
-                let sig_act = ml_dsa_87::_internal_sign(&sk, &message, &[], seed).unwrap();
-                assert_eq!(sig_exp, sig_act);
+                #[cfg(feature = "ml-dsa-65")]
+                if test_group["parameterSet"] == "ML-DSA-65" {
+                    runtest!(ml_dsa_65);
+                }
+
+                #[cfg(feature = "ml-dsa-87")]
+                if test_group["parameterSet"] == "ML-DSA-87" {
+                    runtest!(ml_dsa_87);
+                }
             }
         }
     }
@@ -152,51 +188,55 @@ fn test_sigver() {
             .expect("Unable to read file");
     let v: Value = serde_json::from_str(&vectors).unwrap();
 
-    #[allow(deprecated)]
     for test_group in v["testGroups"].as_array().unwrap().iter() {
-        let pk_bytes = decode(test_group["pk"].as_str().unwrap()).unwrap();
-        for test in test_group["tests"].as_array().unwrap().iter() {
-            let message = decode(test["message"].as_str().unwrap()).unwrap();
-            let signature = decode(test["signature"].as_str().unwrap()).unwrap();
-            let test_passed = test["testPassed"].as_bool().unwrap();
+        // Skip tests for internal interfaces.
+        if test_group["signatureInterface"] == "external" {
+            for test in test_group["tests"].as_array().unwrap().iter() {
+                let message = decode(test["message"].as_str().unwrap()).unwrap();
+                let signature = decode(test["signature"].as_str().unwrap()).unwrap();
+                let context = decode(test["context"].as_str().unwrap()).unwrap();
+                let pk_bytes = decode(test["pk"].as_str().unwrap()).unwrap();
 
-            #[cfg(feature = "ml-dsa-44")]
-            if test_group["parameterSet"] == "ML-DSA-44" {
-                let pk = ml_dsa_44::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
-                    .unwrap();
-                let res = ml_dsa_44::_internal_verify(
-                    &pk,
-                    &message,
-                    &signature.clone().try_into().unwrap(),
-                    &[],
-                );
-                assert_eq!(res, test_passed);
-            }
+                let test_passed = test["testPassed"].as_bool().unwrap();
+                macro_rules! runtest {
+                    ($pc:ident) => {
+                        let pk = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
+                            .unwrap();
+                        if test_group["preHash"] == "preHash" {
+                            // skip tests with an unknown hash algorithm
+                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
+                                let res = pk.hash_verify(
+                                    &message,
+                                    &signature.clone().try_into().unwrap(),
+                                    &context,
+                                    &hash,
+                                );
+                                assert_eq!(res, test_passed);
+                            }
+                        } else {
+                            let res = pk.verify(
+                                &message,
+                                &signature.clone().try_into().unwrap(),
+                                &context,
+                            );
+                            assert_eq!(res, test_passed);
+                        };
+                    };
+                }
+                #[cfg(feature = "ml-dsa-44")]
+                if test_group["parameterSet"] == "ML-DSA-44" {
+                    runtest!(ml_dsa_44);
+                }
 
-            #[cfg(feature = "ml-dsa-65")]
-            if test_group["parameterSet"] == "ML-DSA-65" {
-                let pk = ml_dsa_65::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
-                    .unwrap();
-                let res = ml_dsa_65::_internal_verify(
-                    &pk,
-                    &message,
-                    &signature.clone().try_into().unwrap(),
-                    &[],
-                );
-                assert_eq!(res, test_passed);
-            }
+                #[cfg(feature = "ml-dsa-65")]
+                if test_group["parameterSet"] == "ML-DSA-65" {
+                    runtest!(ml_dsa_65);
+                }
 
-            #[cfg(feature = "ml-dsa-87")]
-            if test_group["parameterSet"] == "ML-DSA-87" {
-                let pk = ml_dsa_87::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
-                    .unwrap();
-                let res = ml_dsa_87::_internal_verify(
-                    &pk,
-                    &message,
-                    &signature.clone().try_into().unwrap(),
-                    &[],
-                );
-                assert_eq!(res, test_passed);
+                #[cfg(feature = "ml-dsa-87")]
+                if test_group["parameterSet"] == "ML-DSA-87" {
+                    runtest!(ml_dsa_87);
+                }
             }
         }
     }
