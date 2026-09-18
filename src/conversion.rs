@@ -595,6 +595,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Alg 20: omega+K out of range")]
+    #[allow(clippy::large_stack_arrays)] // K=255 forces ~255 KiB; needed for the range check
     fn test_hint_bit_pack_omega_k_range() {
         const K: usize = 255;
         let h = [R0; K];

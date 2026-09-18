@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- `ffi` workspace member (`fips204-ffi`) producing `libfips204`, a C shared library for
+  pure ML-DSA keygen / sign / verify across ML-DSA-44/65/87 (HashML-DSA not yet exported
+  via FFI); thank you @dkg
+
+### Changed
+- Updated NIST ACVP test vectors and aligned keyGen / sigGen / sigVer tests with the
+  public external API (including HashML-DSA for digests in `Ph`); thank you @dkg
+- Raised MSRV to **1.85** (Debian stable / trixie); CI MSRV jobs updated accordingly;
+  NIST keyGen tests use `TryInto` for seed arrays; pin `textwrap = "=0.16.2"` so
+  Criterion stays buildable without a checked-in `Cargo.lock`
+- FFI polish: include `<stddef.h>` in `fips204.h`; create a local `libfips204.so.0`
+  symlink in the FFI test Makefile for Linux in-tree `make check`; correct `ffi/README.md`
+  quick start (Python bindings are not in-tree yet)
+
+### Fixed
+- `Signer::get_public_key` doctest builds under feature subsets such as
+  `ml-dsa-44,default-rng` (thank you @dkg)
+
+### Removed
+- Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only
+  internal codepath in `sign_internal` / `verify_internal` (thank you @dkg)
+
 ## 0.4.6 (2024-12-21)
 
 - Added support deterministic signatures via `_seed`

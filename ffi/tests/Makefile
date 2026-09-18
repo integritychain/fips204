@@ -9,8 +9,9 @@
 
 SIZES = 44 65 87
 FRAMES = sign signature verify public_key private_key keygen keygen_from_seed get_public_key
-# should derive SONAME somehow, e.g. from CARGO_PKG_VERSION_MAJOR
-SONAME = libfips204.$(SO_EXT)
+# Link name produced by cargo (libfips204.so / .dylib). ELF SONAME from
+# build.rs is libfips204.so.0 — see RUNTIME_LIB below.
+LINK_LIB = libfips204.$(SO_EXT)
 
 OS := $(shell uname)
 
@@ -26,12 +27,20 @@ all: check
 # adjustments for testing the local debug or release build:
 ifneq ($(AS_INSTALLED),true)
 SO_LOCATIONS = $(foreach w,.. ../..,$(foreach x,release debug,$w/target/$x $w/target/*/$x))
-SO_LOCATION = $(dir $(firstword $(foreach d,$(SO_LOCATIONS),$(wildcard $d/libfips204.$(SO_EXT)))))
+SO_LOCATION = $(dir $(firstword $(foreach d,$(SO_LOCATIONS),$(wildcard $d/$(LINK_LIB)))))
 
 COMPILE_FLAGS = -Wl,-rpath,$(SO_LOCATION) -L $(SO_LOCATION) -I..
 RUN_PREFIX = LD_LIBRARY_PATH=$(SO_LOCATION)
-#ADDITIONAL_RUN_DEPENDS = $(SO_LOCATION)libfips204.so.$(SONAME)
-ADDITIONAL_RUN_DEPENDS = $(SO_LOCATION)$(SONAME)
+ifeq ($(OS), Darwin)
+ADDITIONAL_RUN_DEPENDS = $(SO_LOCATION)$(LINK_LIB)
+else
+# cargo emits libfips204.so, but build.rs sets ELF SONAME to libfips204.so.0,
+# so the loader looks for the versioned name at runtime. Create a local symlink
+# for in-tree tests without changing the installed ABI layout.
+ADDITIONAL_RUN_DEPENDS = $(SO_LOCATION)libfips204.so.0
+$(SO_LOCATION)libfips204.so.0: $(SO_LOCATION)$(LINK_LIB)
+	ln -sfn $(LINK_LIB) $@
+endif
 endif
 
 BASELINES=$(foreach sz, $(SIZES), baseline-$(sz))

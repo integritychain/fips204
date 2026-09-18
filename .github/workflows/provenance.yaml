@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.72
+          - 1.85
         target:
           - thumbv7em-none-eabi
           - x86_64-pc-windows-gnu

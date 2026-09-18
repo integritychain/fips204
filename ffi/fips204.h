@@ -12,6 +12,7 @@
   These functions return 0 (ML_DSA_OK) on success, or a more specific
   non-zero octet on error.
 */
+#include <stddef.h>
 #include <stdint.h>
 
 typedef uint8_t ml_dsa_err;

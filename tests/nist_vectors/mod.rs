@@ -71,7 +71,7 @@ fn test_keygen() {
     for test_group in v["testGroups"].as_array().unwrap().iter() {
         for test in test_group["tests"].as_array().unwrap().iter() {
             let seedvec = decode(test["seed"].as_str().unwrap()).unwrap();
-            let seed = seedvec.as_array::<32>().unwrap();
+            let seed: [u8; 32] = seedvec.try_into().unwrap();
             let pk_exp = decode(test["pk"].as_str().unwrap()).unwrap();
             let sk_exp = decode(test["sk"].as_str().unwrap()).unwrap();
 

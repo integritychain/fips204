@@ -8,7 +8,8 @@
 
 [FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure/safe Rust for server, 
 desktop, browser and embedded applications. The source repository includes examples demonstrating benchmarking,
-an embedded target, constant-time statistical measurements, fuzzing, WASM execution, and robust test coverage.
+an embedded target, constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared library,
+and robust test coverage.
 
 This crate implements the FIPS 204 **released** standard in pure Rust with minimal and mainstream dependencies, and
 without any unsafe code. All three security parameter sets are fully functional and tested. The implementation's 
@@ -58,12 +59,18 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
-* **BEWARE:** As of November 8, 2024 NIST has not released top-level/external/hash test vectors!
+* NIST ACVP test vectors (keyGen / sigGen / sigVer) are exercised against the public API,
+  including external interface and HashML-DSA for the digests enumerated in `Ph`
+  (`SHA2-256`, `SHA2-512`, `SHAKE-128`).
+* An optional `ffi` workspace member builds `libfips204`, a C ABI shared library for the
+  pure ML-DSA external interfaces (see [`ffi/README.md`](ffi/README.md)). HashML-DSA is not
+  yet exported through the FFI.
 * Constant-time assurances target the source-code level only, with confirmation via
   manual review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
-* Requires Rust **1.70** or higher. The minimum supported Rust version may be changed in the future, but 
-  it will be done with a minor version bump (once the major version is larger than 0).
+* Requires Rust **1.85** or higher (aligned with Debian stable / trixie). The minimum
+  supported Rust version may be changed in the future, but it will be done with a minor
+  version bump (once the major version is larger than 0).
 * All on-by-default features of this library are covered by `SemVer`.
 * The FIPS 204 standard and this software should be considered experimental -- USE AT YOUR OWN RISK!
 
@@ -86,7 +93,7 @@ defined in the Apache-2.0 license, shall be dual licensed as above, without any 
 [build-image]: https://github.com/integritychain/fips204/workflows/test/badge.svg
 [build-link]: https://github.com/integritychain/fips204/actions?query=workflow%3Atest
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.70+-blue.svg
+[rustc-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
 
 [//]: # (general links)
 

@@ -26,9 +26,11 @@ non-goals are:
 # Outstanding work
 
 - better internal error handling
-- testing!
+- more testing
 - reduce symbol visibility in shared object
 - export hash_sign and hash_verify
+- Python bindings (planned; not in-tree yet)
+
 
 # Paths considered but discarded
 
@@ -39,14 +41,9 @@ non-goals are:
 
 ~~~
 $ cd ffi   # this directory
-$ cargo build
+$ cargo build -p fips204-ffi
 $ (cd tests && make)
-$ cd python
-$ python3
->>> from fips204 import ML_DSA_44
->>> 
->>> (public_key, private_key) = ML_DSA_44.keygen()
->>> msg = b'this is the message'
->>> sig = private_key.sign(msg)
->>> assert(public_key.verify(sig, msg))
 ~~~
+
+The C smoke tests under `tests/` exercise keygen, hedged and deterministic signing, verification,
+and `get_public_key` for ML-DSA-44/65/87 against the locally built `libfips204`.

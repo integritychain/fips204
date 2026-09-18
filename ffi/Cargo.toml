@@ -9,7 +9,7 @@ documentation = "https://docs.rs/fips204"
 categories = ["cryptography"]
 repository = "https://github.com/integritychain/fips204"
 keywords = ["FIPS204", "lattice", "dilithium", "signature"]
-rust-version = "1.70"
+rust-version = "1.85"
 
 [lib]
 crate-type = ["staticlib", "cdylib"]
