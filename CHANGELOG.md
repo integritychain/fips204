@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `Signer::get_public_key` doctest builds under feature subsets such as
   `ml-dsa-44,default-rng` (thank you @dkg)
+- RustSec advisories: bump Criterion to 0.5 (drops unmaintained/unsound `atty`);
+  replace unmaintained `paste` with `pastey` in `fips204-ffi`
 
 ### Removed
 - Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only

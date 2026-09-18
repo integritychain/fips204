@@ -29,11 +29,10 @@ pub(crate) fn pk_encode<const K: usize, const PK_LEN: usize>(
     // 2: for i from 0 to k − 1 do
     // 3: pk ← pk || SimpleBitPack(t1[i], 2^{bitlen(q−1)−d}-1)
     // 4: end for
-    pk[32..]
-        .chunks_mut(32 * BLQD)
-        .enumerate()
-        .take(K) // not strictly needed
-        .for_each(|(i, chunk)| simple_bit_pack(&t1[i], (1 << BLQD) - 1, chunk));
+    for (i, chunk) in pk[32..].chunks_mut(32 * BLQD).enumerate().take(K) {
+        // take(K) not strictly needed
+        simple_bit_pack(&t1[i], (1 << BLQD) - 1, chunk);
+    }
 
     // 5: return pk
     pk
@@ -369,7 +368,7 @@ mod tests {
     fn test_pk_encode_decode_roundtrip1() {
         // D=13 K=4 PK_LEN=1312
         let mut random_pk = [0u8; 1312];
-        random_pk.iter_mut().for_each(|a| *a = rand::random::<u8>());
+        random_pk.fill_with(rand::random);
         //let mut rho = [0u8; 32];
         //let mut t1 = [[0i32; 256]; 4];
         let (rho, t1) = pk_decode::<4, 1312>(&random_pk).unwrap();
@@ -382,7 +381,7 @@ mod tests {
     fn test_pk_encode_decode_roundtrip2() {
         // D=13 K=6 PK_LEN=1952
         let mut random_pk = [0u8; 1952];
-        random_pk.iter_mut().for_each(|a| *a = rand::random::<u8>());
+        random_pk.fill_with(rand::random);
         //let mut rho = [0u8; 32];
         //let mut t1 = [[0i32; 256]; 6];
         let (rho, t1) = pk_decode::<6, 1952>(&random_pk).unwrap();
@@ -395,7 +394,7 @@ mod tests {
     fn test_pk_encode_decode_roundtrip3() {
         // D=13 K=8 PK_LEN=2592
         let mut random_pk = [0u8; 2592];
-        random_pk.iter_mut().for_each(|a| *a = rand::random::<u8>());
+        random_pk.fill_with(rand::random);
         //let mut rho = [0u8; 32];
         //let mut t1 = [[0i32; 256]; 8];
         let (rho, t1) = pk_decode::<8, 2592>(&random_pk).unwrap();
@@ -406,10 +405,9 @@ mod tests {
 
     fn get_vec(max: u32) -> R {
         let mut rnd_r = R0; //[0i32; 256];
-        rnd_r
-            .0
-            .iter_mut()
-            .for_each(|e| *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap()));
+        for e in &mut rnd_r.0 {
+            *e = rand::random::<i32>().rem_euclid(i32::try_from(max).unwrap());
+        }
         rnd_r
     }
 
@@ -419,7 +417,7 @@ mod tests {
         // D=13 ETA=2 K=4 L=4 SK_LEN=2560
         let (rho, k) = (rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>());
         let mut tr = [0u8; 64];
-        tr.iter_mut().for_each(|e| *e = rand::random::<u8>());
+        tr.fill_with(rand::random);
         let s1 = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let s2 = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let t0 = [

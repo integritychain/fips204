@@ -19,7 +19,7 @@ name = "fips204"
 
 [dependencies]
 rand_core = { version = "0.6.4" }
-paste = { version = "1" }
+pastey = "0.1"
 
 [dependencies.fips204]
 path = ".."

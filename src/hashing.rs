@@ -12,7 +12,9 @@ use sha3::{Shake128, Shake256};
 /// Returns a xof reader for extracting extendable output.
 pub(crate) fn h256_xof(v: &[&[u8]]) -> impl XofReader {
     let mut hasher = Shake256::default();
-    v.iter().for_each(|b| hasher.update(b));
+    for b in v {
+        hasher.update(b);
+    }
     hasher.finalize_xof()
 }
 
@@ -22,7 +24,9 @@ pub(crate) fn h256_xof(v: &[&[u8]]) -> impl XofReader {
 /// Returns a xof reader for extracting extendable output.
 pub(crate) fn g128_xof(v: &[&[u8]]) -> impl XofReader {
     let mut hasher = Shake128::default();
-    v.iter().for_each(|b| hasher.update(b));
+    for b in v {
+        hasher.update(b);
+    }
     hasher.finalize_xof()
 }
 
@@ -62,7 +66,7 @@ pub(crate) fn sample_in_ball<const CTEST: bool>(tau: i32, rho: &[u8]) -> R {
         let mut j = [i.to_le_bytes()[0]]; // remove timing variability
         if !CTEST {
             h_ctx.read(&mut j);
-        };
+        }
 
         // 8: while 𝑗 > 𝑖 do
         while usize::from(j[0]) > i {

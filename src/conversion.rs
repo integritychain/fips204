@@ -287,7 +287,7 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
     );
 
     // 1: y ∈ B^{ω+k} ← 0^{ω+k}
-    y_bytes.iter_mut().for_each(|e| *e = 0);
+    y_bytes.fill(0);
 
     // 2: Index ← 0    ▷ Index for writing the first 𝜔 bytes of 𝑦
     let mut index = 0;
@@ -302,7 +302,7 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
             // CT patch path
             if CTEST && (index > (y_bytes.len() - 1)) {
                 continue;
-            };
+            }
             // CT patch path
             if CTEST || (h[i].0[j] != 0) {
                 //

@@ -1,4 +1,4 @@
-use paste::paste;
+use pastey::paste;
 use rand_core::{OsRng, RngCore};
 
 mod ret {

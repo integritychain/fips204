@@ -105,9 +105,9 @@ pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     for i in 0..K {
         #[allow(clippy::needless_range_loop)] // clarity
         for j in 0..L {
-            w_hat[i].0.iter_mut().enumerate().for_each(|(n, e)| {
+            for (n, e) in w_hat[i].0.iter_mut().enumerate() {
                 *e += mont_reduce(i64::from(a_hat[i][j].0[n]) * i64::from(u_hat_mont[j].0[n]));
-            });
+            }
         }
     }
     w_hat
