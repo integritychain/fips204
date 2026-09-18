@@ -288,7 +288,7 @@ macro_rules! functionality {
                 // 10: 𝑀 ′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
                 // 11: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], rnd, false
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], rnd
                 );
 
                 // 12: return 𝜎
@@ -334,7 +334,7 @@ macro_rules! functionality {
                 // 23: 𝑀 ′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
                 // 24: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], rnd, false
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], rnd
                 );
 
                 // 25: return 𝜎
@@ -375,7 +375,7 @@ macro_rules! functionality {
                 // 5: 𝑀′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx) ∥ 𝑀
                 // 6: return ML-DSA.Verify_internal(pk, 𝑀′, 𝜎)
                 ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[], false
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[]
                 )
             }
 
@@ -406,7 +406,7 @@ macro_rules! functionality {
                 // 18: 𝑀′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx ∥ OID ∥ PH𝑀 )
                 // 19: return ML-DSA.Verify_internal(𝑝𝑘, 𝑀′ , 𝜎)
                 ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len], false
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len]
                 )
             }
         }
@@ -568,7 +568,7 @@ macro_rules! functionality {
             let mut rnd = [0u8; 32];
             rng.try_fill_bytes(&mut rnd).map_err(|_| "Random number generator failed")?;
             let sig = ml_dsa::sign_internal::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], rnd, true
+                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], rnd
             );
             Ok(sig)
         }
