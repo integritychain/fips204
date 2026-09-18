@@ -16,7 +16,7 @@ use fips204::ml_dsa_65;
 #[cfg(feature = "ml-dsa-87")]
 use fips204::ml_dsa_87;
 
-use fips204::traits::{SerDes,KeyGen,Verifier};
+use fips204::traits::{SerDes,KeyGen,Verifier,Signer};
 
 use fips204::Ph;
 
@@ -106,48 +106,76 @@ fn test_siggen() {
             .expect("Unable to read file");
     let v: Value = serde_json::from_str(&vectors).unwrap();
 
-    #[allow(clippy::unnecessary_unwrap, deprecated)]
+    #[allow(clippy::unnecessary_unwrap)]
     for test_group in v["testGroups"].as_array().unwrap().iter() {
-        for test in test_group["tests"].as_array().unwrap().iter() {
-            let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
-            let message = decode(test["message"].as_str().unwrap()).unwrap();
-            let sig_exp = decode(test["signature"].as_str().unwrap()).unwrap();
-            let seed = test["rnd"].as_str();
-            let seed = if seed.is_none() {
-                [0u8; 32]
-            } else {
-                decode(seed.unwrap()).unwrap().try_into().unwrap()
-            };
-            let mut rnd = TestRng::new();
-            rnd.push(&seed);
+        let tg_deterministic = test_group["deterministic"].as_bool().unwrap();
+        // Skip tests for internal interfaces.
+        if test_group["signatureInterface"] == "external" {
+            for test in test_group["tests"].as_array().unwrap().iter() {
+                let sk_bytes = decode(test["sk"].as_str().unwrap()).unwrap();
+                let pk_bytes = decode(test["pk"].as_str().unwrap()).unwrap();
+                let message = decode(test["message"].as_str().unwrap()).unwrap();
+                let context = decode(test["context"].as_str().unwrap()).unwrap();
+                let sig_exp = decode(test["signature"].as_str().unwrap()).unwrap();
+                let test_id = test["tcId"].as_i64().unwrap();
+                let seed = test["rnd"].as_str();
+                assert_eq!((test_id, seed.is_none()),
+                           (test_id, tg_deterministic));
+                let seed = if seed.is_none() {
+                    [0u8; 32]
+                } else {
+                    decode(seed.unwrap()).unwrap().try_into().unwrap()
+                };
+                let mut rnd = TestRng::new();
+                rnd.push(&seed);
 
-            #[cfg(feature = "ml-dsa-44")]
-            if test_group["parameterSet"] == "ML-DSA-44" {
-                let sk =
-                    ml_dsa_44::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
-                        .unwrap();
-                //let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
-                let sig_act = ml_dsa_44::_internal_sign(&sk, &message, &[], seed).unwrap();
-                assert_eq!(sig_exp, sig_act);
-            }
+                macro_rules! runtest {
+                    ($pc:ident) => {
+                        let sk =
+                            $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
+                            .unwrap();
+                        let sig_act = if test_group["preHash"] == "preHash" {
+                            // skip tests with an unknown hash algorithm
+                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
+                                sk.try_hash_sign_with_rng(&mut rnd, &message, &context, &hash).unwrap()
+                            } else {
+                                sig_exp.clone().try_into().unwrap()
+                            }
+                        } else {
+                            sk.try_sign_with_rng(&mut rnd, &message, &context).unwrap()
+                        };
+                        assert_eq!(sig_exp, sig_act);
+                        let pk2 = sk.get_public_key();
+                        assert_eq!(pk_bytes, pk2.into_bytes());
+                        let pk1 = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap()).unwrap();
+                        if test_group["preHash"] == "preHash" {
+                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
+                                assert_eq!((test_id,
+                                            pk1.hash_verify(&message, &sig_exp.clone().try_into().unwrap(), &context, &hash)),
+                                           (test_id, true));
+                            }
+                        } else {
+                            assert_eq!((test_id,
+                                        pk1.verify(&message, &sig_exp.clone().try_into().unwrap(), &context)),
+                                       (test_id, true));
+                        };
+                    }
+                }
 
-            #[cfg(feature = "ml-dsa-65")]
-            if test_group["parameterSet"] == "ML-DSA-65" {
-                let sk =
-                    ml_dsa_65::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
-                        .unwrap();
-                //let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
-                let sig_act = ml_dsa_65::_internal_sign(&sk, &message, &[], seed).unwrap();
-                assert_eq!(sig_exp, sig_act);
-            }
+                #[cfg(feature = "ml-dsa-44")]
+                if test_group["parameterSet"] == "ML-DSA-44" {
+                    runtest!(ml_dsa_44);
+                }
 
-            #[cfg(feature = "ml-dsa-87")]
-            if test_group["parameterSet"] == "ML-DSA-87" {
-                let sk =
-                    ml_dsa_87::PrivateKey::try_from_bytes(sk_bytes.try_into().unwrap()).unwrap();
-                //let sig_act = sk.try_sign_with_rng(&mut rnd, &message, &[]).unwrap();
-                let sig_act = ml_dsa_87::_internal_sign(&sk, &message, &[], seed).unwrap();
-                assert_eq!(sig_exp, sig_act);
+                #[cfg(feature = "ml-dsa-65")]
+                if test_group["parameterSet"] == "ML-DSA-65" {
+                    runtest!(ml_dsa_65);
+                }
+
+                #[cfg(feature = "ml-dsa-87")]
+                if test_group["parameterSet"] == "ML-DSA-87" {
+                    runtest!(ml_dsa_87);
+                }
             }
         }
     }
