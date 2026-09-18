@@ -572,44 +572,6 @@ macro_rules! functionality {
             );
             Ok(sig)
         }
-
-        #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
-        /// As of Oct 30 2024, the NIST test vectors are applied to the **internal** functions rather than
-        /// the external API.
-        ///
-        /// The primary difference pertains to the prepending of domain, context, OID and
-        /// hash information to the message in the `sign_finish()` and `verify_finish()` functions (follow
-        /// the last `nist=true` function argument). This is expected to change such that the full API can
-        /// be robustly tested - when this happens, this function will no longer be needed.
-        /// # Errors
-        /// Propagate errors from the `sign_finish()` function (for failing RNG).
-        pub fn _internal_sign(
-            sk: &PrivateKey, message: &[u8], ctx: &[u8], rnd: [u8; 32]
-        ) -> Result<[u8; SIG_LEN], &'static str> {
-            helpers::ensure!(ctx.len() < 256, "_internal_sign: ctx too long");
-            let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                BETA, GAMMA1, GAMMA2, OMEGA, TAU, sk, message, ctx, &[], &[], rnd, true
-            );
-            Ok(sig)
-        }
-
-        #[deprecated = "Temporary function to allow application of internal nist vectors; will be removed"]
-        #[must_use]
-        /// As of Oct 30 2024, the NIST test vectors are applied to the **internal** functions rather than
-        /// the external API.
-        ///
-        /// The primary difference pertains to the prepending of domain, context, OID and
-        /// hash information to the message in the `sign_finish()` and `verify_finish()` functions (follow
-        /// the last `nist=true` function argument). This is expected to change such that the full API can
-        /// be robustly tested - when this happens, this function will no longer be needed.
-        pub fn _internal_verify(pk: &PublicKey, message: &[u8], sig: &[u8; SIG_LEN], ctx: &[u8]) -> bool {
-            if ctx.len() > 255 {
-                return false;
-            };
-            ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                BETA, GAMMA1, GAMMA2, OMEGA, TAU, pk, &message, &sig, ctx, &[], &[], true
-            )
-        }
     };
 }
 
