@@ -1,3 +1,5 @@
+//! Public traits for key generation, signing, verification, and serialization.
+
 use crate::types::Ph;
 use rand_core::{CryptoRng, RngCore, TryCryptoRng};
 #[cfg(feature = "default-rng")]
@@ -76,10 +78,10 @@ pub trait KeyGen {
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
 
-    /// Generates an public and private key key pair specific to this security parameter set
+    /// Generates a public and private key pair specific to this security parameter set
     /// based on a provided seed. <br>
     /// This function operates in constant-time relative to secret data (which specifically excludes
-    /// the the `rho` value stored in the public key and the hash-derived `rho_prime` values that are
+    /// the `rho` value stored in the public key and the hash-derived `rho_prime` values that are
     /// rejection-sampled/expanded into the internal `s_1` and `s_2` values).
     ///
     /// # Examples
@@ -120,10 +122,10 @@ pub trait Signer {
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **OS default** random number generator.
     /// This function operates in constant-time relative to secret data (which specifically excludes
-    /// the OS default random number generator internals, the `rho` value this is stored in the public
+    /// the OS default random number generator internals, the `rho` value that is stored in the public
     /// key, the hash-derived `rho_prime` values that are rejection-sampled/expanded into the internal
     /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>).
+    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
@@ -300,7 +302,7 @@ pub trait Signer {
     fn get_public_key(&self) -> Self::PublicKey;
 }
 
-// This is for the deterministic signing functions; will be refactored more nicely
+// This is for the deterministic signing functions
 struct DummyRng { data: [u8; 32] }
 
 impl RngCore for DummyRng {
@@ -323,7 +325,7 @@ pub trait Verifier {
     type Signature;
 
     /// Verifies a digital signature on a message with respect to a `PublicKey`. As this function
-    /// operates on purely public data, it need/does not provide constant-time assurances.
+    /// operates on purely public data, it does not provide constant-time assurances.
     ///
     /// # Examples
     /// ```rust
@@ -347,7 +349,7 @@ pub trait Verifier {
 
 
     /// Verifies a digital signature on the hash of a message with respect to a `PublicKey`. As this
-    /// function operates on purely public data, it need/does not provide constant-time assurances.
+    /// function operates on purely public data, it does not provide constant-time assurances.
     fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool;
 }
 

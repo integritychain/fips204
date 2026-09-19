@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`fixed` 1.31+ needs rustc 1.93 via `microbit-v2`)
 - `KeyGen::keygen_from_seed` doctest no longer requires `default-rng` (uses
   `try_sign_with_seed`; drop stray `///` / `OsRng` from the example)
+- Rustdoc polish in `traits` / algorithm map: grammar fixes, Dilithium link
+  punctuation, `HashML-DSA.Verify` takes `pk` (not `sk`), brief `traits` module docs;
+  `ml_dsa_65` / `ml_dsa_87` module docs link their own types (were copy-pasted as
+  `ml_dsa_44`)
 
 ### Changed
 - Crate and sample versions are **0.5.0** (`fips204`, `fips204-ffi`, `wasm`, `ct_cm4`,

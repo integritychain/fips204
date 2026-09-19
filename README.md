@@ -6,21 +6,17 @@
 ![Apache2/MIT licensed][license-image]
 ![Rust Version][rustc-image]
 
-[FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure/safe Rust for server, 
-desktop, browser and embedded applications. The source repository includes examples demonstrating benchmarking,
-an embedded target, constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared library,
-and robust test coverage.
+[FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure/safe Rust for server, desktop, browser and
+embedded applications. The source repository includes examples demonstrating benchmarking, an embedded target,
+constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared library, and robust test coverage.
 
-This crate implements the FIPS 204 **released** standard in pure Rust with minimal and mainstream dependencies, and
-without any unsafe code. All three security parameter sets are fully functional and tested. The implementation's 
-key- and signature-generation functionality operates in constant-time, does not require the standard library, e.g. 
-`#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes the `RNG` so it is suitable for the full 
-range of applications down to the bare-metal. The API is stabilized within a released
-crate version and the code is heavily biased towards safety and correctness; further
-performance optimizations will be implemented over time. **0.5.0** is a breaking release
-versus **0.4.x** (see [CHANGELOG](CHANGELOG.md#050) migration notes). This crate will
-quickly follow any changes related to FIPS 204 as they become available (e.g., pick up
-more test vectors).
+This crate implements [the FIPS 204 **released** standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf) in
+pure Rust with minimal and mainstream dependencies, and without any unsafe code. All three security parameter sets are
+fully functional and tested. The implementation's key- and signature-generation functionality operates in constant-time,
+does not require the standard library, e.g. `#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes
+the `RNG` so it is suitable for the full range of applications down to the bare-metal. The API is stabilized and the
+code is heavily biased towards safety and correctness; further performance optimizations may be implemented over time.
+This crate will quickly follow any changes related to FIPS 204 as they become available.
 
 See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf> for a full description of the target functionality.
 
@@ -62,8 +58,6 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
-  Version **0.5.0** (breaking vs 0.4.x): `rand_core` **0.9** / `TryCryptoRng`, MSRV **1.85**;
-  see [CHANGELOG](CHANGELOG.md#050) for migration details.
 * NIST ACVP test vectors (keyGen / sigGen / sigVer) are exercised against the public API,
   including external interface and HashML-DSA for the digests enumerated in `Ph`
   (`SHA2-256`, `SHA2-512`, `SHAKE-128`).
@@ -74,21 +68,21 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 * RNG integration uses **`rand_core` 0.9**. The default features enable
   `default-rng` (`rand_core/os_rng`) plus all three parameter sets. That OS RNG
   path is for hosted environments; it will **not** compile on bare-metal targets
-  that lack a `getrandom` backend (for example `thumbv7em-none-eabi`). For
+  that lack a `getrandom` backend (for example `thumbv7em-none-eabi`). So for
   embedded / `no_std` builds, disable defaults and pick the sets you need, then
   supply entropy via seeds or `*_with_rng`:
   `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`
   (see also [`ct_cm4/`](ct_cm4/)). Custom generators must implement `TryCryptoRng`
   (re-exported from this crate). `OsRng` is fallible-only on this line; prefer
   seed-based APIs or handle `try_fill_bytes` errors when driving the OS RNG yourself.
-* Constant-time assurances target the source-code level only, with confirmation via
-  manual review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
+* Constant-time assurances target the source-code level only, with manual confirmation via
+  review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
 * Requires Rust **1.85** or higher (aligned with Debian stable / trixie). The minimum
   supported Rust version may be changed in the future, but it will be done with a minor
-  version bump (once the major version is larger than 0).
+  version bump once the major version is larger than 0.
 * All on-by-default features of this library are covered by `SemVer`.
-* The FIPS 204 standard and this software should be considered experimental -- USE AT YOUR OWN RISK!
+* Until it matures further, the FIPS 204 standard and this software should be considered experimental.
 
 ## License
 

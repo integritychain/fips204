@@ -28,11 +28,11 @@
 // Algorithm 2 ML-DSA.Sign(sk,M,ctx) on page 18             --> lib.rs
 // Algorithm 3 ML-DSA.Verify(pk,M,s,ctx) on page 18         --> lib.rs
 // Algorithm 4 HashML-DSA.Sign(sk,M,ctx,PH) on page 20      --> lib.rs
-// Algorithm 5 HashML-DSA.Verify(sk,M,s,ctx,PH) on page 21  --> lib.rs
+// Algorithm 5 HashML-DSA.Verify(pk,M,s,ctx,PH) on page 21  --> lib.rs
 // Algorithm 6 ML-DSA.KeyGen_internal(x) on page 23         --> ml_dsa.rs
 // Algorithm 7 ML-DSA.Sign_internal(sk,M',rnd) on page 25   --> ml_dsa.rs
 // Algorithm 8 ML-DSA.Verify_internal(pk,M',s) on page 27   --> ml_dsa.rs
-// Algorithm 9 IntegerToBits(x,a) one page 28               --> (optimized away) conversion.rs
+// Algorithm 9 IntegerToBits(x,a) on page 28               --> (optimized away) conversion.rs
 // Algorithm 10 BitsToInteger(y,a) on page 28               --> (optimized away) conversion.rs
 // Algorithm 11 IntegerToBytes(x,a) on page 28              --> (optimized away) conversion.rs
 // Algorithm 12 BitsToBytes(y) on page 29                   --> (optimized away) conversion.rs
@@ -66,7 +66,7 @@
 // Algorithm 40 UseHint(h,r) on page 41                     --> high_low.rs
 // Algorithm 41 NTT(w) on page 43                           --> ntt.rs
 // Algorithm 42 NTT−1(wˆ) on page 44                        --> ntt.rs
-// Algorithm 43 BitRev8(m) on page 44                       --> not needed to to zeta table
+// Algorithm 43 BitRev8(m) on page 44                       --> not needed to zeta table
 // Algorithm 44 AddNTT(a,b)̂ on page 45                      --> helpers.rs within 46:AddVectorNTT
 // Algorithm 45 MultiplyNTT(a,b)̂ on page 45                 --> helpers.rs
 // Algorithm 46 AddVectorNTT(v,w) on page 45                --> helpers.rs
@@ -626,22 +626,19 @@ pub mod ml_dsa_44 {
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-65
 /// parameter set is claimed to be in security strength category 3.
 ///
-/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen`] function below to
-/// generate both [`ml_dsa_44::PublicKey`] and [`ml_dsa_44::PrivateKey`] structs. The resulting
-/// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
+/// **1)** The basic usage is for an originator to start with the [`ml_dsa_65::try_keygen`] function below to
+/// generate both [`ml_dsa_65::PublicKey`] and [`ml_dsa_65::PrivateKey`] structs. The resulting
+/// [`ml_dsa_65::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
 /// functions to sign byte-array messages, such as [`traits::Signer::try_sign()`].
 ///
-/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
+/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait.
 /// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
 /// into byte-arrays for storage and/or transmission, similar to the message. Upon retrieval and/or receipt,
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
-/// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
-///
-/// See the top-level [crate] documentation for example code that implements the above flow.
-#[cfg(feature = "ml-dsa-65")]
+/// [`ml_dsa_65::PublicKey`] struct to verify the message with the `Signature` byte array.
 pub mod ml_dsa_65 {
     const TAU: i32 = 49;
     const LAMBDA: usize = 192;
@@ -668,22 +665,19 @@ pub mod ml_dsa_65 {
 /// public key, secret key, and signature along with a number of internal constants. The ML-DSA-87
 /// parameter set is claimed to be in security strength category 5.
 ///
-/// **1)** The basic usage is for an originator to start with the [`ml_dsa_44::try_keygen`] function below to
-/// generate both [`ml_dsa_44::PublicKey`] and [`ml_dsa_44::PrivateKey`] structs. The resulting
-/// [`ml_dsa_44::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
+/// **1)** The basic usage is for an originator to start with the [`ml_dsa_87::try_keygen`] function below to
+/// generate both [`ml_dsa_87::PublicKey`] and [`ml_dsa_87::PrivateKey`] structs. The resulting
+/// [`ml_dsa_87::PrivateKey`] struct implements the [`traits::Signer`] trait which supplies a variety of
 /// functions to sign byte-array messages, such as [`traits::Signer::try_sign()`].
 ///
-/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait
+/// **2)** Both of the `PrivateKey` and `PublicKey` structs implement the [`traits::SerDes`] trait.
 /// The originator utilizes the [`traits::SerDes::into_bytes()`] functions to serialize the structs
 /// into byte-arrays for storage and/or transmission, similar to the message. Upon retrieval and/or receipt,
 /// the remote party utilizes the [`traits::SerDes::try_from_bytes()`] functions to deserialize the
 /// byte-arrays into structs.
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
-/// [`ml_dsa_44::PublicKey`] struct to verify the message with the `Signature` byte array.
-///
-/// See the top-level [crate] documentation for example code that implements the above flow.
-#[cfg(feature = "ml-dsa-87")]
+/// [`ml_dsa_87::PublicKey`] struct to verify the message with the `Signature` byte array.
 pub mod ml_dsa_87 {
     const TAU: i32 = 60;
     const LAMBDA: usize = 256;
