@@ -1,31 +1,30 @@
 {
-  "name": "create-wasm-app",
+  "name": "fips204-wasm-www",
   "version": "0.1.0",
-  "description": "create an app to consume rust-generated wasm packages",
+  "private": true,
+  "description": "Browser front end for the fips204 WASM demo",
   "main": "index.js",
-  "bin": {
-    "create-wasm-app": ".bin/create-wasm-app.js"
-  },
   "scripts": {
     "build": "webpack --config webpack.config.js",
     "start": "webpack-dev-server"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rustwasm/create-wasm-app.git"
+    "url": "git+https://github.com/integritychain/fips204.git",
+    "directory": "wasm/www"
   },
   "keywords": [
     "webassembly",
     "wasm",
     "rust",
-    "webpack"
+    "fips204",
+    "ml-dsa"
   ],
-  "author": "Ashley Williams <ashley666ashley@gmail.com>",
   "license": "(MIT OR Apache-2.0)",
   "bugs": {
-    "url": "https://github.com/rustwasm/create-wasm-app/issues"
+    "url": "https://github.com/integritychain/fips204/issues"
   },
-  "homepage": "https://github.com/rustwasm/create-wasm-app#readme",
+  "homepage": "https://github.com/integritychain/fips204/tree/main/wasm/www",
   "dependencies": {
     "wasm": "file:../pkg"
   },

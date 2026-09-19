@@ -1,6 +1,6 @@
 [package]
 name = "fips204-ffi"
-version = "0.4.6"
+version = "0.5.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "C shared library exposing FIPS 204: Module-Lattice-Based Digital Signature"
@@ -23,4 +23,4 @@ pastey = "0.1"
 
 [dependencies.fips204]
 path = ".."
-version = "0.4.6"
+version = "0.5.0"

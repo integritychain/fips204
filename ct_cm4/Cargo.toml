@@ -1,6 +1,6 @@
 [package]
 name = "fips204-ct_cm4"
-version = "0.4.4"
+version = "0.5.0"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
 description = "Cortex-M4 testbench for FIPS 204 ML-DSA"
 edition = "2021"

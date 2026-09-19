@@ -1,8 +1,8 @@
 [package]
 name = "fips204-dudect"
-version = "0.4.4"
+version = "0.5.0"
 authors = ["Eric Schorn <eschorn@integritychain.com>"]
-description = "Dudect testbench for FIPS 204 (draft) ML-DSA"
+description = "Dudect testbench for FIPS 204 ML-DSA"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 publish = false
@@ -11,7 +11,8 @@ rust-version = "1.85"
 
 [dependencies]
 fips204 = { path = "..", default-features = false, features = ["dudect", "ml-dsa-44"] }
-dudect-bencher = "0.6"
+# Vendored 0.6 patched for rand 0.9 so the tree has a single rand_core (not 0.6+0.9)
+dudect-bencher = { path = "vendor/dudect-bencher" }
 rand_core = { version = "0.9", default-features = false }
 
 

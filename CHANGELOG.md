@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.5.0 (in progress)
+
+### Migration from 0.4.x
+- Bump the dependency to `fips204 = "0.5"` (this release is **not** API-compatible with
+  crates.io `0.4.6`).
+- Replace `CryptoRngCore` bounds with `TryCryptoRng` (re-exported from `fips204`).
+- The `default-rng` feature now enables `rand_core/os_rng` (was `getrandom`); `OsRng`
+  is fallible-only — prefer `keygen_from_seed` / `try_sign_with_seed`, or handle
+  `try_fill_bytes` errors.
+- Custom RNGs and `rand` / `rand_chacha` consumers should use the **0.9** line (matching
+  `rand_core` 0.9).
+- Bare-metal / `no_std`: use `default-features = false` plus the desired `ml-dsa-*`
+  feature(s); default features pull an OS RNG backend that will not build on many
+  embedded targets.
+- MSRV is now **1.85**.
 
 ### Added
 - `ffi` workspace member (`fips204-ffi`) producing `libfips204`, a C shared library for
@@ -13,8 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via FFI); thank you @dkg
 
 ### Fixed
-- `Signer::get_public_key` doctest builds under feature subsets such as
-  `ml-dsa-44,default-rng` (thank you @dkg)
+- `Signer::get_public_key` doctest no longer requires `default-rng` (uses
+  `keygen_from_seed`; thank you @dkg for the earlier feature-subset report)
 - RustSec advisories: bump Criterion to 0.5 (drops unmaintained/unsound `atty`);
   replace unmaintained `paste` with `pastey` in `fips204-ffi`
 - Clippy pedantic cleanups for current stable (`needless_for_each`,
@@ -29,18 +43,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   advisories; bump `wasm-bindgen` / `wasm-bindgen-test`; fix `fips204` path dep to `..`
   (was clone-name-fragile `../../fips204`); rewrite `wasm/README.md` and
   `wasm/www/README.md` (drop stale create-wasm-app/Travis text; document Node/npm,
-  layout, and optional `getrandom_backend="wasm_js"` for OS RNG)
+  layout, and optional `getrandom_backend="wasm_js"` for OS RNG); rename
+  `wasm/www` npm package to `fips204-wasm-www`; point the demo page at the final
+  FIPS 204 PDF §3.6.1 (was draft IPD §3.5.1)
 - `ct_cm4`: pin `fixed = "=1.30.0"` so the Microbit sample resolves on MSRV 1.85
   (`fixed` 1.31+ needs rustc 1.93 via `microbit-v2`)
 - `KeyGen::keygen_from_seed` doctest no longer requires `default-rng` (uses
   `try_sign_with_seed`; drop stray `///` / `OsRng` from the example)
 
 ### Changed
+- Crate and sample versions are **0.5.0** (`fips204`, `fips204-ffi`, `wasm`, `ct_cm4`,
+  `dudect`, `fuzz`)
 - Updated NIST ACVP test vectors and aligned keyGen / sigGen / sigVer tests with the
   public external API (including HashML-DSA for digests in `Ph`); thank you @dkg
 - Raised MSRV to **1.85** (Debian stable / trixie); CI MSRV jobs updated accordingly;
   NIST keyGen tests use `TryInto` for seed arrays; pin `textwrap = "=0.16.2"` so
   Criterion stays buildable without a checked-in `Cargo.lock`
+- Document that default features (including `default-rng` / `os_rng`) are for hosted
+  targets; bare-metal / `no_std` consumers should use `--no-default-features` plus
+  the desired `ml-dsa-*` feature(s) and seed/`*_with_rng` APIs (see `ct_cm4/`)
+- Drop “(draft)” from sample crate descriptions; point GitHub README security-parameter
+  link at docs.rs `#modules` (not a broken in-page anchor); clarify `KeyGen`
+  associated-type docs (drop stale “expanded key” wording); fix incomplete
+  `try_hash_sign_with_seed` doc sentence
+- `dudect`: vendor `dudect-bencher` 0.6 patched for `rand`/`rand_chacha` **0.9** so
+  the sample resolves a single `rand_core` 0.9 (crates.io 0.6 pulled `rand_core` 0.6)
 - FFI polish: include `<stddef.h>` in `fips204.h`; create a local `libfips204.so.0`
   symlink in the FFI test Makefile for Linux in-tree `make check`; expand
   `ffi/README.md` with header/`SONAME`/linking/`pkg-config` notes for C consumers

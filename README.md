@@ -15,9 +15,12 @@ This crate implements the FIPS 204 **released** standard in pure Rust with minim
 without any unsafe code. All three security parameter sets are fully functional and tested. The implementation's 
 key- and signature-generation functionality operates in constant-time, does not require the standard library, e.g. 
 `#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes the `RNG` so it is suitable for the full 
-range of applications down to the bare-metal. The API is stabilized and the code is heavily biased towards safety 
-and correctness; further performance optimizations will be implemented over time. This crate will quickly follow 
-any changes related to FIPS 204 as they become available (e.g., pick up more test vectors).
+range of applications down to the bare-metal. The API is stabilized within a released
+crate version and the code is heavily biased towards safety and correctness; further
+performance optimizations will be implemented over time. **0.5.0** is a breaking release
+versus **0.4.x** (see [CHANGELOG](CHANGELOG.md#050) migration notes). This crate will
+quickly follow any changes related to FIPS 204 as they become available (e.g., pick up
+more test vectors).
 
 See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf> for a full description of the target functionality.
 
@@ -54,11 +57,13 @@ assert!(v);
 ~~~
 
 The Rust [Documentation][docs-link] lives under each **Module** corresponding to the desired
-[security parameter](#modules) below. 
+[security parameter][docs-modules].
 
 ## Notes
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
+  Version **0.5.0** (breaking vs 0.4.x): `rand_core` **0.9** / `TryCryptoRng`, MSRV **1.85**;
+  see [CHANGELOG](CHANGELOG.md#050) for migration details.
 * NIST ACVP test vectors (keyGen / sigGen / sigVer) are exercised against the public API,
   including external interface and HashML-DSA for the digests enumerated in `Ph`
   (`SHA2-256`, `SHA2-512`, `SHAKE-128`).
@@ -66,11 +71,16 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   pure ML-DSA external interfaces (see [`ffi/README.md`](ffi/README.md)). HashML-DSA is not
   yet exported through the FFI.
 * A WASM browser demo lives under [`wasm/`](wasm/) (see [`wasm/README.md`](wasm/README.md)).
-* RNG integration uses **`rand_core` 0.9**. The `default-rng` feature enables
-  `rand_core/os_rng`. Custom generators passed to `*_with_rng` must implement
-  `TryCryptoRng` (re-exported from this crate). `OsRng` is fallible-only on this
-  line; prefer seed-based APIs or handle `try_fill_bytes` errors when driving the OS RNG
-  yourself.
+* RNG integration uses **`rand_core` 0.9**. The default features enable
+  `default-rng` (`rand_core/os_rng`) plus all three parameter sets. That OS RNG
+  path is for hosted environments; it will **not** compile on bare-metal targets
+  that lack a `getrandom` backend (for example `thumbv7em-none-eabi`). For
+  embedded / `no_std` builds, disable defaults and pick the sets you need, then
+  supply entropy via seeds or `*_with_rng`:
+  `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`
+  (see also [`ct_cm4/`](ct_cm4/)). Custom generators must implement `TryCryptoRng`
+  (re-exported from this crate). `OsRng` is fallible-only on this line; prefer
+  seed-based APIs or handle `try_fill_bytes` errors when driving the OS RNG yourself.
 * Constant-time assurances target the source-code level only, with confirmation via
   manual review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
@@ -96,6 +106,7 @@ defined in the Apache-2.0 license, shall be dual licensed as above, without any 
 [crate-link]: https://crates.io/crates/fips204
 [docs-image]: https://docs.rs/fips204/badge.svg
 [docs-link]: https://docs.rs/fips204/
+[docs-modules]: https://docs.rs/fips204/latest/fips204/#modules
 [build-image]: https://github.com/integritychain/fips204/workflows/test/badge.svg
 [build-link]: https://github.com/integritychain/fips204/actions?query=workflow%3Atest
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg

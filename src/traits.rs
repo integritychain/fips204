@@ -6,12 +6,10 @@ use rand_core::OsRng;
 
 /// The `KeyGen` trait is defined to allow trait objects for keygen.
 pub trait KeyGen {
-    /// An expanded public key containing precomputed elements to increase (repeated)
-    /// verify performance. Derived from the public key.
+    /// The public key type for this security parameter set (used for verification).
     type PublicKey;
 
-    /// An expanded private key containing precomputed elements to increase (repeated)
-    /// signing performance. Derived from the private key.
+    /// The private key type for this security parameter set (used for signing).
     type PrivateKey;
 
 
@@ -264,11 +262,11 @@ pub trait Signer {
 
 
     /// Attempt to sign the hash of the given message, returning a digital signature on success,
-    /// something went wrong. This function utilizes the **provided seed to support (less common)
-    /// deterministic signatures**. This function operates in constant-time relative to secret data
-    /// (which specifically excludes the `rho` value stored in the public key, the hash-derived
-    /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values,
-    /// and the main signing rejection loop as noted in section 5.5 of
+    /// or an error if something went wrong. This function utilizes the **provided seed to support
+    /// (less common) deterministic signatures**. This function operates in constant-time relative
+    /// to secret data (which specifically excludes the `rho` value stored in the public key, the
+    /// hash-derived `rho_prime` value that is rejection-sampled/expanded into the internal `s_1`
+    /// and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
@@ -288,12 +286,9 @@ pub trait Signer {
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # #[cfg(feature = "ml-dsa-65")] {
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
-    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    /// use fips204::traits::{KeyGen, SerDes, Signer};
     ///
-    ///
-    /// // Generate both public and secret keys
-    /// let (pk1, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
-    ///
+    /// let (pk1, sk) = ml_dsa_65::KG::keygen_from_seed(&[0u8; 32]);
     ///
     /// // The public key can be derived from the secret key
     /// let pk2 = sk.get_public_key();

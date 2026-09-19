@@ -3,9 +3,8 @@
 Webpack app that loads the `wasm-pack` output from [`../pkg`](../pkg) and calls the
 Rust `sign` export in the browser.
 
-**Setup and run instructions are in the parent [`../README.md`](../README.md).** Do not
-use older `npm init wasm-app` / Travis-oriented templates; this directory is maintained
-as part of the fips204 repo.
+**Setup and run instructions are in the parent [`../README.md`](../README.md).** The
+npm package name is `fips204-wasm-www` (private demo front end; not published).
 
 ## Scripts
 

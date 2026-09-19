@@ -1,0 +1,19 @@
+[package]
+name = "dudect-bencher"
+version = "0.6.0"
+edition = "2021"
+authors = ["Michael Rosenberg <michael@mrosenberg.pub>"]
+license = "MIT OR Apache-2.0"
+description = "Vendored dudect-bencher 0.6 patched for rand 0.9 (fips204 dudect sample)"
+publish = false
+readme = "README.md"
+
+[dependencies]
+clap = "2"
+ctrlc = "3"
+rand = "0.9"
+rand_chacha = "0.9"
+
+[features]
+default = ["core-hint-black-box"]
+core-hint-black-box = []
