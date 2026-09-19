@@ -1,5 +1,5 @@
 use pastey::paste;
-use rand_core::{OsRng, RngCore};
+use rand_core::{OsRng, TryRngCore};
 
 mod ret {
     pub const OK: u8 = 0;
@@ -23,7 +23,9 @@ pub extern "C" fn ml_dsa_populate_seed(seed_out: Option<&mut ml_dsa_seed>) -> u8
     let Some(seed_out) = seed_out else {
         return ret::NULL_PTR_ERROR;
     };
-    OsRng.fill_bytes(&mut seed_out.data);
+    if OsRng.try_fill_bytes(&mut seed_out.data).is_err() {
+        return ret::KEYGEN_ERROR;
+    }
     ret::OK
 }
 

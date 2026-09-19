@@ -12,7 +12,7 @@ rust-version = "1.85"
 [dependencies]
 fips204 = { path = "..", default-features = false, features = ["dudect", "ml-dsa-44"] }
 dudect-bencher = "0.6"
-rand_core = { version = "0.6.4", default-features = false }
+rand_core = { version = "0.9", default-features = false }
 
 
 [profile.bench]

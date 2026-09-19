@@ -491,7 +491,7 @@ mod tests {
     fn test_simple_bit_pack_roundtrip() {
         // Round trip for 32 * 6(bitlen) bytes
         let mut random_bytes = [0u8; 32 * 6];
-        rand::thread_rng().fill_bytes(&mut random_bytes);
+        rand::rng().fill_bytes(&mut random_bytes);
         let r = simple_bit_unpack(&random_bytes, (1 << 6) - 1).unwrap();
         let mut res = [0u8; 32 * 6];
         simple_bit_pack(&r, (1 << 6) - 1, &mut res);
@@ -504,7 +504,7 @@ mod tests {
     fn test_simple_bit_unpack_validation1() {
         // wrong size of bytes
         let mut random_bytes = [0u8; 32 * 7];
-        rand::thread_rng().fill_bytes(&mut random_bytes);
+        rand::rng().fill_bytes(&mut random_bytes);
         let res = simple_bit_unpack(&random_bytes, (1 << 6) - 1);
         assert!(res.is_err());
     }
@@ -515,7 +515,7 @@ mod tests {
     fn test_bit_unpack_validation1() {
         // wrong size of bytes
         let mut random_bytes = [0u8; 32 * 7];
-        rand::thread_rng().fill_bytes(&mut random_bytes);
+        rand::rng().fill_bytes(&mut random_bytes);
         let res = bit_unpack(&random_bytes, 0, (1 << 6) - 1);
         assert!(res.is_err());
     }
@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn test_simple_bit_pack_validation1() {
         let mut random_bytes = [0u8; 32 * 6];
-        rand::thread_rng().fill_bytes(&mut random_bytes);
+        rand::rng().fill_bytes(&mut random_bytes);
         let r = R([0i32; 256]);
         simple_bit_pack(&r, (1 << 6) - 1, &mut random_bytes);
         // no panic is good news

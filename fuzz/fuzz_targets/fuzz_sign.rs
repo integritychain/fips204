@@ -4,7 +4,7 @@ use fips204::Ph;
 use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 use libfuzzer_sys::fuzz_target;
 use rand_chacha::ChaCha20Rng;
-use rand_core::{CryptoRngCore, SeedableRng};
+use rand_core::{SeedableRng, TryCryptoRng};
 
 
 // Helper to create deterministic RNG from data
@@ -24,7 +24,7 @@ fn create_rng(seed_data: &[u8]) -> ChaCha20Rng {
 
 // Helper function to test signing operations for a specific parameter set
 fn fuzz_signer_for_params<S, V>(
-    data: &[u8], rng: &mut impl CryptoRngCore, keypair: &(V, S), ctx: &[u8],
+    data: &[u8], rng: &mut impl TryCryptoRng, keypair: &(V, S), ctx: &[u8],
 ) where
     S: Signer<PublicKey = V>,
     V: Verifier<Signature = S::Signature> + SerDes + Clone,

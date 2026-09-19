@@ -90,7 +90,9 @@
 
 /// The `rand_core` types are re-exported so that users of fips204 do not
 /// have to worry about using the exact correct version of `rand_core`.
-pub use rand_core::{CryptoRng, Error as RngError, RngCore};
+pub use rand_core::{CryptoRng, RngCore, TryCryptoRng, TryRngCore};
+#[cfg(feature = "default-rng")]
+pub use rand_core::{OsError as RngError, OsRng};
 
 mod conversion;
 mod encodings;
@@ -122,7 +124,7 @@ macro_rules! functionality {
         use crate::ntt;
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
         use crate::types;
-        use rand_core::CryptoRngCore;
+        use rand_core::TryCryptoRng;
         use zeroize::{Zeroize, ZeroizeOnDrop};
 
         use crate::{D, Q};
@@ -227,7 +229,7 @@ macro_rules! functionality {
         /// # }
         /// # Ok(())}
         /// ```
-        pub fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
+        pub fn try_keygen_with_rng(rng: &mut impl TryCryptoRng) -> Result<(PublicKey, PrivateKey), &'static str> {
             KG::try_keygen_with_rng(rng)
         }
 
@@ -238,7 +240,7 @@ macro_rules! functionality {
 
 
             /// # Algorithm 1 in `KeyGen` trait
-            fn try_keygen_with_rng(rng: &mut impl CryptoRngCore) -> Result<(PublicKey, PrivateKey), &'static str> {
+            fn try_keygen_with_rng(rng: &mut impl TryCryptoRng) -> Result<(PublicKey, PrivateKey), &'static str> {
                 let (pk, sk) = ml_dsa::key_gen::<CTEST, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
                 Ok((pk, sk))
             }
@@ -266,7 +268,7 @@ macro_rules! functionality {
             /// # Errors
             /// Returns an error when the random number generator fails or context too long.
             fn try_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
+                &self, rng: &mut impl TryCryptoRng, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 // 1: if |ctx| > 255 then
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
@@ -308,7 +310,7 @@ macro_rules! functionality {
             /// # Errors
             /// Returns an error when the random number generator fails or context too long.
             fn try_hash_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &types::Ph,
+                &self, rng: &mut impl TryCryptoRng, message: &[u8], ctx: &[u8], ph: &types::Ph,
             ) -> Result<Self::Signature, &'static str> {
                 // 1: if |ctx| > 255 then
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
@@ -562,7 +564,7 @@ macro_rules! functionality {
         #[deprecated = "Function for constant-time testing; do not use elsewhere"]
         #[cfg(feature = "dudect")]
         pub fn dudect_keygen_sign_with_rng(
-            rng: &mut impl CryptoRngCore, message: &[u8],
+            rng: &mut impl TryCryptoRng, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let mut rnd = [0u8; 32];

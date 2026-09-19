@@ -1,5 +1,5 @@
 use crate::types::Ph;
-use rand_core::{CryptoRng, CryptoRngCore, RngCore};
+use rand_core::{CryptoRng, RngCore, TryCryptoRng};
 #[cfg(feature = "default-rng")]
 use rand_core::OsRng;
 
@@ -74,7 +74,7 @@ pub trait KeyGen {
     /// # Ok(())}
     /// ```
     fn try_keygen_with_rng(
-        rng: &mut impl CryptoRngCore,
+        rng: &mut impl TryCryptoRng,
     ) -> Result<(Self::PublicKey, Self::PrivateKey), &'static str>;
 
 
@@ -89,14 +89,14 @@ pub trait KeyGen {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # #[cfg(feature = "ml-dsa-44")] {
-    /// use crate::fips204::RngCore;
+    /// use crate::fips204::TryRngCore;
     /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
     /// use fips204::traits::{KeyGen, Signer, Verifier};
     /// use rand_core::OsRng;
     ///
     /// // The signor gets the xi seed from the OS random number generator
     /// let mut xi = [0u8; 32];
-    /// OsRng.fill_bytes(&mut xi);
+    /// OsRng.try_fill_bytes(&mut xi).unwrap();
     /// ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
@@ -190,7 +190,7 @@ pub trait Signer {
     /// # Ok(())}
     /// ```
     fn try_sign_with_rng(
-        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
+        &self, rng: &mut impl TryCryptoRng, message: &[u8], ctx: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 
 
@@ -263,7 +263,7 @@ pub trait Signer {
     /// # Errors
     /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     fn try_hash_sign_with_rng(
-        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
+        &self, rng: &mut impl TryCryptoRng, message: &[u8], ctx: &[u8], ph: &Ph,
     ) -> Result<Self::Signature, &'static str>;
 
 
@@ -317,11 +317,8 @@ impl RngCore for DummyRng {
 
     fn next_u64(&mut self) -> u64 { unimplemented!() }
 
-    fn fill_bytes(&mut self, _out: &mut [u8]) { unimplemented!() }
-
-    fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn fill_bytes(&mut self, out: &mut [u8]) {
         out.copy_from_slice(&self.data);
-        Ok(())
     }
 }
 

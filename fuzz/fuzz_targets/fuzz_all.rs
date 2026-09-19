@@ -3,7 +3,7 @@ use libfuzzer_sys::fuzz_target;
 use fips204::ml_dsa_44::{PrivateKey, PublicKey, KG, SIG_LEN};
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 use fips204::Ph; //::{SHA256, SHA512, SHAKE128};
-use rand_core::OsRng;
+use fips204::OsRng;
 
 fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
 

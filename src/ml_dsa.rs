@@ -10,7 +10,7 @@ use crate::high_low::{high_bits, low_bits, make_hint, power2round, use_hint};
 use crate::ntt::{inv_ntt, ntt};
 use crate::types::{PrivateKey, PublicKey, R, T};
 use crate::{D, Q};
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 use sha3::digest::XofReader;
 
 
@@ -30,7 +30,7 @@ pub(crate) fn key_gen<
     const PK_LEN: usize,
     const SK_LEN: usize,
 >(
-    rng: &mut impl CryptoRngCore, eta: i32,
+    rng: &mut impl TryCryptoRng, eta: i32,
 ) -> Result<(PublicKey<K, L>, PrivateKey<K, L>), &'static str> {
     //
     // 1: ξ ← B^{32}    ▷ Choose random seed

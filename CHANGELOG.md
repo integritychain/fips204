@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pure ML-DSA keygen / sign / verify across ML-DSA-44/65/87 (HashML-DSA not yet exported
   via FFI); thank you @dkg
 
+### Fixed
+- `Signer::get_public_key` doctest builds under feature subsets such as
+  `ml-dsa-44,default-rng` (thank you @dkg)
+- RustSec advisories: bump Criterion to 0.5 (drops unmaintained/unsound `atty`);
+  replace unmaintained `paste` with `pastey` in `fips204-ffi`
+- CI `cargo_deny`: bump `EmbarkStudios/cargo-deny-action` to v2 (CVSS 4.0 advisory
+  DB support); refresh `deny.toml` `[graph]`/`[output]` layout
+- CI `cargo_outdated`: exclude `rand_core` from Latest probing (`-x rand_core`) so the
+  job does not fail while we stay on the 0.9 `os_rng` feature line
+
 ### Changed
 - Updated NIST ACVP test vectors and aligned keyGen / sigGen / sigVer tests with the
   public external API (including HashML-DSA for digests in `Ph`); thank you @dkg
@@ -21,14 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FFI polish: include `<stddef.h>` in `fips204.h`; create a local `libfips204.so.0`
   symlink in the FFI test Makefile for Linux in-tree `make check`; correct `ffi/README.md`
   quick start (Python bindings are not in-tree yet)
-
-### Fixed
-- `Signer::get_public_key` doctest builds under feature subsets such as
-  `ml-dsa-44,default-rng` (thank you @dkg)
-- RustSec advisories: bump Criterion to 0.5 (drops unmaintained/unsound `atty`);
-  replace unmaintained `paste` with `pastey` in `fips204-ffi`
-- CI `cargo_deny`: bump `EmbarkStudios/cargo-deny-action` to v2 (CVSS 4.0 advisory
-  DB support); refresh `deny.toml` `[graph]`/`[output]` layout
+- **Breaking:** migrate to `rand_core` / `rand` / `rand_chacha` **0.9**; `default-rng`
+  now enables `rand_core/os_rng`; public `*_with_rng` APIs take `TryCryptoRng` (was
+  `CryptoRngCore`); `OsRng` is fallible-only; re-export `TryRngCore` / `TryCryptoRng`,
+  and `OsError as RngError` / `OsRng` when `default-rng` is enabled
 
 ### Removed
 - Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only

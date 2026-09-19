@@ -12,11 +12,8 @@ impl RngCore for TestRng {
 
     fn next_u64(&mut self) -> u64 { unimplemented!() }
 
-    fn fill_bytes(&mut self, _out: &mut [u8]) { unimplemented!() }
-
-    fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn fill_bytes(&mut self, out: &mut [u8]) {
         out.copy_from_slice(&self.0);
-        Ok(())
     }
 }
 
