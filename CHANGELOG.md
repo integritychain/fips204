@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ml-dsa-44,default-rng` (thank you @dkg)
 - RustSec advisories: bump Criterion to 0.5 (drops unmaintained/unsound `atty`);
   replace unmaintained `paste` with `pastey` in `fips204-ffi`
+- CI `cargo_deny`: bump `EmbarkStudios/cargo-deny-action` to v2 (CVSS 4.0 advisory
+  DB support); refresh `deny.toml` `[graph]`/`[output]` layout
 
 ### Removed
 - Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only
