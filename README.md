@@ -65,6 +65,12 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 * An optional `ffi` workspace member builds `libfips204`, a C ABI shared library for the
   pure ML-DSA external interfaces (see [`ffi/README.md`](ffi/README.md)). HashML-DSA is not
   yet exported through the FFI.
+* A WASM browser demo lives under [`wasm/`](wasm/) (see [`wasm/README.md`](wasm/README.md)).
+* RNG integration uses **`rand_core` 0.9**. The `default-rng` feature enables
+  `rand_core/os_rng`. Custom generators passed to `*_with_rng` must implement
+  `TryCryptoRng` (re-exported from this crate). `OsRng` is fallible-only on this
+  line; prefer seed-based APIs or handle `try_fill_bytes` errors when driving the OS RNG
+  yourself.
 * Constant-time assurances target the source-code level only, with confirmation via
   manual review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.

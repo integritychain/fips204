@@ -17,10 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ml-dsa-44,default-rng` (thank you @dkg)
 - RustSec advisories: bump Criterion to 0.5 (drops unmaintained/unsound `atty`);
   replace unmaintained `paste` with `pastey` in `fips204-ffi`
+- Clippy pedantic cleanups for current stable (`needless_for_each`,
+  `unnecessary_semicolon`, `large_stack_arrays` allow on the K=255 test, etc.); CI
+  `clippy` job now installs `dtolnay/rust-toolchain@stable` with the clippy component
 - CI `cargo_deny`: bump `EmbarkStudios/cargo-deny-action` to v2 (CVSS 4.0 advisory
   DB support); refresh `deny.toml` `[graph]`/`[output]` layout
 - CI `cargo_outdated`: exclude `rand_core` from Latest probing (`-x rand_core`) so the
   job does not fail while we stay on the 0.9 `os_rng` feature line
+- WASM demo: refresh npm toolchain (`copy-webpack-plugin` 14, `webpack-cli` 7,
+  `webpack-dev-server` 6) clearing Dependabot `serialize-javascript` / `uuid`
+  advisories; bump `wasm-bindgen` / `wasm-bindgen-test`; fix `fips204` path dep to `..`
+  (was clone-name-fragile `../../fips204`); rewrite `wasm/README.md` and
+  `wasm/www/README.md` (drop stale create-wasm-app/Travis text; document Node/npm,
+  layout, and optional `getrandom_backend="wasm_js"` for OS RNG)
+- `ct_cm4`: pin `fixed = "=1.30.0"` so the Microbit sample resolves on MSRV 1.85
+  (`fixed` 1.31+ needs rustc 1.93 via `microbit-v2`)
+- `KeyGen::keygen_from_seed` doctest no longer requires `default-rng` (uses
+  `try_sign_with_seed`; drop stray `///` / `OsRng` from the example)
 
 ### Changed
 - Updated NIST ACVP test vectors and aligned keyGen / sigGen / sigVer tests with the
@@ -29,8 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   NIST keyGen tests use `TryInto` for seed arrays; pin `textwrap = "=0.16.2"` so
   Criterion stays buildable without a checked-in `Cargo.lock`
 - FFI polish: include `<stddef.h>` in `fips204.h`; create a local `libfips204.so.0`
-  symlink in the FFI test Makefile for Linux in-tree `make check`; correct `ffi/README.md`
-  quick start (Python bindings are not in-tree yet)
+  symlink in the FFI test Makefile for Linux in-tree `make check`; expand
+  `ffi/README.md` with header/`SONAME`/linking/`pkg-config` notes for C consumers
+  (Python bindings are not in-tree yet)
 - **Breaking:** migrate to `rand_core` / `rand` / `rand_chacha` **0.9**; `default-rng`
   now enables `rand_core/os_rng`; public `*_with_rng` APIs take `TryCryptoRng` (was
   `CryptoRngCore`); `OsRng` is fallible-only; re-export `TryRngCore` / `TryCryptoRng`,

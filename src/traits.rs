@@ -89,20 +89,16 @@ pub trait KeyGen {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # #[cfg(feature = "ml-dsa-44")] {
-    /// use crate::fips204::TryRngCore;
     /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
     /// use fips204::traits::{KeyGen, Signer, Verifier};
-    /// use rand_core::OsRng;
     ///
-    /// // The signor gets the xi seed from the OS random number generator
-    /// let mut xi = [0u8; 32];
-    /// OsRng.try_fill_bytes(&mut xi).unwrap();
-    /// ///
+    /// // Example seed (in production, draw 32 bytes from a CSPRNG)
+    /// let xi = [0u8; 32];
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
     ///
-    /// // Generate key pair and signature
-    /// let (pk, sk) = ml_dsa_44::KG::keygen_from_seed(&xi); // Generate both public and secret keys
-    /// let sig = sk.try_sign(&message, &[0])?; // Use the secret key to generate a message signature
+    /// // Generate key pair from the seed, then form a deterministic signature
+    /// let (pk, sk) = ml_dsa_44::KG::keygen_from_seed(&xi);
+    /// let sig = sk.try_sign_with_seed(&[0u8; 32], &message, &[0])?;
     ///
     /// let res = pk.verify(&message, &sig, &[0]);
     /// assert!(res); // Signature accepted
