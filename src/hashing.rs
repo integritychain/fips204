@@ -2,7 +2,7 @@
 
 use crate::conversion::{bit_unpack, coeff_from_half_byte, coeff_from_three_bytes};
 use crate::helpers::{bit_length, is_in_range};
-use crate::types::{Ph, R, R0, T, T0};
+use crate::types::{R, R0, T, T0};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256};
 
@@ -313,29 +313,4 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
 
     // 7: return y
     y
-}
-
-
-/// See for example, Algorithm 4 lines 10-22
-pub(crate) fn get_hash_params(ph: &Ph) -> ([u8; 11], usize) {
-    match ph {
-        Ph::SHA256 => (
-            [
-                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
-            ],
-            32
-        ),
-        Ph::SHA512 => (
-            [
-                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03,
-            ],
-            64
-        ),
-        Ph::SHAKE128 => (
-            [
-                0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B,
-            ],
-            32
-         ),
-    }
 }

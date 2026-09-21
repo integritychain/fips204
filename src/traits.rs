@@ -1,6 +1,5 @@
 //! Public traits for key generation, signing, verification, and serialization.
 
-use crate::types::Ph;
 use rand_core::{CryptoRng, CryptoRngCore, RngCore};
 #[cfg(feature = "default-rng")]
 use rand_core::OsRng;
@@ -242,9 +241,9 @@ pub trait Signer {
     /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     #[cfg(feature = "default-rng")]
     fn try_hash_sign(
-        &self, message: &[u8], ctx: &[u8], ph: &Ph,
+        &self, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str> {
-        self.try_hash_sign_with_rng(&mut OsRng, message, ctx, ph)
+        self.try_hash_sign_with_rng(&mut OsRng, hash, ctx, hash_oid)
     }
 
 
@@ -260,7 +259,7 @@ pub trait Signer {
     /// # Errors
     /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
     fn try_hash_sign_with_rng(
-        &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &Ph,
+        &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 
 
@@ -275,9 +274,9 @@ pub trait Signer {
     /// # Errors
     /// Returns an error when the `ctx` is longer than 255 bytes; propagates internal errors.
     fn try_hash_sign_with_seed(
-        &self, seed: &[u8;32], message: &[u8], ctx: &[u8], ph: &Ph,
+        &self, seed: &[u8;32], hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str> {
-        self.try_hash_sign_with_rng(&mut DummyRng {data: *seed}, message, ctx, ph)
+        self.try_hash_sign_with_rng(&mut DummyRng {data: *seed}, hash, ctx, hash_oid)
     }
 
 
@@ -354,7 +353,7 @@ pub trait Verifier {
 
     /// Verifies a digital signature on the hash of a message with respect to a `PublicKey`. As this
     /// function operates on purely public data, it does not provide constant-time assurances.
-    fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &Ph) -> bool;
+    fn hash_verify(&self, hash: &[u8], sig: &Self::Signature, ctx: &[u8], hash_oid: &[u8]) -> bool;
 }
 
 
