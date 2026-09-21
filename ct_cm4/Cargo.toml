@@ -16,7 +16,7 @@ cortex-m-rt = "0.7.3"
 panic-rtt-target = { version =  "0.1.2", features = ["cortex-m"] }
 microbit-v2 = "0.13.0"
 rtt-target = { version = "0.5.0"}
-rand_core = { version = "0.9", default-features = false }
+rand_core = { version = "0.6.4", default-features = false }
 hex-literal = "0.4.1"
 # Pin: microbit-v2 → nrf-hal-common pulls `fixed`; 1.31+ needs rustc 1.93 (> MSRV 1.85)
 fixed = "=1.30.0"

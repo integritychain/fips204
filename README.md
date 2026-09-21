@@ -65,8 +65,8 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   pure ML-DSA external interfaces (see [`ffi/README.md`](ffi/README.md)). HashML-DSA is not
   yet exported through the FFI.
 * A WASM browser demo lives under [`wasm/`](wasm/) (see [`wasm/README.md`](wasm/README.md)).
-* RNG integration uses **`rand_core` 0.9**. The default features enable
-  `default-rng` (`rand_core/os_rng`) plus all three parameter sets. That OS RNG
+* RNG integration uses **`rand_core` 0.6**. The default features enable
+  `default-rng` plus all three parameter sets. That OS RNG
   path is for hosted environments; it will **not** compile on bare-metal targets
   that lack a `getrandom` backend (for example `thumbv7em-none-eabi`). So for
   embedded / `no_std` builds, disable defaults and pick the sets you need, then
