@@ -300,7 +300,7 @@ macro_rules! functionality {
             /// Generate a “pre-hash” ML-DSA signature.
             ///
             /// **Input**:  Implemented on private key struct,
-            ///             message `𝑀 ∈ {0, 1}∗`,
+            ///             hash of message `PH(𝑀) | 𝑀 ∈ {0, 1}∗`,
             ///             context string `ctx` (a byte string of 255 or fewer bytes),
             ///             pre-hash function `PH`. <br>
             /// **Output**: ML-DSA signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}`.
@@ -308,7 +308,7 @@ macro_rules! functionality {
             /// # Errors
             /// Returns an error when the random number generator fails or context too long.
             fn try_hash_sign_with_rng(
-                &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8], ph: &types::Ph,
+                &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], ph: &types::Ph,
             ) -> Result<Self::Signature, &'static str> {
                 // 1: if |ctx| > 255 then
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
@@ -326,15 +326,19 @@ macro_rules! functionality {
 
                 // 9:  (blank line in spec)
 
-                // Note: steps 10-22 are performed within `hash_message()` below
-                let mut phm = [0u8; 64];  // hashers don't all play well with each other
-                let (oid, phm_len) = hashing::hash_message(message, ph, &mut phm);
+                // 12, 15, 18: assigning oid
+                // Note: actual hashing of the message (steps13, 16, 19) are performed outside of this module
+                let (oid, phm_len) = hashing::get_hash_params(ph);
+
+                if hash.len() != phm_len {
+                    return Err("Hash was wrong length for selected digest");
+                }
 
                 // Note: step 23 is performed within `sign_internal()` and below.
                 // 23: 𝑀 ′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
                 // 24: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &oid, &phm[0..phm_len], rnd
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &[], ctx, &oid, &hash, rnd
                 );
 
                 // 25: return 𝜎
@@ -383,12 +387,12 @@ macro_rules! functionality {
             /// Verifies a pre-hash HashML-DSA signature.
             ///
             /// **Input**:  Implemented on public key struct,
-            ///             message `𝑀 ∈ {0, 1}∗`,
+            ///             hash of message `PH(𝑀) | 𝑀 ∈ {0, 1}∗`,
             ///             signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}`,
             ///             context string `ctx` (a byte string of 255 or fewer bytes),
             ///             pre-hash function `PH`. <br>
             /// **Output**: Boolean.
-            fn hash_verify(&self, message: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &types::Ph) -> bool {
+            fn hash_verify(&self, hash: &[u8], sig: &Self::Signature, ctx: &[u8], ph: &types::Ph) -> bool {
                 // 1: if |ctx| > 255 then
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
                 // 3: end if
@@ -398,15 +402,19 @@ macro_rules! functionality {
 
                 // 4:  (blank line in spec)
 
-                // Note: steps 5-17 are performed within `hash_message()` below
-                let mut phm = [0u8; 64];  // hashers don't all play well with each other
-                let (oid, phm_len) = hashing::hash_message(message, ph, &mut phm);
+                // 7, 10, 13: assigning oid
+                // Note: actual hashing of the message (steps 8, 11, 14) are performed outside of this module
+                let (oid, phm_len) = hashing::get_hash_params(ph);
+
+                if hash.len() != phm_len {
+                    return false;
+                }
 
                 // Note: step 18 is performed within `verify_internal()` and below.
                 // 18: 𝑀′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx ∥ OID ∥ PH𝑀 )
                 // 19: return ML-DSA.Verify_internal(𝑝𝑘, 𝑀′ , 𝜎)
                 ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &oid, &phm[0..phm_len]
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &[], &sig, ctx, &oid, &hash
                 )
             }
         }
@@ -499,6 +507,32 @@ macro_rules! functionality {
             use super::*;
             use crate::types::Ph;
             use rand_chacha::rand_core::SeedableRng;
+            use sha2::{Digest, Sha256, Sha512};
+            use sha3::{Shake128,digest::{Update,ExtendableOutput,XofReader}};
+
+            fn digest(message: &[u8], ph: &Ph, hash: &mut [u8; 64]) -> usize {
+                match ph {
+                    Ph::SHA256 => {
+                        let mut hasher = Sha256::new();
+                        Digest::update(&mut hasher, message);
+                        hash[0..32].copy_from_slice(&hasher.finalize());
+                        32
+                    },
+                    Ph::SHA512 => {
+                        let mut hasher = Sha512::new();
+                        Digest::update(&mut hasher, message);
+                        hash.copy_from_slice(&hasher.finalize());
+                        64
+                    },
+                    Ph::SHAKE128 => {
+                        let mut hasher = Shake128::default();
+                        hasher.update(message);
+                        let mut reader = hasher.finalize_xof();
+                        reader.read(&mut hash[0..32]);
+                        32
+                    },
+                }
+            }
 
             #[test]
             fn smoke_test() {
@@ -512,8 +546,10 @@ macro_rules! functionality {
                     assert!(pk.verify(&message1, &sig, &[]));
                     assert!(!pk.verify(&message2, &sig, &[]));
                     for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
-                        let sig = sk.try_hash_sign_with_rng(&mut rng, &message1, &[], &ph).unwrap();
-                        let v = pk.hash_verify(&message1, &sig, &[], &ph);
+                        let mut hash = [ 0u8;64];
+                        let hashlen = digest(&message1, &ph, &mut hash);
+                        let sig = sk.try_hash_sign_with_rng(&mut rng, &hash[0..hashlen], &[], &ph).unwrap();
+                        let v = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
                         assert!(v);
                     }
                     assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
@@ -527,8 +563,10 @@ macro_rules! functionality {
                 assert!(sk.try_sign(&message1, &[0u8; 257]).is_err());
 
                 for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
-                    let sig = sk.try_hash_sign(&message1, &[], &ph).unwrap();
-                    let v = pk.hash_verify(&message1, &sig, &[], &ph);
+                    let mut hash = [ 0u8;64];
+                    let hashlen = digest(&message1, &ph, &mut hash);
+                    let sig = sk.try_hash_sign(&hash[0..hashlen], &[], &ph).unwrap();
+                    let v = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
                     assert!(v);
                 }
                 assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
@@ -536,8 +574,10 @@ macro_rules! functionality {
                 let (pk, sk) = KG::keygen_from_seed(&[0x11u8; 32]);
                 let sig = sk.try_sign_with_seed(&[12u8; 32], &message1, &[]).unwrap();
                 assert!(pk.verify(&message1, &sig, &[]));
-                let sig = sk.try_hash_sign_with_seed(&[34u8; 32], &message1, &[], &Ph::SHA256).unwrap();
-                assert!(pk.hash_verify(&message1, &sig, &[], &Ph::SHA256));
+                let mut hash = [ 0u8; 64 ];
+                let hashlen = digest(&message1, &Ph::SHA256, &mut hash);
+                let sig = sk.try_hash_sign_with_seed(&[34u8; 32], &hash[0..hashlen], &[], &Ph::SHA256).unwrap();
+                assert!(pk.hash_verify(&hash[0..hashlen], &sig, &[], &Ph::SHA256));
 
                 let pk_bytes = pk.into_bytes();
                 if pk_bytes.len() == 1312 { assert_eq!(pk_bytes[0], 197) }

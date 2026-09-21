@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bare-metal / `no_std`: use `default-features = false` plus the desired `ml-dsa-*`
   feature(s); default features pull an OS RNG backend that will not build on many
   embedded targets.
+- pass the hash digest and a DER-encoded OID to `hash_sign` and `hash_verify`, instead
+  of the full message.
 - MSRV is now **1.85**.
 
 ### Added
@@ -69,6 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symlink in the FFI test Makefile for Linux in-tree `make check`; expand
   `ffi/README.md` with header/`SONAME`/linking/`pkg-config` notes for C consumers
   (Python bindings are not in-tree yet)
+- Rather than the message itself, `hash_sign` and `hash_verify` functions now accept an explicit
+  DER-encoded OID identifying the hash function, and a the digest of
+  the message.
 
 ### Removed
 - Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only
