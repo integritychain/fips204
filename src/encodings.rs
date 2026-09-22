@@ -446,7 +446,7 @@ mod tests {
     fn test_sig_roundtrip() {
         // GAMMA1=2^17 K=4 L=4 LAMBDA=128 OMEGA=80
         let mut c_tilde = [0u8; 2 * 128 / 8];
-        rand::rng().fill_bytes(&mut c_tilde);
+        rand::thread_rng().fill_bytes(&mut c_tilde);
         let z = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let h = [get_vec(1), get_vec(1), get_vec(1), get_vec(1)];
         let sigma =

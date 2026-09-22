@@ -34,6 +34,11 @@ impl RngCore for TestRng {
         let x = self.data.pop().expect("test rng problem");
         out.copy_from_slice(&x)
     }
+
+    fn try_fill_bytes(&mut self, out: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.fill_bytes(out);
+        Ok(())
+    }
 }
 
 impl CryptoRng for TestRng {}

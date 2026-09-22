@@ -11,9 +11,8 @@ rust-version = "1.85"
 
 [dependencies]
 fips204 = { path = "..", default-features = false, features = ["dudect", "ml-dsa-44"] }
-# Vendored 0.6 patched for rand 0.9 so the tree has a single rand_core (not 0.6+0.9)
-dudect-bencher = { path = "vendor/dudect-bencher" }
-rand_core = { version = "0.9", default-features = false }
+dudect-bencher = "0.6"
+rand_core = { version = "0.6.4", default-features = false }
 
 
 [profile.bench]

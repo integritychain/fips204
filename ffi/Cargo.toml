@@ -18,7 +18,7 @@ name = "fips204"
 
 
 [dependencies]
-rand_core = { version = "0.9", features = ["os_rng"] }
+rand_core = { version = "0.6.4" }
 pastey = "0.1"
 
 [dependencies.fips204]

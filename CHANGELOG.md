@@ -11,11 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the dependency to `fips204 = "0.5"` (this release is **not** API-compatible with
   crates.io `0.4.6`).
 - Replace `CryptoRngCore` bounds with `TryCryptoRng` (re-exported from `fips204`).
-- The `default-rng` feature now enables `rand_core/os_rng` (was `getrandom`); `OsRng`
-  is fallible-only — prefer `keygen_from_seed` / `try_sign_with_seed`, or handle
-  `try_fill_bytes` errors.
-- Custom RNGs and `rand` / `rand_chacha` consumers should use the **0.9** line (matching
-  `rand_core` 0.9).
 - Bare-metal / `no_std`: use `default-features = false` plus the desired `ml-dsa-*`
   feature(s); default features pull an OS RNG backend that will not build on many
   embedded targets.
@@ -37,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI `cargo_deny`: bump `EmbarkStudios/cargo-deny-action` to v2 (CVSS 4.0 advisory
   DB support); refresh `deny.toml` `[graph]`/`[output]` layout
 - CI `cargo_outdated`: exclude `rand_core` from Latest probing (`-x rand_core`) so the
-  job does not fail while we stay on the 0.9 `os_rng` feature line
+  job does not fail while we stay on the 0.6 line
 - WASM demo: refresh npm toolchain (`copy-webpack-plugin` 14, `webpack-cli` 7,
   `webpack-dev-server` 6) clearing Dependabot `serialize-javascript` / `uuid`
   advisories; bump `wasm-bindgen` / `wasm-bindgen-test`; fix `fips204` path dep to `..`
@@ -70,16 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link at docs.rs `#modules` (not a broken in-page anchor); clarify `KeyGen`
   associated-type docs (drop stale “expanded key” wording); fix incomplete
   `try_hash_sign_with_seed` doc sentence
-- `dudect`: vendor `dudect-bencher` 0.6 patched for `rand`/`rand_chacha` **0.9** so
-  the sample resolves a single `rand_core` 0.9 (crates.io 0.6 pulled `rand_core` 0.6)
 - FFI polish: include `<stddef.h>` in `fips204.h`; create a local `libfips204.so.0`
   symlink in the FFI test Makefile for Linux in-tree `make check`; expand
   `ffi/README.md` with header/`SONAME`/linking/`pkg-config` notes for C consumers
   (Python bindings are not in-tree yet)
-- **Breaking:** migrate to `rand_core` / `rand` / `rand_chacha` **0.9**; `default-rng`
-  now enables `rand_core/os_rng`; public `*_with_rng` APIs take `TryCryptoRng` (was
-  `CryptoRngCore`); `OsRng` is fallible-only; re-export `TryRngCore` / `TryCryptoRng`,
-  and `OsError as RngError` / `OsRng` when `default-rng` is enabled
 
 ### Removed
 - Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only

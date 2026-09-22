@@ -17,7 +17,7 @@ rust-version = "1.85"
 
 [features]
 default = ["default-rng", "ml-dsa-44", "ml-dsa-65", "ml-dsa-87"]
-default-rng = ["rand_core/os_rng"]
+default-rng = ["rand_core/getrandom"]
 ml-dsa-44 = []
 ml-dsa-65 = []
 ml-dsa-87 = []
@@ -25,7 +25,7 @@ dudect = []
 
 
 [dependencies]
-rand_core = { version = "0.9", default-features = false }
+rand_core = { version = "0.6.4", default-features = false }
 sha2 = { version = "0.10.8", default-features = false }
 sha3 = { version = "0.10.2", default-features = false }
 zeroize = { version = "1.6.0", default-features = false, features = ["zeroize_derive"] }
@@ -36,8 +36,8 @@ criterion = "0.5"
 # Direct pin: Cargo.lock is gitignored; textwrap>=0.16.3 raises MSRV above 1.85
 textwrap = "=0.16.2"
 hex = "0.4.3"
-rand = "0.9"
-rand_chacha = "0.9"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
 regex = "1.10.2"
 serde_json = {version = "1.0.127", features = []}
 
