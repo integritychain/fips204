@@ -538,11 +538,10 @@ macro_rules! functionality {
                     assert!(!pk.verify(&message2, &sig, &[]));
                     for ph in [pre_hash::SHA2_256, pre_hash::SHA2_512, pre_hash::SHAKE_128] {
                         let mut hash = [ 0u8;64];
-                        if let Ok(hashlen) = digest(&message1, &ph, &mut hash) {
-                            let sig = sk.try_hash_sign_with_rng(&mut rng, &hash[0..hashlen], &[], &ph).unwrap();
-                            let v1 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
-                            assert!(v1);
-                        } // Skip unknown OIDs
+                        let hashlen = digest(&message1, &ph, &mut hash).unwrap();
+                        let sig = sk.try_hash_sign_with_rng(&mut rng, &hash[0..hashlen], &[], &ph).unwrap();
+                        let v1 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
+                        assert!(v1);
                     }
                     assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
                 }
@@ -556,11 +555,10 @@ macro_rules! functionality {
 
                 for ph in [pre_hash::SHA2_256, pre_hash::SHA2_512, pre_hash::SHAKE_128] {
                     let mut hash = [ 0u8;64];
-                    if let Ok(hashlen) = digest(&message1, &ph, &mut hash) {
-                        let sig = sk.try_hash_sign(&hash[0..hashlen], &[], &ph).unwrap();
-                        let v2 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
-                        assert!(v2);
-                    } // Skip unknown OIDs
+                    let hashlen = digest(&message1, &ph, &mut hash).unwrap();
+                    let sig = sk.try_hash_sign(&hash[0..hashlen], &[], &ph).unwrap();
+                    let v2 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
+                    assert!(v2);
                 }
                 assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
 
