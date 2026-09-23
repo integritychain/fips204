@@ -10,12 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration from 0.4.x
 - Bump the dependency to `fips204 = "0.5"` (this release is **not** API-compatible with
   crates.io `0.4.6`).
-- Replace `CryptoRngCore` bounds with `TryCryptoRng` (re-exported from `fips204`).
+- RNG bounds remain `rand_core` 0.6 `CryptoRngCore` (`CryptoRng` + `RngCore`). This
+  crate re-exports `CryptoRng`, `RngCore`, and `RngError`. It does not provide
+  `TryCryptoRng`.
 - Bare-metal / `no_std`: use `default-features = false` plus the desired `ml-dsa-*`
   feature(s); default features pull an OS RNG backend that will not build on many
   embedded targets.
-- pass the hash digest and a DER-encoded OID to `hash_sign` and `hash_verify`, instead
-  of the full message.
+- Pass a precomputed digest and a DER-encoded OID (`pre_hash`) to `hash_sign` and
+  `hash_verify`, instead of the message and `Ph`. An empty OID is an error on sign and
+  a failed verify. A digest longer than 1024 bytes is an error on sign and a failed
+  verify.
 - MSRV is now **1.85**.
 
 ### Added
@@ -56,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crate and sample versions are **0.5.0** (`fips204`, `fips204-ffi`, `wasm`, `ct_cm4`,
   `dudect`, `fuzz`)
 - Updated NIST ACVP test vectors and aligned keyGen / sigGen / sigVer tests with the
-  public external API (including HashML-DSA for digests in `Ph`); thank you @dkg
+  public external API (including HashML-DSA for the digests in `pre_hash`); thank you @dkg
 - Raised MSRV to **1.85** (Debian stable / trixie); CI MSRV jobs updated accordingly;
   NIST keyGen tests use `TryInto` for seed arrays; pin `textwrap = "=0.16.2"` so
   Criterion stays buildable without a checked-in `Cargo.lock`
@@ -71,9 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symlink in the FFI test Makefile for Linux in-tree `make check`; expand
   `ffi/README.md` with header/`SONAME`/linking/`pkg-config` notes for C consumers
   (Python bindings are not in-tree yet)
-- Rather than the message itself, `hash_sign` and `hash_verify` functions now accept an explicit
-  DER-encoded OID identifying the hash function, and a the digest of
-  the message.
+- `sha2` is a dev-dependency. The library no longer hashes the HashML-DSA message;
+  callers supply `PH(M)`. `sha3` remains for the internal SHAKE functions.
 
 ### Removed
 - Temporary public `_internal_sign` / `_internal_verify` helpers and the NIST-only

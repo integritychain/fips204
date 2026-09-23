@@ -2,7 +2,7 @@
 use libfuzzer_sys::fuzz_target;
 use fips204::ml_dsa_44::{PrivateKey, PublicKey, KG, SIG_LEN};
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-use fips204::Ph; //::{SHA256, SHA512, SHAKE128};
+use fips204::pre_hash;
 use rand_core::OsRng;
 
 fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
@@ -44,8 +44,10 @@ fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
     }
 
     if let (Ok(sk), Ok(pk)) = (sk_fuzz, pk_fuzz) {
-        let ph = &[Ph::SHA256, Ph::SHA512, Ph::SHAKE128][data[0].rem_euclid(3) as usize];
-        let sig = sk.try_hash_sign_with_rng(&mut OsRng, &[0u8, 1, 2, 3], &[], ph).unwrap();
-        let _res = pk.hash_verify(&[0u8, 1, 2, 3], &sig, &[], ph);
+        let oid = [&pre_hash::SHA2_256[..], &pre_hash::SHA2_512[..], &pre_hash::SHAKE_128[..]]
+            [usize::from(data[0]) % 3];
+        let digest = [0u8, 1, 2, 3];
+        let sig = sk.try_hash_sign_with_rng(&mut OsRng, &digest, &[], oid).unwrap();
+        let _res = pk.hash_verify(&digest, &sig, &[], oid);
 }
 });

@@ -228,17 +228,19 @@ pub trait Signer {
     }
 
 
-    /// Attempt to sign the hash of the given message, returning a digital signature on success,
-    /// or an error if something went wrong. This function utilizes the **default OS** random number
-    /// generator and allows for several hash algorithms. This function operates in constant-time
-    /// relative to secret data (which specifically excludes the provided random number generator
-    /// internals, the `rho` value (also) stored in the public key, the hash-derived `rho_prime`
-    /// value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values, and the
-    /// main signing rejection loop as noted in section 5.5 of
+    /// Attempt to sign a precomputed digest, returning a HashML-DSA signature on success, or an
+    /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
+    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
+    /// This function does not hash `hash` again. It utilizes the **default OS** random number
+    /// generator. This function operates in constant-time relative to secret data (which specifically
+    /// excludes the provided random number generator internals, the `rho` value (also) stored in the
+    /// public key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the
+    /// internal `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
-    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
+    /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
+    /// `hash_oid` is empty, or `hash` is longer than 1024 bytes; propagates internal errors.
     #[cfg(feature = "default-rng")]
     fn try_hash_sign(
         &self, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
@@ -247,32 +249,37 @@ pub trait Signer {
     }
 
 
-    /// Attempt to sign the hash of the given message, returning a digital signature on success,
-    /// or an error if something went wrong. This function utilizes the **provided** random number
-    /// generator and allows for several hash algorithms. This function operates in constant-time
-    /// relative to secret data (which specifically excludes the provided random number generator
-    /// internals, the `rho` value (also) stored in the public key, the hash-derived `rho_prime`
-    /// value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values, and the
-    /// main signing rejection loop as noted in section 5.5 of
+    /// Attempt to sign a precomputed digest, returning a HashML-DSA signature on success, or an
+    /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
+    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
+    /// This function does not hash `hash` again. It utilizes the **provided** random number
+    /// generator. This function operates in constant-time relative to secret data (which specifically
+    /// excludes the provided random number generator internals, the `rho` value (also) stored in the
+    /// public key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the
+    /// internal `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
-    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
+    /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
+    /// `hash_oid` is empty, or `hash` is longer than 1024 bytes; propagates internal errors.
     fn try_hash_sign_with_rng(
         &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str>;
 
 
-    /// Attempt to sign the hash of the given message, returning a digital signature on success,
-    /// or an error if something went wrong. This function utilizes the **provided seed to support
-    /// (less common) deterministic signatures**. This function operates in constant-time relative
-    /// to secret data (which specifically excludes the `rho` value stored in the public key, the
-    /// hash-derived `rho_prime` value that is rejection-sampled/expanded into the internal `s_1`
-    /// and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
+    /// Attempt to sign a precomputed digest, returning a HashML-DSA signature on success, or an
+    /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
+    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
+    /// This function does not hash `hash` again. It utilizes the **provided seed to support (less
+    /// common) deterministic signatures**. This function operates in constant-time relative to secret
+    /// data (which specifically excludes the `rho` value stored in the public key, the hash-derived
+    /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values,
+    /// and the main signing rejection loop as noted in section 5.5 of
     /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
     ///
     /// # Errors
-    /// Returns an error when the `ctx` is longer than 255 bytes; propagates internal errors.
+    /// Returns an error when the `ctx` is longer than 255 bytes, `hash_oid` is empty, or `hash` is
+    /// longer than 1024 bytes; propagates internal errors.
     fn try_hash_sign_with_seed(
         &self, seed: &[u8;32], hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str> {
@@ -351,8 +358,12 @@ pub trait Verifier {
     fn verify(&self, message: &[u8], signature: &Self::Signature, ctx: &[u8]) -> bool;
 
 
-    /// Verifies a digital signature on the hash of a message with respect to a `PublicKey`. As this
-    /// function operates on purely public data, it does not provide constant-time assurances.
+    /// Verifies a HashML-DSA signature over a precomputed digest. `hash` is `PH(M)` and `hash_oid`
+    /// is the DER encoding of that pre-hash, including the tag and length; see [`crate::pre_hash`].
+    /// The caller must supply the same digest and OID that were signed. As this function operates on
+    /// purely public data, it does not provide constant-time assurances. Returns `false` when `ctx`
+    /// is longer than 255 bytes, `hash_oid` is empty, `hash` is longer than 1024 bytes, or the
+    /// signature does not verify.
     fn hash_verify(&self, hash: &[u8], sig: &Self::Signature, ctx: &[u8], hash_oid: &[u8]) -> bool;
 }
 

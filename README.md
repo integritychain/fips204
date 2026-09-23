@@ -59,8 +59,9 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
 * NIST ACVP test vectors (keyGen / sigGen / sigVer) are exercised against the public API,
-  including external interface and HashML-DSA for the digests enumerated in `Ph`
-  (`SHA2-256`, `SHA2-512`, `SHAKE-128`).
+  including HashML-DSA. `hash_sign` and `hash_verify` take a precomputed digest and a
+  DER-encoded OID (`pre_hash` lists the NIST CSOR encodings). The vectors cover the
+  SHA-2, SHA-3, and SHAKE functions in that list.
 * An optional `ffi` workspace member builds `libfips204`, a C ABI shared library for the
   pure ML-DSA external interfaces (see [`ffi/README.md`](ffi/README.md)). HashML-DSA is not
   yet exported through the FFI.
@@ -72,9 +73,10 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   embedded / `no_std` builds, disable defaults and pick the sets you need, then
   supply entropy via seeds or `*_with_rng`:
   `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`
-  (see also [`ct_cm4/`](ct_cm4/)). Custom generators must implement `TryCryptoRng`
-  (re-exported from this crate). `OsRng` is fallible-only on this line; prefer
-  seed-based APIs or handle `try_fill_bytes` errors when driving the OS RNG yourself.
+  (see also [`ct_cm4/`](ct_cm4/)). Custom generators must implement `CryptoRngCore`
+  from `rand_core` 0.6 (`CryptoRng` + `RngCore`). This crate re-exports `CryptoRng`,
+  `RngCore`, and `RngError`. Signing and key generation call `try_fill_bytes`, so
+  handle that error or use the seed-based APIs.
 * Constant-time assurances target the source-code level only, with manual confirmation via
   review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.

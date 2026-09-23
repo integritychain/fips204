@@ -1,6 +1,6 @@
 #![no_main]
+use fips204::pre_hash;
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-use fips204::Ph;
 use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 use libfuzzer_sys::fuzz_target;
 
@@ -31,30 +31,28 @@ where
         assert!(!pk.verify(data, &sig, &modified_ctx));
     }
 
-    // Test hash verify
-    for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
-        if let Ok(sig) = sk.try_hash_sign(data, ctx, &ph) {
-            // Valid signature should verify
-            assert!(pk.hash_verify(data, &sig, ctx, &ph));
+    // Test HashML-DSA over a caller-supplied digest and DER OID.
+    let digest = &data[..data.len().min(64)];
+    for oid in [&pre_hash::SHA2_256[..], &pre_hash::SHA2_512[..], &pre_hash::SHAKE_128[..]] {
+        if let Ok(sig) = sk.try_hash_sign(digest, ctx, oid) {
+            assert!(pk.hash_verify(digest, &sig, ctx, oid));
 
-            // Modified message should not verify
-            if !data.is_empty() {
-                let mut modified_msg = data.to_vec();
-                modified_msg[0] ^= 1;
-                assert!(!pk.hash_verify(&modified_msg, &sig, ctx, &ph));
+            if !digest.is_empty() {
+                let mut modified = digest.to_vec();
+                modified[0] ^= 1;
+                assert!(!pk.hash_verify(&modified, &sig, ctx, oid));
             }
 
-            // Modified context should not verify
             let mut modified_ctx = ctx.to_vec();
             modified_ctx.push(1);
-            assert!(!pk.hash_verify(data, &sig, &modified_ctx, &ph));
+            assert!(!pk.hash_verify(digest, &sig, &modified_ctx, oid));
 
-            // Different hash function should not verify
-            let different_ph = match ph {
-                Ph::SHA256 => Ph::SHA512,
-                _ => Ph::SHA256,
+            let different_oid = if oid == pre_hash::SHA2_256.as_slice() {
+                &pre_hash::SHA2_512[..]
+            } else {
+                &pre_hash::SHA2_256[..]
             };
-            assert!(!pk.hash_verify(data, &sig, ctx, &different_ph));
+            assert!(!pk.hash_verify(digest, &sig, ctx, different_oid));
         }
     }
 }

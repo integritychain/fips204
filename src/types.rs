@@ -5,7 +5,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 /// See RFC 6234 (for SHA2), RFC 9688 (for SHA3), and RFC 8702 (for SHAKE).
 /// These are all within the OID space prefixed by 2.16.840.1.101.3.4.2, a.k.a.
 /// joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101) csor(3) nistalgorithm(4) hashalgs(2)
-/// See also https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration#Hash
+/// See also <https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration#Hash>
 pub mod pre_hash {
     #![allow(dead_code)]
 

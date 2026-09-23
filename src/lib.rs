@@ -105,6 +105,10 @@ mod types;
 pub mod traits;
 pub use crate::types::pre_hash;
 
+/// Largest `PH(M)` accepted by HashML-DSA sign and verify. A longer digest is rejected
+/// rather than absorbed into the internal message representative.
+const MAX_PREHASH_LEN: usize = 1024;
+
 // Applies across all security parameter sets
 const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; page 15 table 1 first row
 const ZETA: i32 = 1753; // See section 2.5 of FIPS 204; page 15 table 1 second row
@@ -305,7 +309,9 @@ macro_rules! functionality {
             /// **Output**: ML-DSA signature `𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}`.
             ///
             /// # Errors
-            /// Returns an error when the random number generator fails or context too long.
+            /// Returns an error when the random number generator fails, the context is too long,
+            /// the OID is empty, or the digest is longer than 1024 bytes. An empty OID would select
+            /// pure ML-DSA inside `sign_internal`.
             fn try_hash_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
             ) -> Result<Self::Signature, &'static str> {
@@ -313,6 +319,8 @@ macro_rules! functionality {
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
                 // 3: end if
                 helpers::ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
+                // An empty OID selects the pure ML-DSA domain separator (0x00) inside sign_internal.
+                helpers::ensure!(!hash_oid.is_empty(), "HashML-DSA.Sign: OID is empty");
 
                 // 4:  (blank line in spec)
 
@@ -326,7 +334,7 @@ macro_rules! functionality {
                 // 9:  (blank line in spec)
                 // steps 10-22 are performed outside of this module
 
-                if hash.len() > 1024 {
+                if hash.len() > crate::MAX_PREHASH_LEN {
                     // this is a safety check
                     return Err("Hash of message is too long, should not be more than 1KiB");
                 }
@@ -396,6 +404,14 @@ macro_rules! functionality {
                 if ctx.len() > 255 {
                     return false;
                 };
+                // An empty OID selects the pure ML-DSA domain separator (0x00) inside verify_internal.
+                if hash_oid.is_empty() {
+                    return false;
+                }
+                // Same ceiling as HashML-DSA.Sign: do not absorb an oversized digest.
+                if hash.len() > crate::MAX_PREHASH_LEN {
+                    return false;
+                }
 
                 // 4:  (blank line in spec)
                 // steps 5-18 are performed outside of this module.
@@ -559,7 +575,12 @@ macro_rules! functionality {
                     let sig = sk.try_hash_sign(&hash[0..hashlen], &[], &ph).unwrap();
                     let v2 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
                     assert!(v2);
+                    assert!(sk.try_hash_sign(&hash[0..hashlen], &[], &[]).is_err());
+                    assert!(!pk.hash_verify(&hash[0..hashlen], &sig, &[], &[]));
                 }
+                let too_long = [0u8; crate::MAX_PREHASH_LEN + 1];
+                assert!(sk.try_hash_sign(&too_long, &[], &pre_hash::SHA2_256).is_err());
+                assert!(!pk.hash_verify(&too_long, &sig, &[], &pre_hash::SHA2_256));
                 assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
 
                 let (pk, sk) = KG::keygen_from_seed(&[0x11u8; 32]);

@@ -1,6 +1,6 @@
 #![no_main]
+use fips204::pre_hash;
 use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-use fips204::Ph;
 use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 use libfuzzer_sys::fuzz_target;
 use rand_chacha::ChaCha20Rng;
@@ -52,24 +52,24 @@ fn fuzz_signer_for_params<S, V>(
         assert!(derived_pk.verify(data, &sig1, ctx));
     }
 
-    // Test hash signing with different hash functions
-    for ph in [Ph::SHA256, Ph::SHA512, Ph::SHAKE128] {
-        if let Ok(sig) = sk.try_hash_sign_with_rng(rng, data, ctx, &ph) {
-            // Verify the hash signature works
-            assert!(pk.hash_verify(data, &sig, ctx, &ph));
+    // Test HashML-DSA over a caller-supplied digest and DER OID.
+    // Cap the digest so inputs longer than the API ceiling still reach signing.
+    let digest = &data[..data.len().min(64)];
+    for oid in [&pre_hash::SHA2_256[..], &pre_hash::SHA2_512[..], &pre_hash::SHAKE_128[..]] {
+        if let Ok(sig) = sk.try_hash_sign_with_rng(rng, digest, ctx, oid) {
+            assert!(pk.hash_verify(digest, &sig, ctx, oid));
 
-            // Test that hash signing the same message twice produces different signatures
-            if let Ok(sig2) = sk.try_hash_sign_with_rng(rng, data, ctx, &ph) {
+            if let Ok(sig2) = sk.try_hash_sign_with_rng(rng, digest, ctx, oid) {
                 assert!(sig != sig2);
-                assert!(pk.hash_verify(data, &sig2, ctx, &ph));
+                assert!(pk.hash_verify(digest, &sig2, ctx, oid));
             }
 
-            // Verify signature doesn't work with wrong hash function
-            let wrong_ph = match ph {
-                Ph::SHA256 => Ph::SHA512,
-                _ => Ph::SHA256,
+            let wrong_oid = if oid == pre_hash::SHA2_256.as_slice() {
+                &pre_hash::SHA2_512[..]
+            } else {
+                &pre_hash::SHA2_256[..]
             };
-            assert!(!pk.hash_verify(data, &sig, ctx, &wrong_ph));
+            assert!(!pk.hash_verify(digest, &sig, ctx, wrong_oid));
         }
     }
 }
