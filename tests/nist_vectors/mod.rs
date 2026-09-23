@@ -18,7 +18,11 @@ use fips204::ml_dsa_87;
 
 use fips204::traits::{SerDes,KeyGen,Verifier,Signer};
 
-use fips204::Ph;
+use fips204::pre_hash;
+
+use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
+use sha3::{Sha3_224, Sha3_256, Sha3_384, Sha3_512};
+use sha3::{Shake128, Shake256, digest::{Update, ExtendableOutput, XofReader}};
 
 // ----- CUSTOM RNG TO REPLAY VALUES -----
 struct TestRng {
@@ -52,11 +56,36 @@ impl TestRng {
     }
 }
 
-fn get_ph(hashname: &str) -> Result<Ph, &'static str> {
+fn get_ph(hashname: &str, message: &[u8]) -> Result<(&'static [u8], Box<[u8]>), &'static str> {
     match hashname {
-        "SHA2-256" => Ok(Ph::SHA256),
-        "SHA2-512" => Ok(Ph::SHA512),
-        "SHAKE-128" => Ok(Ph::SHAKE128),
+        "SHA2-224" => Ok((&pre_hash::SHA2_224, Sha224::digest(message).as_slice().into())),
+        "SHA2-256" => Ok((&pre_hash::SHA2_256, Sha256::digest(message).as_slice().into())),
+        "SHA2-384" => Ok((&pre_hash::SHA2_384, Sha384::digest(message).as_slice().into())),
+        "SHA2-512" => Ok((&pre_hash::SHA2_512, Sha512::digest(message).as_slice().into())),
+        "SHA2-512/224" => Ok((&pre_hash::SHA2_512_224, Sha512_224::digest(message).as_slice().into())),
+        "SHA2-512/256" => Ok((&pre_hash::SHA2_512_256, Sha512_256::digest(message).as_slice().into())),
+
+        "SHA3-224" => Ok((&pre_hash::SHA3_224, Sha3_224::digest(message).as_slice().into())),
+        "SHA3-256" => Ok((&pre_hash::SHA3_256, Sha3_256::digest(message).as_slice().into())),
+        "SHA3-384" => Ok((&pre_hash::SHA3_384, Sha3_384::digest(message).as_slice().into())),
+        "SHA3-512" => Ok((&pre_hash::SHA3_512, Sha3_512::digest(message).as_slice().into())),
+
+        "SHAKE-128" => Ok((&pre_hash::SHAKE_128, {
+            let mut ret = [0u8; 32];
+            let mut hasher = Shake128::default();
+            hasher.update(message);
+            let mut reader = hasher.finalize_xof();
+            reader.read(&mut ret);
+            ret.into()
+        })),
+        "SHAKE-256" => Ok((&pre_hash::SHAKE_256, {
+            let mut ret = [0u8; 64];
+            let mut hasher = Shake256::default();
+            hasher.update(message);
+            let mut reader = hasher.finalize_xof();
+            reader.read(&mut ret);
+            ret.into()
+        })),
         &_ => Err("unknown digest algorithm"),
     }
 }
@@ -135,12 +164,8 @@ fn test_siggen() {
                             $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
                             .unwrap();
                         let sig_act = if test_group["preHash"] == "preHash" {
-                            // skip tests with an unknown hash algorithm
-                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
-                                sk.try_hash_sign_with_rng(&mut rnd, &message, &context, &hash).unwrap()
-                            } else {
-                                sig_exp.clone().try_into().unwrap()
-                            }
+                            let (hash_oid, digest) = get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
+                            sk.try_hash_sign_with_rng(&mut rnd, &digest, &context, &hash_oid).unwrap()
                         } else {
                             sk.try_sign_with_rng(&mut rnd, &message, &context).unwrap()
                         };
@@ -149,11 +174,10 @@ fn test_siggen() {
                         assert_eq!(pk_bytes, pk2.into_bytes());
                         let pk1 = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap()).unwrap();
                         if test_group["preHash"] == "preHash" {
-                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
-                                assert_eq!((test_id,
-                                            pk1.hash_verify(&message, &sig_exp.clone().try_into().unwrap(), &context, &hash)),
-                                           (test_id, true));
-                            }
+                            let (hash_oid, digest) = get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
+                            assert_eq!((test_id,
+                                        pk1.hash_verify(&digest, &sig_exp.clone().try_into().unwrap(), &context, &hash_oid)),
+                                       (test_id, true));
                         } else {
                             assert_eq!((test_id,
                                         pk1.verify(&message, &sig_exp.clone().try_into().unwrap(), &context)),
@@ -203,16 +227,14 @@ fn test_sigver() {
                         let pk = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
                             .unwrap();
                         if test_group["preHash"] == "preHash" {
-                            // skip tests with an unknown hash algorithm
-                            if let Ok(hash) = get_ph(test["hashAlg"].as_str().unwrap()) {
-                                let res = pk.hash_verify(
-                                    &message,
-                                    &signature.clone().try_into().unwrap(),
-                                    &context,
-                                    &hash,
-                                );
-                                assert_eq!(res, test_passed);
-                            }
+                            let (hash_oid, digest) = get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
+                            let res = pk.hash_verify(
+                                &digest,
+                                &signature.clone().try_into().unwrap(),
+                                &context,
+                                &hash_oid,
+                            );
+                            assert_eq!(res, test_passed);
                         } else {
                             let res = pk.verify(
                                 &message,
