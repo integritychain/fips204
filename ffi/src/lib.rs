@@ -141,6 +141,46 @@ macro_rules! parameter_set {
                 ret::OK
             }
 
+            pub fn hash_sign(
+                private: Option<&c_private_key>,
+                hash: *const u8,
+                hash_size: usize,
+                context: *const u8,
+                context_size: usize,
+                hash_oid: *const u8,
+                hash_oid_size: usize,
+                signature_out: Option<&mut c_signature>,
+                deterministic: bool,
+            ) -> u8 {
+                use fips204::traits::{Signer, SerDes};
+
+                let (Some(private), Some(signature_out)) =
+                    (private, signature_out)
+                else {
+                    return ret::NULL_PTR_ERROR;
+                };
+
+                let digest = slice_from_c_buf!(hash, hash_size);
+                let ctx = slice_from_c_buf!(context, context_size);
+                let hoid = slice_from_c_buf!(hash_oid, hash_oid_size);
+
+                let Ok(privkey) = fips204::$pc::PrivateKey::try_from_bytes(private.data) else {
+                    return ret::DESERIALIZATION_ERROR;
+                };
+                let ans = if deterministic {
+                    let s = [ 0u8; 32 ];
+                    privkey.try_hash_sign_with_seed(&s, digest, ctx, hoid)
+                } else {
+                    privkey.try_hash_sign(digest, ctx, hoid)
+                };
+                let Ok(sig) = ans else {
+                    return ret::SIGN_ERROR;
+                };
+
+                signature_out.data = sig;
+                ret::OK
+            }
+
             pub fn verify(
                 public: Option<&c_public_key>,
                 signature: Option<&c_signature>,
@@ -165,6 +205,39 @@ macro_rules! parameter_set {
                 };
 
                 if pubkey.verify(msg, &signature.data, ctx) {
+                    ret::OK
+                } else {
+                    ret::VERIFICATION_FAILURE
+                }
+            }
+
+            pub fn hash_verify(
+                public: Option<&c_public_key>,
+                signature: Option<&c_signature>,
+                hash: *const u8,
+                hash_size: usize,
+                context: *const u8,
+                context_size: usize,
+                hash_oid: *const u8,
+                hash_oid_size: usize,
+            ) -> u8 {
+                use fips204::traits::{Verifier, SerDes};
+
+                let (Some(public), Some(signature)) =
+                    (public, signature)
+                else {
+                    return ret::NULL_PTR_ERROR;
+                };
+
+                let digest = slice_from_c_buf!(hash, hash_size);
+                let ctx = slice_from_c_buf!(context, context_size);
+                let hoid = slice_from_c_buf!(hash_oid, hash_oid_size);
+
+                let Ok(pubkey) = fips204::$pc::PublicKey::try_from_bytes(public.data) else {
+                    return ret::DESERIALIZATION_ERROR;
+                };
+
+                if pubkey.hash_verify(digest, &signature.data, ctx, hoid) {
                     ret::OK
                 } else {
                     ret::VERIFICATION_FAILURE
@@ -236,6 +309,51 @@ macro_rules! parameter_set {
             context_size: usize,
         ) -> u8 {
             $pc::verify(public, signature, message, message_size, context, context_size)
+        }
+
+        #[no_mangle]
+        pub extern "C" fn [<$pc _hash_sign>] (
+            private: Option<&$pc::c_private_key>,
+            hash: *const u8,
+            hash_size: usize,
+            context: *const u8,
+            context_size: usize,
+            hash_oid: *const u8,
+            hash_oid_size: usize,
+            signature_out: Option<&mut $pc::c_signature>,
+        ) -> u8 {
+            $pc::hash_sign(private, hash, hash_size, context, context_size,
+                           hash_oid, hash_oid_size, signature_out, false)
+        }
+
+        #[no_mangle]
+        pub extern "C" fn [<$pc _hash_sign_deterministic>] (
+            private: Option<&$pc::c_private_key>,
+            hash: *const u8,
+            hash_size: usize,
+            context: *const u8,
+            context_size: usize,
+            hash_oid: *const u8,
+            hash_oid_size: usize,
+            signature_out: Option<&mut $pc::c_signature>,
+        ) -> u8 {
+            $pc::hash_sign(private, hash, hash_size, context, context_size,
+                           hash_oid, hash_oid_size, signature_out, true)
+        }
+
+        #[no_mangle]
+        pub extern "C" fn [<$pc _hash_verify>] (
+            public: Option<&$pc::c_public_key>,
+            signature: Option<&$pc::c_signature>,
+            hash: *const u8,
+            hash_size: usize,
+            context: *const u8,
+            context_size: usize,
+            hash_oid: *const u8,
+            hash_oid_size: usize,
+        ) -> u8 {
+            $pc::hash_verify(public, signature, hash, hash_size, context, context_size,
+                             hash_oid, hash_oid_size)
         }
     }
     };
