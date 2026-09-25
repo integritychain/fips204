@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <fips204.h>
+#ifdef HAVE_LIBMD
+#include <sys/types.h>
+#include <sha2.h>
+#endif
 
 int main(int argc, const char **argv) {
   MLDSA_public_key pub;
@@ -142,6 +146,27 @@ int main(int argc, const char **argv) {
     fprintf (stderr, "verify should have failed if the signature was tampered with\n");
     return 6;
   }
+
+#ifdef HAVE_LIBMD
+  {
+    /* just test with SHA2_224 for now */
+    SHA2_CTX sha2ctx;
+    uint8_t sha2_224[SHA224_DIGEST_LENGTH];
+    SHA224Init(&sha2ctx);
+    SHA224Update(&sha2ctx, msg, msglen);
+    SHA224Final(sha2_224, &sha2ctx);
+    if (MLDSA_hash_sign (&priv, sha2_224, sizeof(sha2_224), ctx, ctxlen,
+                         ML_DSA_SHA2_224, sizeof(ML_DSA_SHA2_224), &sig)) {
+      fprintf (stderr, "hash_sign failed\n");
+      return 10;
+    }
+    if (MLDSA_hash_verify(&pub, &sig, sha2_224, sizeof(sha2_224), ctx, ctxlen,
+                          ML_DSA_SHA2_224, sizeof(ML_DSA_SHA2_224))) {
+      fprintf (stderr, "hash_verify failed\n");
+      return 11;
+    }
+  }
+#endif
 
   /* this ought to fail if BitUnpack aborts in skDecode, but it doesn't seem to.
      Is it possible that the parameters for ML-DSA-44 neatly avoid

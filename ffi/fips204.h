@@ -32,6 +32,21 @@ typedef struct ml_dsa_seed {
 } ml_dsa_seed;
 
 
+/* DER-encoded OIDs for convenience for hash_sign and hash_verify */
+const uint8_t ML_DSA_SHA2_224[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04 };
+const uint8_t ML_DSA_SHA2_256[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01 };
+const uint8_t ML_DSA_SHA2_384[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02 };
+const uint8_t ML_DSA_SHA2_512[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03 };
+const uint8_t ML_DSA_SHA2_512_224[] = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05 };
+const uint8_t ML_DSA_SHA2_512_256[] = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06 };
+const uint8_t ML_DSA_SHA3_224[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07 };
+const uint8_t ML_DSA_SHA3_256[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08 };
+const uint8_t ML_DSA_SHA3_384[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x09 };
+const uint8_t ML_DSA_SHA3_512[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0a };
+const uint8_t ML_DSA_SHAKE_128[]    = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0b };
+const uint8_t ML_DSA_SHAKE_256[]    = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0c };
+
+
 typedef struct ml_dsa_44_private_key {
   uint8_t data[2560];
 } ml_dsa_44_private_key;
@@ -101,6 +116,33 @@ ml_dsa_err ml_dsa_44_verify(const ml_dsa_44_public_key *public,
                             const uint8_t *context,
                             size_t context_size);
 
+ml_dsa_err ml_dsa_44_hash_sign(const ml_dsa_44_private_key *private,
+                               const uint8_t *hash,
+                               size_t hash_size,
+                               const uint8_t *context,
+                               size_t context_size,
+                               const uint8_t *hash_oid,
+                               size_t hash_oid_size,
+                               ml_dsa_44_signature *signature_out);
+
+ml_dsa_err ml_dsa_44_hash_sign_deterministic(const ml_dsa_44_private_key *private,
+                                             const uint8_t *hash,
+                                             size_t hash_size,
+                                             const uint8_t *context,
+                                             size_t context_size,
+                                             const uint8_t *hash_oid,
+                                             size_t hash_oid_size,
+                                             ml_dsa_44_signature *signature_out);
+
+ml_dsa_err ml_dsa_44_hash_verify(const ml_dsa_44_public_key *public,
+                                 const ml_dsa_44_signature *signature,
+                                 const uint8_t *hash,
+                                 size_t hash_size,
+                                 const uint8_t *context,
+                                 size_t context_size,
+                                 const uint8_t *hash_oid,
+                                 size_t hash_oid_size);
+
 /* ML-DSA-65 */
 ml_dsa_err ml_dsa_65_keygen(ml_dsa_65_public_key *public_out,
                             ml_dsa_65_private_key *private_out);
@@ -133,6 +175,33 @@ ml_dsa_err ml_dsa_65_verify(const ml_dsa_65_public_key *public,
                             const uint8_t *context,
                             size_t context_size);
 
+ml_dsa_err ml_dsa_65_hash_sign(const ml_dsa_65_private_key *private,
+                               const uint8_t *hash,
+                               size_t hash_size,
+                               const uint8_t *context,
+                               size_t context_size,
+                               const uint8_t *hash_oid,
+                               size_t hash_oid_size,
+                               ml_dsa_65_signature *signature_out);
+
+ml_dsa_err ml_dsa_65_hash_sign_deterministic(const ml_dsa_65_private_key *private,
+                                             const uint8_t *hash,
+                                             size_t hash_size,
+                                             const uint8_t *context,
+                                             size_t context_size,
+                                             const uint8_t *hash_oid,
+                                             size_t hash_oid_size,
+                                             ml_dsa_65_signature *signature_out);
+
+ml_dsa_err ml_dsa_65_hash_verify(const ml_dsa_65_public_key *public,
+                                 const ml_dsa_65_signature *signature,
+                                 const uint8_t *hash,
+                                 size_t hash_size,
+                                 const uint8_t *context,
+                                 size_t context_size,
+                                 const uint8_t *hash_oid,
+                                 size_t hash_oid_size);
+
 /* ML-DSA-87 */
 ml_dsa_err ml_dsa_87_keygen(ml_dsa_87_public_key *public_out,
                             ml_dsa_87_private_key *private_out);
@@ -164,6 +233,33 @@ ml_dsa_err ml_dsa_87_verify(const ml_dsa_87_public_key *public,
                             size_t message_size,
                             const uint8_t *context,
                             size_t context_size);
+
+ml_dsa_err ml_dsa_87_hash_sign(const ml_dsa_87_private_key *private,
+                               const uint8_t *hash,
+                               size_t hash_size,
+                               const uint8_t *context,
+                               size_t context_size,
+                               const uint8_t *hash_oid,
+                               size_t hash_oid_size,
+                               ml_dsa_87_signature *signature_out);
+
+ml_dsa_err ml_dsa_87_hash_sign_deterministic(const ml_dsa_87_private_key *private,
+                                             const uint8_t *hash,
+                                             size_t hash_size,
+                                             const uint8_t *context,
+                                             size_t context_size,
+                                             const uint8_t *hash_oid,
+                                             size_t hash_oid_size,
+                                             ml_dsa_87_signature *signature_out);
+
+ml_dsa_err ml_dsa_87_hash_verify(const ml_dsa_87_public_key *public,
+                                 const ml_dsa_87_signature *signature,
+                                 const uint8_t *hash,
+                                 size_t hash_size,
+                                 const uint8_t *context,
+                                 size_t context_size,
+                                 const uint8_t *hash_oid,
+                                 size_t hash_oid_size);
 
 
 #ifdef  __cplusplus
