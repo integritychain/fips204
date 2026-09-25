@@ -44,17 +44,24 @@ endif
 endif
 
 BASELINES=$(foreach sz, $(SIZES), baseline-$(sz))
-CHECKS=$(foreach sz, $(SIZES), runtest-$(sz))
+CHECKS=$(foreach sz, $(SIZES), run-baseline-$(sz)) run-nist-tests
 
 check: $(CHECKS)
 
-runtest-%: baseline-% $(ADDITIONAL_RUN_DEPENDS)
+run-%: % $(ADDITIONAL_RUN_DEPENDS)
 	$(RUN_PREFIX) ./$<
 
 baseline-%: baseline.c ../fips204.h
 	$(CC) -o $@ -g -D MLDSA_size=$* $(foreach v, $(FRAMES),-D MLDSA_$(v)=ml_dsa_$*_$(v)) -Werror -Wall -pedantic $< -Wall $(COMPILE_FLAGS) -lfips204
 
+nist-tests.c:  nist-tests-template.c generate-nist.py
+	./generate-nist.py > $@.tmp
+	mv $@.tmp $@
+
+nist-tests: nist-tests.c
+	$(CC) -o $@ -g  -Werror -Wall -pedantic $< -Wall $(COMPILE_FLAGS) -lfips204
+
 clean:
-	rm -f $(BASELINES) $(ADDITIONAL_RUN_DEPENDS)
+	rm -f $(BASELINES) $(ADDITIONAL_RUN_DEPENDS) nist-tests.c nist-tests
 
 .PHONY: clean check all
