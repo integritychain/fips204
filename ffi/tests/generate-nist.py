@@ -77,6 +77,41 @@ results keygen() {
 }
 """
 
+class hasher:
+    def __init__(self, tid: int, algo: str) -> None:
+        if algo in ['SHA2-512/224']:
+            raise Exception(f"{algo} not supported")
+        self.tid = tid
+        self.algo = algo
+        algo = algo.replace('/', '_')
+        self.ctx = algo.replace('-', '_') + "_CTX"
+        self.prefix = algo.replace("SHA2-", "SHA").replace("-", "_")
+        self.hashoid = "ML_DSA_" + algo.replace("-", "_")
+        self.hashlen = self.prefix + "_DIGEST_LENGTH"
+        if algo.startswith("SHA2"):
+            self.ctx = "SHA2_CTX"
+        elif algo.startswith("SHAKE"):
+            self.ctx = algo.replace("-", "") + "_CTX"
+            self.hashlen = int(algo.split('-')[1])//4
+            self.prefix = algo.replace("-","") + "_"
+        elif algo.startswith("SHA3"):
+            self.prefix += "_"
+    def prep(self) -> str:
+        out = f"""
+  uint8_t hash_{self.tid}[{self.hashlen}];
+  {self.ctx} hashctx_{self.tid};
+  {self.prefix}Init(&hashctx_{self.tid});
+  {self.prefix}Update(&hashctx_{self.tid}, message_{self.tid}, sizeof(message_{self.tid}));
+"""
+        if self.algo.startswith("SHAKE"):
+            out += f"  {self.prefix}Final(hash_{self.tid}, {self.hashlen}, &hashctx_{self.tid});\n"
+        else:
+            out += f"  {self.prefix}Final(hash_{self.tid}, &hashctx_{self.tid});\n"
+        return out
+    @property
+    def oid(self) -> str:
+        return self.hashoid
+
 
 def sigver(f: str) -> str:
     d = json.load(open(f))
@@ -96,21 +131,34 @@ results sigver() {
   ret.skipped++;
 """
             else:
-                if tg["preHash"] == "preHash":
-                    out += f"""
-  /* Skipping prehashed test {tid} */
-  ret.skipped++;
-"""
-                else:
-                    tid = int(t["tcId"])
-                    msg, msglen = buf(t["message"], "message", tid)
-                    ctx, ctxlen = buf(t["context"], "ctx", tid)
-                    out += f"""
+                msg, msglen = buf(t["message"], "message", tid)
+                ctx, ctxlen = buf(t["context"], "ctx", tid)
+                start = f"""
   {struct(t["pk"], "public_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
   ret.tests ++;
+"""
+                if tg["preHash"] == "preHash":
+                    try:
+                        h = hasher(tid, t["hashAlg"])
+                        out += start + f"""
+  {h.prep()}
+  if (ml_dsa_{ps}_hash_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
+      hash_{tid}, sizeof(hash_{tid}),
+      ctx_{tid}, {ctxlen},
+      {h.oid}, sizeof({h.oid}),
+      {str(t["testPassed"]).lower()}))
+     ret.failed++;
+"""
+                    except Exception as e:
+                        out += f"""
+  /* Skipping test {tid}: {e} */
+  ret.skipped ++;
+"""
+                else:
+                    out += start + f"""
   if (ml_dsa_{ps}_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen},
@@ -185,6 +233,11 @@ def prefix() -> str:
 #include <stdbool.h>
 #include <fips204.h>
 
+#ifdef HAVE_LIBMD
+#include <sha2.h>
+#include <sha3.h>
+#endif
+
 typedef struct {
   int tests;
   int skipped;
@@ -198,12 +251,14 @@ typedef struct {
         for term in [
             "keygen_test",
             "sigver_test",
+            "hash_sigver_test",
             "siggen_test",
             "keygen_from_seed",
             "public_key",
             "private_key",
             "signature",
             "verify",
+            "hash_verify",
             "sign_deterministic",
         ]:
             prefix += f"#define MLDSA_{term} ml_dsa_{pc}_{term}\n"
