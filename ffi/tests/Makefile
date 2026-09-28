@@ -70,7 +70,7 @@ nist-tests.c:  nist-tests-template.c generate-nist.py
 	./generate-nist.py > $@.tmp
 	mv $@.tmp $@
 
-nist-tests: nist-tests.c
+nist-tests: nist-tests.c ../fips204.h
 	$(CC) -o $@ -g  -Werror -Wall -pedantic $< -Wall $(COMPILE_FLAGS) -lfips204
 
 clean:

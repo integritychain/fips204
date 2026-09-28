@@ -95,19 +95,39 @@ ml_dsa_err ml_dsa_44_keygen_from_seed(const ml_dsa_seed *d_z,
 ml_dsa_err ml_dsa_44_get_public_key(const ml_dsa_44_private_key *private,
                                     ml_dsa_44_public_key *public_out);
 
-ml_dsa_err ml_dsa_44_sign(const ml_dsa_44_private_key *private,
-                          const uint8_t *message,
-                          size_t message_size,
-                          const uint8_t *context,
-                          size_t context_size,
-                          ml_dsa_44_signature *signature_out);
+ml_dsa_err ml_dsa_44_sign_with_seed(const ml_dsa_44_private_key *private,
+                                    const uint8_t *message,
+                                    size_t message_size,
+                                    const uint8_t *context,
+                                    size_t context_size,
+                                    const ml_dsa_seed *seed,
+                                    ml_dsa_44_signature *signature_out);
 
 ml_dsa_err ml_dsa_44_sign_deterministic(const ml_dsa_44_private_key *private,
                                         const uint8_t *message,
                                         size_t message_size,
                                         const uint8_t *context,
                                         size_t context_size,
-                                        ml_dsa_44_signature *signature_out);
+                                        ml_dsa_44_signature *signature_out) {
+  ml_dsa_seed seed = { .data = { 0 } };
+  return ml_dsa_44_sign_with_seed(private,
+                                  message, message_size,
+                                  context, context_size,
+                                  &seed, signature_out);
+}
+ml_dsa_err ml_dsa_44_sign(const ml_dsa_44_private_key *private,
+                                 const uint8_t *message,
+                                 size_t message_size,
+                                 const uint8_t *context,
+                                 size_t context_size,
+                                 ml_dsa_44_signature *signature_out) {
+  return ml_dsa_44_sign_with_seed(private,
+                                  message, message_size,
+                                  context, context_size,
+                                  NULL, signature_out);
+}
+
+
 
 ml_dsa_err ml_dsa_44_verify(const ml_dsa_44_public_key *public,
                             const ml_dsa_44_signature *signature,
@@ -116,14 +136,15 @@ ml_dsa_err ml_dsa_44_verify(const ml_dsa_44_public_key *public,
                             const uint8_t *context,
                             size_t context_size);
 
-ml_dsa_err ml_dsa_44_hash_sign(const ml_dsa_44_private_key *private,
-                               const uint8_t *hash,
-                               size_t hash_size,
-                               const uint8_t *context,
-                               size_t context_size,
-                               const uint8_t *hash_oid,
-                               size_t hash_oid_size,
-                               ml_dsa_44_signature *signature_out);
+ml_dsa_err ml_dsa_44_hash_sign_with_seed(const ml_dsa_44_private_key *private,
+                                         const uint8_t *hash,
+                                         size_t hash_size,
+                                         const uint8_t *context,
+                                         size_t context_size,
+                                         const uint8_t *hash_oid,
+                                         size_t hash_oid_size,
+                                         const ml_dsa_seed *seed,
+                                         ml_dsa_44_signature *signature_out);
 
 ml_dsa_err ml_dsa_44_hash_sign_deterministic(const ml_dsa_44_private_key *private,
                                              const uint8_t *hash,
@@ -132,7 +153,29 @@ ml_dsa_err ml_dsa_44_hash_sign_deterministic(const ml_dsa_44_private_key *privat
                                              size_t context_size,
                                              const uint8_t *hash_oid,
                                              size_t hash_oid_size,
-                                             ml_dsa_44_signature *signature_out);
+                                             ml_dsa_44_signature *signature_out) {
+  ml_dsa_seed seed = { .data = { 0 } };
+  return ml_dsa_44_hash_sign_with_seed(private,
+                                       hash, hash_size,
+                                       context, context_size,
+                                       hash_oid, hash_oid_size,
+                                       &seed, signature_out);
+}
+ml_dsa_err ml_dsa_44_hash_sign(const ml_dsa_44_private_key *private,
+                                      const uint8_t *hash,
+                                      size_t hash_size,
+                                      const uint8_t *context,
+                                      size_t context_size,
+                                      const uint8_t *hash_oid,
+                                      size_t hash_oid_size,
+                                      ml_dsa_44_signature *signature_out) {
+  return ml_dsa_44_hash_sign_with_seed(private,
+                                       hash, hash_size,
+                                       context, context_size,
+                                       hash_oid, hash_oid_size,
+                                       NULL, signature_out);
+}
+
 
 ml_dsa_err ml_dsa_44_hash_verify(const ml_dsa_44_public_key *public,
                                  const ml_dsa_44_signature *signature,
@@ -154,19 +197,39 @@ ml_dsa_err ml_dsa_65_keygen_from_seed(const ml_dsa_seed *d_z,
 ml_dsa_err ml_dsa_65_get_public_key(const ml_dsa_65_private_key *private,
                                     ml_dsa_65_public_key *public_out);
 
-ml_dsa_err ml_dsa_65_sign(const ml_dsa_65_private_key *private,
-                          const uint8_t *message,
-                          size_t message_size,
-                          const uint8_t *context,
-                          size_t context_size,
-                          ml_dsa_65_signature *signature_out);
+ml_dsa_err ml_dsa_65_sign_with_seed(const ml_dsa_65_private_key *private,
+                                    const uint8_t *message,
+                                    size_t message_size,
+                                    const uint8_t *context,
+                                    size_t context_size,
+                                    const ml_dsa_seed *seed,
+                                    ml_dsa_65_signature *signature_out);
 
 ml_dsa_err ml_dsa_65_sign_deterministic(const ml_dsa_65_private_key *private,
                                         const uint8_t *message,
                                         size_t message_size,
                                         const uint8_t *context,
                                         size_t context_size,
-                                        ml_dsa_65_signature *signature_out);
+                                        ml_dsa_65_signature *signature_out) {
+  ml_dsa_seed seed = { .data = { 0 } };
+  return ml_dsa_65_sign_with_seed(private,
+                                  message, message_size,
+                                  context, context_size,
+                                  &seed, signature_out);
+}
+
+  ml_dsa_err ml_dsa_65_sign(const ml_dsa_65_private_key *private,
+                                 const uint8_t *message,
+                                 size_t message_size,
+                                 const uint8_t *context,
+                                 size_t context_size,
+                                 ml_dsa_65_signature *signature_out) {
+  return ml_dsa_65_sign_with_seed(private,
+                                  message, message_size,
+                                  context, context_size,
+                                  NULL, signature_out);
+}
+
 
 ml_dsa_err ml_dsa_65_verify(const ml_dsa_65_public_key *public,
                             const ml_dsa_65_signature *signature,
@@ -175,14 +238,15 @@ ml_dsa_err ml_dsa_65_verify(const ml_dsa_65_public_key *public,
                             const uint8_t *context,
                             size_t context_size);
 
-ml_dsa_err ml_dsa_65_hash_sign(const ml_dsa_65_private_key *private,
-                               const uint8_t *hash,
-                               size_t hash_size,
-                               const uint8_t *context,
-                               size_t context_size,
-                               const uint8_t *hash_oid,
-                               size_t hash_oid_size,
-                               ml_dsa_65_signature *signature_out);
+ml_dsa_err ml_dsa_65_hash_sign_with_seed(const ml_dsa_65_private_key *private,
+                                         const uint8_t *hash,
+                                         size_t hash_size,
+                                         const uint8_t *context,
+                                         size_t context_size,
+                                         const uint8_t *hash_oid,
+                                         size_t hash_oid_size,
+                                         const ml_dsa_seed *seed,
+                                         ml_dsa_65_signature *signature_out);
 
 ml_dsa_err ml_dsa_65_hash_sign_deterministic(const ml_dsa_65_private_key *private,
                                              const uint8_t *hash,
@@ -191,7 +255,29 @@ ml_dsa_err ml_dsa_65_hash_sign_deterministic(const ml_dsa_65_private_key *privat
                                              size_t context_size,
                                              const uint8_t *hash_oid,
                                              size_t hash_oid_size,
-                                             ml_dsa_65_signature *signature_out);
+                                             ml_dsa_65_signature *signature_out) {
+  ml_dsa_seed seed = { .data = { 0 } };
+  return ml_dsa_65_hash_sign_with_seed(private,
+                                       hash, hash_size,
+                                       context, context_size,
+                                       hash_oid, hash_oid_size,
+                                       &seed, signature_out);
+}
+
+ml_dsa_err ml_dsa_65_hash_sign(const ml_dsa_65_private_key *private,
+                               const uint8_t *hash,
+                               size_t hash_size,
+                               const uint8_t *context,
+                               size_t context_size,
+                               const uint8_t *hash_oid,
+                               size_t hash_oid_size,
+                               ml_dsa_65_signature *signature_out) {
+  return ml_dsa_65_hash_sign_with_seed(private,
+                                       hash, hash_size,
+                                       context, context_size,
+                                       hash_oid, hash_oid_size,
+                                       NULL, signature_out);
+}
 
 ml_dsa_err ml_dsa_65_hash_verify(const ml_dsa_65_public_key *public,
                                  const ml_dsa_65_signature *signature,
@@ -213,19 +299,38 @@ ml_dsa_err ml_dsa_87_keygen_from_seed(const ml_dsa_seed *d_z,
 ml_dsa_err ml_dsa_87_get_public_key(const ml_dsa_87_private_key *private,
                                     ml_dsa_87_public_key *public_out);
 
-ml_dsa_err ml_dsa_87_sign(const ml_dsa_87_private_key *private,
-                          const uint8_t *message,
-                          size_t message_size,
-                          const uint8_t *context,
-                          size_t context_size,
-                          ml_dsa_87_signature *signature_out);
+ml_dsa_err ml_dsa_87_sign_with_seed(const ml_dsa_87_private_key *private,
+                                    const uint8_t *message,
+                                    size_t message_size,
+                                    const uint8_t *context,
+                                    size_t context_size,
+                                    const ml_dsa_seed *seed,
+                                    ml_dsa_87_signature *signature_out);
 
 ml_dsa_err ml_dsa_87_sign_deterministic(const ml_dsa_87_private_key *private,
                                         const uint8_t *message,
                                         size_t message_size,
                                         const uint8_t *context,
                                         size_t context_size,
-                                        ml_dsa_87_signature *signature_out);
+                                        ml_dsa_87_signature *signature_out) {
+  ml_dsa_seed seed = { .data = { 0 } };
+  return ml_dsa_87_sign_with_seed(private,
+                                  message, message_size,
+                                  context, context_size,
+                                  &seed, signature_out);
+}
+ml_dsa_err ml_dsa_87_sign(const ml_dsa_87_private_key *private,
+                          const uint8_t *message,
+                          size_t message_size,
+                          const uint8_t *context,
+                          size_t context_size,
+                          ml_dsa_87_signature *signature_out) {
+  return ml_dsa_87_sign_with_seed(private,
+                                  message, message_size,
+                                  context, context_size,
+                                  NULL, signature_out);
+}
+
 
 ml_dsa_err ml_dsa_87_verify(const ml_dsa_87_public_key *public,
                             const ml_dsa_87_signature *signature,
@@ -234,23 +339,47 @@ ml_dsa_err ml_dsa_87_verify(const ml_dsa_87_public_key *public,
                             const uint8_t *context,
                             size_t context_size);
 
-ml_dsa_err ml_dsa_87_hash_sign(const ml_dsa_87_private_key *private,
-                               const uint8_t *hash,
-                               size_t hash_size,
-                               const uint8_t *context,
-                               size_t context_size,
-                               const uint8_t *hash_oid,
-                               size_t hash_oid_size,
-                               ml_dsa_87_signature *signature_out);
+ml_dsa_err ml_dsa_87_hash_sign_with_seed(const ml_dsa_87_private_key *private,
+                                         const uint8_t *hash,
+                                         size_t hash_size,
+                                         const uint8_t *context,
+                                         size_t context_size,
+                                         const uint8_t *hash_oid,
+                                         size_t hash_oid_size,
+                                         const ml_dsa_seed *seed,
+                                         ml_dsa_87_signature *signature_out);
 
 ml_dsa_err ml_dsa_87_hash_sign_deterministic(const ml_dsa_87_private_key *private,
-                                             const uint8_t *hash,
-                                             size_t hash_size,
-                                             const uint8_t *context,
-                                             size_t context_size,
-                                             const uint8_t *hash_oid,
-                                             size_t hash_oid_size,
-                                             ml_dsa_87_signature *signature_out);
+                                                    const uint8_t *hash,
+                                                    size_t hash_size,
+                                                    const uint8_t *context,
+                                                    size_t context_size,
+                                                    const uint8_t *hash_oid,
+                                                    size_t hash_oid_size,
+                                                    ml_dsa_87_signature *signature_out) {
+  ml_dsa_seed seed = { .data = { 0 } };
+  return ml_dsa_87_hash_sign_with_seed(private,
+                                       hash, hash_size,
+                                       context, context_size,
+                                       hash_oid, hash_oid_size,
+                                       &seed, signature_out);
+
+}
+
+ml_dsa_err ml_dsa_87_hash_sign(const ml_dsa_87_private_key *private,
+                                      const uint8_t *hash,
+                                      size_t hash_size,
+                                      const uint8_t *context,
+                                      size_t context_size,
+                                      const uint8_t *hash_oid,
+                                      size_t hash_oid_size,
+                                      ml_dsa_87_signature *signature_out) {
+  return ml_dsa_87_hash_sign_with_seed(private,
+                                       hash, hash_size,
+                                       context, context_size,
+                                       hash_oid, hash_oid_size,
+                                       NULL, signature_out);
+}
 
 ml_dsa_err ml_dsa_87_hash_verify(const ml_dsa_87_public_key *public,
                                  const ml_dsa_87_signature *signature,

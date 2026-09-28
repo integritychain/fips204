@@ -111,7 +111,7 @@ macro_rules! parameter_set {
                 context: *const u8,
                 context_size: usize,
                 signature_out: Option<&mut c_signature>,
-                deterministic: bool,
+                seed: Option<&ml_dsa_seed>,
             ) -> u8 {
                 use fips204::traits::{Signer, SerDes};
 
@@ -127,9 +127,8 @@ macro_rules! parameter_set {
                 let Ok(privkey) = fips204::$pc::PrivateKey::try_from_bytes(private.data) else {
                     return ret::DESERIALIZATION_ERROR;
                 };
-                let ans = if deterministic {
-                    let s = [ 0u8; 32 ];
-                    privkey.try_sign_with_seed(&s, msg, ctx)
+                let ans = if let Some(seed) = seed {
+                    privkey.try_sign_with_seed(&seed.data, msg, ctx)
                 } else {
                     privkey.try_sign(msg, ctx)
                 };
@@ -150,7 +149,7 @@ macro_rules! parameter_set {
                 hash_oid: *const u8,
                 hash_oid_size: usize,
                 signature_out: Option<&mut c_signature>,
-                deterministic: bool,
+                seed: Option<&ml_dsa_seed>,
             ) -> u8 {
                 use fips204::traits::{Signer, SerDes};
 
@@ -167,9 +166,8 @@ macro_rules! parameter_set {
                 let Ok(privkey) = fips204::$pc::PrivateKey::try_from_bytes(private.data) else {
                     return ret::DESERIALIZATION_ERROR;
                 };
-                let ans = if deterministic {
-                    let s = [ 0u8; 32 ];
-                    privkey.try_hash_sign_with_seed(&s, digest, ctx, hoid)
+                let ans = if let Some(seed) = seed {
+                    privkey.try_hash_sign_with_seed(&seed.data, digest, ctx, hoid)
                 } else {
                     privkey.try_hash_sign(digest, ctx, hoid)
                 };
@@ -276,27 +274,16 @@ macro_rules! parameter_set {
 
 
         #[no_mangle]
-        pub extern "C" fn [<$pc _sign>] (
+        pub extern "C" fn [<$pc _sign_with_seed>] (
             private: Option<&$pc::c_private_key>,
             message: *const u8,
             message_size: usize,
             context: *const u8,
             context_size: usize,
+            seed: Option<&ml_dsa_seed>,
             signature_out: Option<&mut $pc::c_signature>,
         ) -> u8 {
-            $pc::sign(private, message, message_size, context, context_size, signature_out, false)
-        }
-
-        #[no_mangle]
-        pub extern "C" fn [<$pc _sign_deterministic>] (
-            private: Option<&$pc::c_private_key>,
-            message: *const u8,
-            message_size: usize,
-            context: *const u8,
-            context_size: usize,
-            signature_out: Option<&mut $pc::c_signature>,
-        ) -> u8 {
-            $pc::sign(private, message, message_size, context, context_size, signature_out, true)
+            $pc::sign(private, message, message_size, context, context_size, signature_out, seed)
         }
 
         #[no_mangle]
@@ -312,7 +299,7 @@ macro_rules! parameter_set {
         }
 
         #[no_mangle]
-        pub extern "C" fn [<$pc _hash_sign>] (
+        pub extern "C" fn [<$pc _hash_sign_with_seed>] (
             private: Option<&$pc::c_private_key>,
             hash: *const u8,
             hash_size: usize,
@@ -320,25 +307,11 @@ macro_rules! parameter_set {
             context_size: usize,
             hash_oid: *const u8,
             hash_oid_size: usize,
+            seed: Option<&ml_dsa_seed>,
             signature_out: Option<&mut $pc::c_signature>,
         ) -> u8 {
             $pc::hash_sign(private, hash, hash_size, context, context_size,
-                           hash_oid, hash_oid_size, signature_out, false)
-        }
-
-        #[no_mangle]
-        pub extern "C" fn [<$pc _hash_sign_deterministic>] (
-            private: Option<&$pc::c_private_key>,
-            hash: *const u8,
-            hash_size: usize,
-            context: *const u8,
-            context_size: usize,
-            hash_oid: *const u8,
-            hash_oid_size: usize,
-            signature_out: Option<&mut $pc::c_signature>,
-        ) -> u8 {
-            $pc::hash_sign(private, hash, hash_size, context, context_size,
-                           hash_oid, hash_oid_size, signature_out, true)
+                           hash_oid, hash_oid_size, signature_out, seed)
         }
 
         #[no_mangle]
