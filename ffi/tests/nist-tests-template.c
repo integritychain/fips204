@@ -99,10 +99,11 @@ MLDSA_siggen_test(int tcId,
                   const uint8_t *msg,
                   const size_t msglen,
                   const uint8_t *ctx,
-                  const size_t ctxlen) {
+                  const size_t ctxlen,
+                  const ml_dsa_seed *seed) {
   ml_dsa_err err = 0;
   MLDSA_signature newsig;
-  err = MLDSA_sign_deterministic(priv, msg, msglen, ctx, ctxlen, &newsig);
+  err = MLDSA_sign_with_seed(priv, msg, msglen, ctx, ctxlen, seed, &newsig);
   if (err) {
     fprintf(stderr, "sigGen test %d failed with return code %d\n",
             tcId, err);
@@ -124,10 +125,11 @@ MLDSA_hash_siggen_test(int tcId,
                        const uint8_t *ctx,
                        const size_t ctxlen,
                        const uint8_t *hashoid,
-                       const size_t hashoidlen) {
+                       const size_t hashoidlen,
+                       const ml_dsa_seed *seed) {
   ml_dsa_err err = 0;
   MLDSA_signature newsig;
-  err = MLDSA_hash_sign_deterministic(priv, hash, hashlen, ctx, ctxlen, hashoid, hashoidlen, &newsig);
+  err = MLDSA_hash_sign_with_seed(priv, hash, hashlen, ctx, ctxlen, hashoid, hashoidlen, seed, &newsig);
   if (err) {
     fprintf(stderr, "hash sigGen test %d failed with return code %d\n",
             tcId, err);

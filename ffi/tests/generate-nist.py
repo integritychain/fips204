@@ -191,19 +191,21 @@ results siggen() {
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
             tid = int(t["tcId"])
-            if tg["signatureInterface"] != "external" or not tg["deterministic"]:
+            if tg["signatureInterface"] != "external":
                 out += f"""
-  /* Skipping {tg["signatureInterface"]} {"" if tg["deterministic"] else "non-"}deterministic interface test {tid} */
+  /* Skipping {tg["signatureInterface"]} interface test {tid} */
   ret.skipped++;
 """
             else:
                 msg, msglen = buf(t["message"], "message", tid)
                 ctx, ctxlen = buf(t["context"], "ctx", tid)
+                rnd = t.get("rnd", "0"*64)
                 start = f"""
   {struct(t["sk"], "private_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
+  {struct(rnd, "seed", ps, tid)}
   ret.tests ++;
 """
                 if tg["preHash"] == "preHash":
@@ -214,7 +216,8 @@ results siggen() {
   if (ml_dsa_{ps}_hash_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
       ctx_{tid}, {ctxlen},
-      {h.oid}, sizeof({h.oid})))
+      {h.oid}, sizeof({h.oid}),
+      &seed_{tid}))
      ret.failed++;
 """
                     except Exception as e:
@@ -226,7 +229,8 @@ results siggen() {
                     out += start + f"""
   if (ml_dsa_{ps}_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
-      ctx_{tid}, {ctxlen}))
+      ctx_{tid}, {ctxlen},
+      &seed_{tid}))
      ret.failed++;
 """
 
@@ -275,8 +279,8 @@ typedef struct {
             "signature",
             "verify",
             "hash_verify",
-            "sign_deterministic",
-            "hash_sign_deterministic",
+            "sign_with_seed",
+            "hash_sign_with_seed",
         ]:
             prefix += f"#define MLDSA_{term} ml_dsa_{pc}_{term}\n"
             suffix += f"#undef MLDSA_{term}\n"
