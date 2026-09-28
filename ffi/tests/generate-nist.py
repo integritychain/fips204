@@ -135,17 +135,21 @@ results sigver() {
             else:
                 msg, msglen = buf(t["message"], "message", tid)
                 ctx, ctxlen = buf(t["context"], "ctx", tid)
+                out += """
+  ret.tests++;
+"""
                 start = f"""
   {struct(t["pk"], "public_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
-  ret.tests ++;
 """
                 if tg["preHash"] == "preHash":
                     try:
                         h = hasher(tid, t["hashAlg"])
-                        out += start + f"""
+                        out += """
+#ifdef HAVE_LIBMD
+""" + start + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
@@ -153,6 +157,10 @@ results sigver() {
       {h.oid}, sizeof({h.oid}),
       {str(t["testPassed"]).lower()}))
      ret.failed++;
+#else
+  /* Skipping test {tid}: no libmd available */
+  ret.skipped ++;
+#endif
 """
                     except NISTTestException as e:
                         out += f"""
@@ -200,18 +208,22 @@ results siggen() {
                 msg, msglen = buf(t["message"], "message", tid)
                 ctx, ctxlen = buf(t["context"], "ctx", tid)
                 rnd = t.get("rnd", "0"*64)
+                out += """
+  ret.tests ++;
+"""
                 start = f"""
   {struct(t["sk"], "private_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
   {struct(rnd, "seed", ps, tid)}
-  ret.tests ++;
 """
                 if tg["preHash"] == "preHash":
                     try:
                         h = hasher(tid, t["hashAlg"])
-                        out += start + f"""
+                        out += """
+#ifdef HAVE_LIBMD
+""" + start + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
@@ -219,6 +231,10 @@ results siggen() {
       {h.oid}, sizeof({h.oid}),
       &seed_{tid}))
      ret.failed++;
+#else
+  /* Skipping test {tid}: no libmd available */
+  ret.skipped ++;
+#endif
 """
                     except Exception as e:
                         out += f"""

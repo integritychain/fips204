@@ -45,7 +45,7 @@ endif
 
 LIBMD = $(shell pkgconf --libs --cflags libmd)
 HAS_LIBMD = No
-ifneq ($(LIBMD), false)
+ifneq ($(LIBMD), )
   COMPILE_FLAGS += $(LIBMD) -DHAVE_LIBMD
   FRAMES += hash_sign hash_verify
   HAS_LIBMD = Yes
