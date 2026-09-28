@@ -79,12 +79,12 @@ MLDSA_hash_sigver_test(int tcId,
   ml_dsa_err err = 0;
   err = MLDSA_hash_verify(pub, sig, hash, hashlen, ctx, ctxlen, hashoid, hashoidlen);
   if (err != ML_DSA_OK && err != ML_DSA_VERIFICATION_FAILURE) {
-    fprintf(stderr, "sigVer test %d failed with surprising return code %d\n",
+    fprintf(stderr, "hash sigVer test %d failed with surprising return code %d\n",
             tcId, err);
     return 1;
   }
   if ((bool)(!err) != testpassed) {
-    fprintf(stderr, "sigVer test %d failed: return status %d, expected test to %s\n",
+    fprintf(stderr, "hash sigVer test %d failed: return status %d, expected test to %s\n",
             tcId, err, (testpassed ? "pass" : "not pass"));
     return 1;
   }
@@ -110,6 +110,31 @@ MLDSA_siggen_test(int tcId,
   }
   if (memcmp(&newsig, sig, sizeof(newsig))) {
     fprintf(stderr, "sigGen test %d failed: sigs didn't match\n", tcId);
+    return 1;
+  }
+  return 0;
+}
+
+int
+MLDSA_hash_siggen_test(int tcId,
+                       const MLDSA_private_key *priv,
+                       const MLDSA_signature *sig,
+                       const uint8_t *hash,
+                       const size_t hashlen,
+                       const uint8_t *ctx,
+                       const size_t ctxlen,
+                       const uint8_t *hashoid,
+                       const size_t hashoidlen) {
+  ml_dsa_err err = 0;
+  MLDSA_signature newsig;
+  err = MLDSA_hash_sign_deterministic(priv, hash, hashlen, ctx, ctxlen, hashoid, hashoidlen, &newsig);
+  if (err) {
+    fprintf(stderr, "hash sigGen test %d failed with return code %d\n",
+            tcId, err);
+    return 1;
+  }
+  if (memcmp(&newsig, sig, sizeof(newsig))) {
+    fprintf(stderr, "hash sigGen test %d failed: sigs didn't match\n", tcId);
     return 1;
   }
   return 0;

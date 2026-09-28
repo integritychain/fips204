@@ -188,27 +188,40 @@ results siggen() {
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
+            tid = int(t["tcId"])
             if tg["signatureInterface"] != "external" or not tg["deterministic"]:
                 out += f"""
   /* Skipping {tg["signatureInterface"]} interface test {tid} */
   ret.skipped++;
 """
             else:
-                if tg["preHash"] == "preHash":
-                    out += f"""
-  /* Skipping prehash test {tid} */
-  ret.skipped++;
-"""
-                else:
-                    tid = int(t["tcId"])
-                    msg, msglen = buf(t["message"], "message", tid)
-                    ctx, ctxlen = buf(t["context"], "ctx", tid)
-                    out += f"""
+                msg, msglen = buf(t["message"], "message", tid)
+                ctx, ctxlen = buf(t["context"], "ctx", tid)
+                start = f"""
   {struct(t["sk"], "private_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
   ret.tests ++;
+"""
+                if tg["preHash"] == "preHash":
+                    try:
+                        h = hasher(tid, t["hashAlg"])
+                        out += start + f"""
+  {h.prep()}
+  if (ml_dsa_{ps}_hash_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
+      hash_{tid}, sizeof(hash_{tid}),
+      ctx_{tid}, {ctxlen},
+      {h.oid}, sizeof({h.oid})))
+     ret.failed++;
+"""
+                    except Exception as e:
+                        out += f"""
+  /* Skipping test {tid}: {e} */
+  ret.skipped ++;
+"""
+                else:
+                    out += start + f"""
   if (ml_dsa_{ps}_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen}))
@@ -252,6 +265,7 @@ typedef struct {
             "keygen_test",
             "sigver_test",
             "hash_sigver_test",
+            "hash_siggen_test",
             "siggen_test",
             "keygen_from_seed",
             "public_key",
@@ -260,6 +274,7 @@ typedef struct {
             "verify",
             "hash_verify",
             "sign_deterministic",
+            "hash_sign_deterministic",
         ]:
             prefix += f"#define MLDSA_{term} ml_dsa_{pc}_{term}\n"
             suffix += f"#undef MLDSA_{term}\n"
