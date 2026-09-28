@@ -6,6 +6,8 @@ import json
 
 from typing import Tuple
 
+class NISTTestException(Exception):
+    pass
 
 def convert_bytes(h: str, nybblesperline: int = 16, indent: int = 4) -> str:
     """convert a hex string into a C representation of an array"""
@@ -49,7 +51,7 @@ results keygen() {
   results ret = { 0,0,0 };
     """
     if d["mode"] != "keyGen":
-        raise Exception(f"expected keyGen data, got {d["mode"]}")
+        raise NISTTestException(f"expected keyGen data, got {d["mode"]}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
 
@@ -80,7 +82,7 @@ results keygen() {
 class hasher:
     def __init__(self, tid: int, algo: str) -> None:
         if algo in ['SHA2-512/224']:
-            raise Exception(f"{algo} not supported")
+            raise NISTTestException(f"{algo} not supported")
         self.tid = tid
         self.algo = algo
         algo = algo.replace('/', '_')
@@ -120,7 +122,7 @@ results sigver() {
    results ret = { 0,0,0 };
     """
     if d["mode"] != "sigVer":
-        raise Exception(f"expected sigVer data, got {d["mode"]}")
+        raise NISTTestException(f"expected sigVer data, got {d["mode"]}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
@@ -152,7 +154,7 @@ results sigver() {
       {str(t["testPassed"]).lower()}))
      ret.failed++;
 """
-                    except Exception as e:
+                    except NISTTestException as e:
                         out += f"""
   /* Skipping test {tid}: {e} */
   ret.skipped ++;
@@ -184,14 +186,14 @@ results siggen() {
   results ret = { 0,0,0 };
     """
     if d["mode"] != "sigGen":
-        raise Exception(f"expected sigGen data, got {d["mode"]}")
+        raise NISTTestException(f"expected sigGen data, got {d["mode"]}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
             tid = int(t["tcId"])
             if tg["signatureInterface"] != "external" or not tg["deterministic"]:
                 out += f"""
-  /* Skipping {tg["signatureInterface"]} interface test {tid} */
+  /* Skipping {tg["signatureInterface"]} {"" if tg["deterministic"] else "non-"}deterministic interface test {tid} */
   ret.skipped++;
 """
             else:
