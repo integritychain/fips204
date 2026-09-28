@@ -45,9 +45,8 @@ def buf(h: str, name: str, x: int) -> Tuple[str, str]:
 def keygen(f: str) -> str:
     d = json.load(open(f))
     out = """
-int keygen() {
-  int testcount = 0;
-  int errcount = 0;
+results keygen() {
+  results ret = { 0,0,0 };
     """
     if d["mode"] != "keyGen":
         raise Exception(f"expected keyGen data, got {d["mode"]}")
@@ -64,39 +63,44 @@ int keygen() {
   {pk}
   {sk}
   {seed}
-  testcount ++;
+  ret.tests++;
   if (ml_dsa_{ps}_keygen_test ({tid}, &seed_{tid}, &public_key_{tid}, &private_key_{tid}))
-     errcount++;
+     ret.failed++;
 """
     return out + """
-  if (errcount) {
-    fprintf(stderr, "%d/%d keygen tests failed\\n", errcount, testcount);
+  if (ret.failed) {
+    fprintf(stderr, "%d/%d keygen tests failed\\n", ret.failed, ret.tests);
   } else {
-    fprintf(stderr, "%d keygen tests passed\\n", testcount);
+    fprintf(stderr, "%d keygen tests passed\\n", ret.tests);
   }
-  return errcount;
+  return ret;
 }
 """
 
 
 def sigver(f: str) -> str:
     d = json.load(open(f))
-    skipped = 0
     out = """
-int sigver() {
-  int testcount = 0;
-  int errcount = 0;
+results sigver() {
+   results ret = { 0,0,0 };
     """
     if d["mode"] != "sigVer":
         raise Exception(f"expected sigVer data, got {d["mode"]}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
+            tid = int(t["tcId"])
             if tg["signatureInterface"] != "external":
-                skipped += 1
+                out += f"""
+  /* Skipping {tg["signatureInterface"]} interface test {tid} */
+  ret.skipped++;
+"""
             else:
                 if tg["preHash"] == "preHash":
-                    skipped += 1
+                    out += f"""
+  /* Skipping prehashed test {tid} */
+  ret.skipped++;
+"""
                 else:
                     tid = int(t["tcId"])
                     msg, msglen = buf(t["message"], "message", tid)
@@ -106,32 +110,30 @@ int sigver() {
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
-  testcount ++;
+  ret.tests ++;
   if (ml_dsa_{ps}_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen},
       {str(t["testPassed"]).lower()}))
-     errcount++;
+     ret.failed++;
 """
 
     return out + f"""
-  if (errcount) {{
-    fprintf(stderr, "%d/%d sigver tests failed ({skipped} skipped)\\n", errcount, testcount);
+  if (ret.failed) {{
+    fprintf(stderr, "%d/%d sigver tests failed (%d skipped)\\n", ret.failed, ret.tests, ret.skipped);
   }} else {{
-    fprintf(stderr, "%d sigver tests passed ({skipped} skipped)\\n", testcount);
+    fprintf(stderr, "%d sigver tests passed (%d skipped)\\n", ret.tests, ret.skipped);
   }}
-  return errcount;
+  return ret;
 }}
 """
 
 
 def siggen(f: str) -> str:
     d = json.load(open(f))
-    skipped = 0
     out = """
-int siggen() {
-  int testcount = 0;
-  int errcount = 0;
+results siggen() {
+  results ret = { 0,0,0 };
     """
     if d["mode"] != "sigGen":
         raise Exception(f"expected sigGen data, got {d["mode"]}")
@@ -139,10 +141,16 @@ int siggen() {
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
             if tg["signatureInterface"] != "external" or not tg["deterministic"]:
-                skipped += 1
+                out += f"""
+  /* Skipping {tg["signatureInterface"]} interface test {tid} */
+  ret.skipped++;
+"""
             else:
                 if tg["preHash"] == "preHash":
-                    skipped += 1
+                    out += f"""
+  /* Skipping prehash test {tid} */
+  ret.skipped++;
+"""
                 else:
                     tid = int(t["tcId"])
                     msg, msglen = buf(t["message"], "message", tid)
@@ -152,20 +160,20 @@ int siggen() {
   {struct(t["signature"], "signature", ps, tid)}
   {msg}
   {ctx}
-  testcount ++;
+  ret.tests ++;
   if (ml_dsa_{ps}_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen}))
-     errcount++;
+     ret.failed++;
 """
 
     return out + f"""
-  if (errcount) {{
-    fprintf(stderr, "%d/%d siggen tests failed ({skipped} skipped)\\n", errcount, testcount);
+  if (ret.failed) {{
+    fprintf(stderr, "%d/%d siggen tests failed (%d skipped)\\n", ret.failed, ret.tests, ret.skipped);
   }} else {{
-    fprintf(stderr, "%d siggen tests passed ({skipped} skipped)\\n", testcount);
+    fprintf(stderr, "%d siggen tests passed (%d skipped)\\n", ret.tests, ret.skipped);
   }}
-  return errcount;
+  return ret;
 }}
 """
 
@@ -176,6 +184,12 @@ def prefix() -> str:
 #include <string.h>
 #include <stdbool.h>
 #include <fips204.h>
+
+typedef struct {
+  int tests;
+  int skipped;
+  int failed;
+} results;
 """
 
     for pc in ["44", "65", "87"]:
@@ -198,18 +212,24 @@ def prefix() -> str:
         out += prefix + '#include "nist-tests-template.c"\n' + suffix
     out += """
 
-int keygen();
-int sigver();
-int siggen();
+results keygen();
+results sigver();
+results siggen();
 
 int
 main (int argc, const char **argv) {
-  int errcount = 0;
-  errcount += keygen();
-  errcount += sigver();
-  errcount += siggen();
-  if (errcount) {
-    fprintf(stderr, "%d failures\\n", errcount);
+  results res[3] = { {0,0,0},{0,0,0},{0,0,0} };
+  results total = { 0, 0, 0 };
+  res[0] = keygen();
+  res[1] = sigver();
+  res[2] = siggen();
+  for (int i = 0; i < 3; i++) {
+    total.tests += res[i].tests;
+    total.skipped += res[i].skipped;
+    total.failed += res[i].failed;
+  }
+  if (total.failed) {
+    fprintf(stderr, "%d failures\\n", total.failed);
     return 1;
   } else {
     fprintf(stderr, "All tests passed!\\n");
