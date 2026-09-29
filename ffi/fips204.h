@@ -85,12 +85,17 @@ extern "C" {
 ml_dsa_err ml_dsa_populate_seed(ml_dsa_seed *seed_out);
 
 /* ML-DSA-44 */
-ml_dsa_err ml_dsa_44_keygen(ml_dsa_44_public_key *public_out,
-                            ml_dsa_44_private_key *private_out);
-
 ml_dsa_err ml_dsa_44_keygen_from_seed(const ml_dsa_seed *d_z,
                                       ml_dsa_44_public_key *public_out,
                                       ml_dsa_44_private_key *private_out);
+
+ml_dsa_err ml_dsa_44_keygen(ml_dsa_44_public_key *public_out,
+                            ml_dsa_44_private_key *private_out) {
+  return ml_dsa_44_keygen_from_seed(NULL,
+                                    public_out,
+                                    private_out);
+}
+
 
 ml_dsa_err ml_dsa_44_get_public_key(const ml_dsa_44_private_key *private,
                                     ml_dsa_44_public_key *public_out);
@@ -187,13 +192,16 @@ ml_dsa_err ml_dsa_44_hash_verify(const ml_dsa_44_public_key *public,
                                  size_t hash_oid_size);
 
 /* ML-DSA-65 */
-ml_dsa_err ml_dsa_65_keygen(ml_dsa_65_public_key *public_out,
-                            ml_dsa_65_private_key *private_out);
-
 ml_dsa_err ml_dsa_65_keygen_from_seed(const ml_dsa_seed *d_z,
                                       ml_dsa_65_public_key *public_out,
                                       ml_dsa_65_private_key *private_out);
 
+ml_dsa_err ml_dsa_65_keygen(ml_dsa_65_public_key *public_out,
+                            ml_dsa_65_private_key *private_out) {
+  return ml_dsa_65_keygen_from_seed(NULL,
+                                    public_out,
+                                    private_out);
+}
 ml_dsa_err ml_dsa_65_get_public_key(const ml_dsa_65_private_key *private,
                                     ml_dsa_65_public_key *public_out);
 
@@ -289,12 +297,16 @@ ml_dsa_err ml_dsa_65_hash_verify(const ml_dsa_65_public_key *public,
                                  size_t hash_oid_size);
 
 /* ML-DSA-87 */
-ml_dsa_err ml_dsa_87_keygen(ml_dsa_87_public_key *public_out,
-                            ml_dsa_87_private_key *private_out);
-
 ml_dsa_err ml_dsa_87_keygen_from_seed(const ml_dsa_seed *d_z,
                                       ml_dsa_87_public_key *public_out,
                                       ml_dsa_87_private_key *private_out);
+
+ml_dsa_err ml_dsa_87_keygen(ml_dsa_87_public_key *public_out,
+                            ml_dsa_87_private_key *private_out) {
+  return ml_dsa_87_keygen_from_seed(NULL,
+                                    public_out,
+                                    private_out);
+}
 
 ml_dsa_err ml_dsa_87_get_public_key(const ml_dsa_87_private_key *private,
                                     ml_dsa_87_public_key *public_out);

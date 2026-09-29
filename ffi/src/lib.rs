@@ -245,23 +245,12 @@ macro_rules! parameter_set {
 
         paste! {
         #[no_mangle]
-        pub extern "C" fn [<$pc _keygen>] (
-            public_out: Option<&mut $pc::c_public_key>,
-            private_out: Option<&mut $pc::c_private_key>,
-        ) -> u8 {
-            $pc::keygen(None, public_out, private_out)
-        }
-
-        #[no_mangle]
         pub extern "C" fn [<$pc _keygen_from_seed>] (
             seed: Option<&ml_dsa_seed>,
             public_out: Option<&mut $pc::c_public_key>,
             private_out: Option<&mut $pc::c_private_key>,
         ) -> u8 {
-            let Some(seed) = seed else {
-                return ret::NULL_PTR_ERROR;
-            };
-            $pc::keygen(Some(seed), public_out, private_out)
+            $pc::keygen(seed, public_out, private_out)
         }
 
         #[no_mangle]
