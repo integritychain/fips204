@@ -43,10 +43,22 @@ $(SO_LOCATION)libfips204.so.0: $(SO_LOCATION)$(LINK_LIB)
 endif
 endif
 
+LIBMD = $(shell pkgconf --libs --cflags libmd)
+HAS_LIBMD = No
+ifneq ($(LIBMD), )
+  COMPILE_FLAGS += $(LIBMD) -DHAVE_LIBMD
+  FRAMES += hash_sign hash_verify
+  HAS_LIBMD = Yes
+endif
+
+
 BASELINES=$(foreach sz, $(SIZES), baseline-$(sz))
 CHECKS=$(foreach sz, $(SIZES), run-baseline-$(sz)) run-nist-tests
 
-check: $(CHECKS)
+check: status $(CHECKS)
+
+status:
+	printf "With libmd: %s\n" "$(HAS_LIBMD)"
 
 run-%: % $(ADDITIONAL_RUN_DEPENDS)
 	$(RUN_PREFIX) ./$<
@@ -58,7 +70,7 @@ nist-tests.c:  nist-tests-template.c generate-nist.py
 	./generate-nist.py > $@.tmp
 	mv $@.tmp $@
 
-nist-tests: nist-tests.c
+nist-tests: nist-tests.c ../fips204.h
 	$(CC) -o $@ -g  -Werror -Wall -pedantic $< -Wall $(COMPILE_FLAGS) -lfips204
 
 clean:
