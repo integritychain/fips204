@@ -15,10 +15,10 @@ pub trait KeyGen {
 
 
     /// Generates a public and private key pair specific to this security parameter set.
-    /// This function utilizes the **OS default** random number generator. This function operates
-    /// in constant-time relative to secret data (which specifically excludes the OS random
-    /// number generator internals, the `rho` value stored in the public key, and the hash-derived
-    /// `rho_prime` values that are rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    /// This function utilizes the **OS default** random number generator. Within one attempt,
+    /// key generation avoids branches on secret data. Sampling `s_1` and `s_2` in FIPS 204
+    /// `ExpandS` (Algorithm 33) may repeat. The OS random number generator and `rho` (stored
+    /// in the public key) are not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails.
@@ -46,10 +46,10 @@ pub trait KeyGen {
 
 
     /// Generates a public and private key pair specific to this security parameter set.
-    /// This function utilizes the **provided** random number generator. This function operates
-    /// in constant-time relative to secret data (which specifically excludes the provided random
-    /// number generator internals, the `rho` value stored in the public key, and the hash-derived
-    /// `rho_prime` values that are rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    /// This function utilizes the **provided** random number generator. Within one attempt,
+    /// key generation avoids branches on secret data. Sampling `s_1` and `s_2` in FIPS 204
+    /// `ExpandS` (Algorithm 33) may repeat. The provided random number generator and `rho`
+    /// (stored in the public key) are not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails.
@@ -79,9 +79,9 @@ pub trait KeyGen {
 
     /// Generates a public and private key pair specific to this security parameter set
     /// based on a provided seed. <br>
-    /// This function operates in constant-time relative to secret data (which specifically excludes
-    /// the `rho` value stored in the public key and the hash-derived `rho_prime` values that are
-    /// rejection-sampled/expanded into the internal `s_1` and `s_2` values).
+    /// Within one attempt, key generation avoids branches on secret data. Sampling `s_1` and
+    /// `s_2` in FIPS 204 `ExpandS` (Algorithm 33) may repeat. `rho`, stored in the public key,
+    /// is not treated as secret.
     ///
     /// # Examples
     /// ```rust
@@ -121,11 +121,10 @@ pub trait Signer {
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **OS default** random number generator.
-    /// This function operates in constant-time relative to secret data (which specifically excludes
-    /// the OS default random number generator internals, the `rho` value that is stored in the public
-    /// key, the hash-derived `rho_prime` values that are rejection-sampled/expanded into the internal
-    /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// Within one attempt, signing avoids branches on secret data. The rejection loop in
+    /// FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the number of attempts is
+    /// not constant. The OS random number generator and `rho` (stored in the public key) are
+    /// not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
@@ -156,11 +155,10 @@ pub trait Signer {
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **provided** random number generator.
-    /// This function operates in constant-time relative to secret data (which specifically excludes
-    /// the provided random number generator internals, the `rho` value (also) stored in the public
-    /// key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the internal
-    /// `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// Within one attempt, signing avoids branches on secret data. The rejection loop in
+    /// FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the number of attempts is
+    /// not constant. The provided random number generator and `rho` (stored in the public key)
+    /// are not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
@@ -192,11 +190,9 @@ pub trait Signer {
 
     /// Attempt to sign the given message, returning a digital signature on success, or an error if
     /// something went wrong. This function utilizes the **provided seed to support (less common)
-    /// deterministic signatures**. This function operates in constant-time relative to secret data
-    /// (which specifically excludes the `rho` value stored in the public key, the hash-derived
-    /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values,
-    /// and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// deterministic signatures**. Within one attempt, signing avoids branches on secret data.
+    /// The rejection loop in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the
+    /// number of attempts is not constant. `rho`, stored in the public key, is not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the `ctx` is longer than 255 bytes; propagates internal errors.
@@ -232,11 +228,10 @@ pub trait Signer {
     /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
     /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
     /// This function does not hash `hash` again. It utilizes the **default OS** random number
-    /// generator. This function operates in constant-time relative to secret data (which specifically
-    /// excludes the provided random number generator internals, the `rho` value (also) stored in the
-    /// public key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the
-    /// internal `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// generator. Within one attempt, signing avoids branches on secret data. The rejection loop
+    /// in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the number of attempts is
+    /// not constant. The OS random number generator and `rho` (stored in the public key) are
+    /// not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
@@ -253,11 +248,10 @@ pub trait Signer {
     /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
     /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
     /// This function does not hash `hash` again. It utilizes the **provided** random number
-    /// generator. This function operates in constant-time relative to secret data (which specifically
-    /// excludes the provided random number generator internals, the `rho` value (also) stored in the
-    /// public key, the hash-derived `rho_prime` value that is rejection-sampled/expanded into the
-    /// internal `s_1` and `s_2` values, and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// generator. Within one attempt, signing avoids branches on secret data. The rejection loop
+    /// in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the number of attempts is
+    /// not constant. The provided random number generator and `rho` (stored in the public key)
+    /// are not treated as secret.
     ///
     /// # Errors
     /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
@@ -271,11 +265,10 @@ pub trait Signer {
     /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
     /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
     /// This function does not hash `hash` again. It utilizes the **provided seed to support (less
-    /// common) deterministic signatures**. This function operates in constant-time relative to secret
-    /// data (which specifically excludes the `rho` value stored in the public key, the hash-derived
-    /// `rho_prime` value that is rejection-sampled/expanded into the internal `s_1` and `s_2` values,
-    /// and the main signing rejection loop as noted in section 5.5 of
-    /// <https://pq-crystals.org/dilithium/data/dilithium-specification-round3-20210208.pdf>.
+    /// common) deterministic signatures**. Within one attempt, signing avoids branches on secret
+    /// data. The rejection loop in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so
+    /// the number of attempts is not constant. `rho`, stored in the public key, is not treated
+    /// as secret.
     ///
     /// # Errors
     /// Returns an error when the `ctx` is longer than 255 bytes, `hash_oid` is empty, or `hash` is

@@ -167,11 +167,10 @@ macro_rules! functionality {
         /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
         /// Generates a public-private key pair specific to this security parameter set.
         ///
-        /// This function utilizes the **default OS ** random number generator. It operates
-        /// in constant-time relative to secret data (which specifically excludes the
-        /// random number generator internals, the `rho` value stored in the public key,
-        /// and the hash-derived `rho_prime` value that is rejection-sampled/expanded into
-        /// the internal `s_1` and `s_2` values).
+        /// This function utilizes the **default OS** random number generator. Within one attempt,
+        /// key generation avoids branches on secret data. Sampling `s_1` and `s_2` in FIPS 204
+        /// `ExpandS` (Algorithm 33) may repeat. The OS random number generator and `rho` (stored
+        /// in the public key) are not treated as secret.
         ///
         /// **Output**: Public key struct and private key struct.
         ///
@@ -201,11 +200,10 @@ macro_rules! functionality {
         /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
         /// Generates a public and private key pair specific to this security parameter set.
         ///
-        /// This function utilizes the **provided** random number generator. It operates
-        /// in constant-time relative to secret data (which specifically excludes the
-        /// random number generator internals, the `rho` value stored in the public key,
-        /// and the hash-derived `rho_prime` value that is rejection-sampled/expanded into
-        /// the internal `s_1` and `s_2` values).
+        /// This function utilizes the **provided** random number generator. Within one attempt,
+        /// key generation avoids branches on secret data. Sampling `s_1` and `s_2` in FIPS 204
+        /// `ExpandS` (Algorithm 33) may repeat. The provided random number generator and `rho`
+        /// (stored in the public key) are not treated as secret.
         ///
         /// **Output**: Public key struct and private key struct.
         ///
