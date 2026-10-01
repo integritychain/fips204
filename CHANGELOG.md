@@ -24,8 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `ffi` workspace member (`fips204-ffi`) producing `libfips204`, a C shared library for
-  pure ML-DSA keygen / sign / verify across ML-DSA-44/65/87 (HashML-DSA not yet exported
-  via FFI); thank you @dkg
+  ML-DSA and HashML-DSA keygen / sign / verify across ML-DSA-44/65/87; thank you @dkg
 
 ### Fixed
 - `Signer::get_public_key` doctest no longer requires `default-rng` (uses

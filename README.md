@@ -63,8 +63,10 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   DER-encoded OID (`pre_hash` lists the NIST CSOR encodings). The vectors cover the
   SHA-2, SHA-3, and SHAKE functions in that list.
 * An optional `ffi` workspace member builds `libfips204`, a C ABI shared library for the
-  pure ML-DSA external interfaces (see [`ffi/README.md`](ffi/README.md)). HashML-DSA is not
-  yet exported through the FFI.
+  external ML-DSA and HashML-DSA interfaces (`hash_sign_with_seed` and `hash_verify` for
+  ML-DSA-44/65/87; see [`ffi/README.md`](ffi/README.md)). The C NIST harness does not hash,
+  because Ubuntu 24.04 libmd has no `<sha3.h>`. Those vectors run from
+  `ffi/python/test/nist.py`.
 * A WASM browser demo lives under [`wasm/`](wasm/) (see [`wasm/README.md`](wasm/README.md)).
 * RNG integration uses **`rand_core` 0.6**. The default features enable
   `default-rng` plus all three parameter sets. That OS RNG
