@@ -115,7 +115,7 @@ __all__ = [
     "PublicKey",
     "PrivateKey",
     "Seed",
-    "HashOID",
+    "HASH_OIDS",
 ]
 
 import ctypes
@@ -126,51 +126,32 @@ from typing import Tuple, Dict, Any, Union, Optional
 from abc import ABC
 import sys
 from os import path, environ
-from enum import Enum
-
-
-class HashOID(Enum):
-    """Convenience for fips204.PrivateKey.hash_sign() fips204.PublicKey.hash_verify()
-
-    Both of these functions need to take an identifier for the digest algorithm used.
-    The identifier is passed in the form of a DER-encoded OID.
-
-    To use a digest algorithm not encoded here, pass a raw bytes object instead.
-    """
-
-    SHA2_224 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x04"
-    SHA2_256 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01"
-    SHA2_384 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x02"
-    SHA2_512 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x03"
-    SHA2_512_224 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x05"
-    SHA2_512_256 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x06"
-    SHA3_224 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x07"
-    SHA3_256 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x08"
-    SHA3_384 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x09"
-    SHA3_512 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0a"
-    SHAKE_128 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0b"
-    SHAKE_256 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0c"
-
-
-def _alias_hashoid(member: HashOID, name: str) -> None:
-    """Register HashOID[name]. Enum._add_alias_ exists only in Python 3.13+."""
-    HashOID._member_map_[name] = member
-
-
-# allow hyphens instead of underscores when looking up as a dict:
-for h in HashOID:
-    rep = h.name.replace("_", "-")
-    if rep != h.name:
-        _alias_hashoid(h, rep)
-# add common aliases for SHA2 variants:
-_alias_hashoid(HashOID.SHA2_224, "SHA224")
-_alias_hashoid(HashOID.SHA2_256, "SHA256")
-_alias_hashoid(HashOID.SHA2_384, "SHA384")
-_alias_hashoid(HashOID.SHA2_512, "SHA512")
-_alias_hashoid(HashOID.SHA2_512_224, "SHA512/224")
-_alias_hashoid(HashOID.SHA2_512_256, "SHA512/256")
-_alias_hashoid(HashOID.SHA2_512_224, "SHA2-512/224")
-_alias_hashoid(HashOID.SHA2_512_256, "SHA2-512/256")
+# NIST hyphenated names used by ACVP, mapped to DER OIDs (tag and length included).
+# hash_sign and hash_verify accept one of these names, or the raw OID bytes.
+HASH_OIDS: Dict[str, bytes] = {
+    "SHA2-224": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x04",
+    "SHA2-256": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01",
+    "SHA2-384": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x02",
+    "SHA2-512": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x03",
+    "SHA2-512/224": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x05",
+    "SHA2-512/256": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x06",
+    "SHA3-224": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x07",
+    "SHA3-256": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x08",
+    "SHA3-384": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x09",
+    "SHA3-512": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0a",
+    "SHAKE-128": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0b",
+    "SHAKE-256": b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0c",
+}
+# Names that are not the ACVP spelling, kept as lookups on the same bytes.
+for _short, _long in (
+    ("SHA224", "SHA2-224"),
+    ("SHA256", "SHA2-256"),
+    ("SHA384", "SHA2-384"),
+    ("SHA512", "SHA2-512"),
+    ("SHA512/224", "SHA2-512/224"),
+    ("SHA512/256", "SHA2-512/256"),
+):
+    HASH_OIDS[_short] = HASH_OIDS[_long]
 
 
 class _Seed(ctypes.Structure):
@@ -317,15 +298,14 @@ class PublicKey:
         self,
         sig: bytes,
         digest: bytes,
-        hashoid: Union[bytes, HashOID],
+        hashoid: Union[bytes, str],
         context: bytes = b"",
     ) -> bool:
         """Verify a signature over the digest of a message.
 
         Pass this function the digest of the message, not the message itself.
 
-        The `hashoid` parameter is a DER-encoded OID that identifies the hash algorithm used.
-        As a convenience, fips204.HashOID contains a list of DER-encoded OIDs of common digest algorithms.
+        `hashoid` is a DER-encoded OID, or a name in `HASH_OIDS`.
         """
         if not isinstance(sig, bytes):
             raise TypeError(
@@ -339,11 +319,11 @@ class PublicKey:
             raise TypeError(
                 f"{self}.hash_verify wants a context of type bytes, got {type(context)}"
             )
-        if isinstance(hashoid, HashOID):
-            hashoid = hashoid.value
+        if isinstance(hashoid, str):
+            hashoid = HASH_OIDS[hashoid]
         if not isinstance(hashoid, bytes):
             raise TypeError(
-                f"{self}.hash_verify wants a hashoid of type bytes or HashOID, got {type(hashoid)}"
+                f"{self}.hash_verify wants a hashoid of type bytes or str, got {type(hashoid)}"
             )
         sig_param = self._ffi["Signature"]()
         if len(sig) != len(sig_param.data):
@@ -469,14 +449,13 @@ class PrivateKey:
     def hash_sign(
         self,
         digest: bytes,
-        hashoid: Union[bytes, HashOID],
+        hashoid: Union[bytes, str],
         context: bytes = b"",
         hedged: Union[bool, Seed, bytes] = True,
     ) -> bytes:
         """Sign a message hash `digest` in the given `context`, producing a bytes representation of a signature.
 
-        The `hashoid` parameter is a DER-encoded OID that identifies the hash algorithm used.
-        As a convenience, fips204.HashOID contains a list of DER-encoded OIDs of common digest algorithms.
+        `hashoid` is a DER-encoded OID, or a name in `HASH_OIDS`.
 
         For normal hedged signatures, leave `hedged` set to `True` (the default).
         For deterministic signatures, pass `hedged=False`.
@@ -490,11 +469,11 @@ class PrivateKey:
             raise TypeError(
                 f"{self}.hash_sign wants a context of type bytes, got {type(context)}"
             )
-        if isinstance(hashoid, HashOID):
-            hashoid = hashoid.value
+        if isinstance(hashoid, str):
+            hashoid = HASH_OIDS[hashoid]
         if not isinstance(hashoid, bytes):
             raise TypeError(
-                f"{self}.hash_sign wants a hashoid of type bytes or HashOID, got {type(hashoid)}"
+                f"{self}.hash_sign wants a hashoid of type bytes or str, got {type(hashoid)}"
             )
         sig = self._ffi["Signature"]()
         seed: _Seed

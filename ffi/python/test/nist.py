@@ -159,7 +159,7 @@ class SigGenTest(SigTest):
         else:
             sig = priv.hash_sign(
                 digest_message(self.hashAlg, self.message),
-                fips204.HashOID[self.hashAlg],
+                self.hashAlg,
                 context=self.context,
                 hedged=False if self.rnd is None else self.rnd,
             )
@@ -185,7 +185,7 @@ class SigVerTest(SigTest):
             verif = pub.hash_verify(
                 self.signature,
                 digest_message(self.hashAlg, self.message),
-                fips204.HashOID[self.hashAlg],
+                self.hashAlg,
                 context=self.context,
             )
         if verif != self.testpassed:
