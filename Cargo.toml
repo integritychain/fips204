@@ -46,6 +46,7 @@ serde_json = {version = "1.0.127", features = []}
 [[bench]]
 name = "benchmark"
 harness = false
+required-features = ["ml-dsa-44", "ml-dsa-65", "ml-dsa-87", "default-rng"]
 
 
 [profile.dev]

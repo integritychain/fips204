@@ -694,6 +694,7 @@ pub mod ml_dsa_44 {
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
 /// [`ml_dsa_65::PublicKey`] struct to verify the message with the `Signature` byte array.
+#[cfg(feature = "ml-dsa-65")]
 pub mod ml_dsa_65 {
     const TAU: i32 = 49;
     const LAMBDA: usize = 192;
@@ -733,6 +734,7 @@ pub mod ml_dsa_65 {
 ///
 /// **3)** Finally, the remote party uses the [`traits::Verifier::verify()`] function implemented on the
 /// [`ml_dsa_87::PublicKey`] struct to verify the message with the `Signature` byte array.
+#[cfg(feature = "ml-dsa-87")]
 pub mod ml_dsa_87 {
     const TAU: i32 = 60;
     const LAMBDA: usize = 256;

@@ -63,7 +63,7 @@ endif
 
 
 BASELINES=$(foreach sz, $(SIZES), baseline-$(sz))
-CHECKS=$(foreach sz, $(SIZES), run-baseline-$(sz)) run-nist-tests
+CHECKS=$(foreach sz, $(SIZES), run-baseline-$(sz)) run-nist-tests run-link-two run-cplusplus
 
 check: status $(CHECKS)
 
@@ -83,7 +83,15 @@ nist-tests.c:  nist-tests-template.c generate-nist.py
 nist-tests: nist-tests.c ../fips204.h
 	$(CC) -o $@ -g  -Werror -Wall -pedantic $< -Wall $(COMPILE_FLAGS) -lfips204
 
+# Two translation units that both include fips204.h must link.
+link-two: two_a.c two_b.c ../fips204.h
+	$(CC) -o $@ -g -Werror -Wall -pedantic two_a.c two_b.c $(COMPILE_FLAGS) -lfips204
+
+# fips204.h must also compile and link as C++ (C++11 is the oldest supported).
+cplusplus: cplusplus.cc ../fips204.h
+	$(CXX) -o $@ -g -std=c++11 -Werror -Wall -Wextra -pedantic $< $(COMPILE_FLAGS) -lfips204
+
 clean:
-	rm -f $(BASELINES) $(ADDITIONAL_RUN_DEPENDS) nist-tests.c nist-tests
+	rm -f $(BASELINES) $(ADDITIONAL_RUN_DEPENDS) nist-tests.c nist-tests link-two cplusplus
 
 .PHONY: clean check all

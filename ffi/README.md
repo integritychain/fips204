@@ -45,7 +45,8 @@ $ (cd tests && make)
 ~~~
 
 The C smoke tests under `tests/` exercise keygen, hedged and deterministic signing, verification,
-and `get_public_key` for ML-DSA-44/65/87 against the locally built `libfips204`.
+and `get_public_key` for ML-DSA-44/65/87 against the locally built `libfips204`. They also link two
+translation units that both include `fips204.h`, and build and run a C++ caller.
 
 If the library and headers are already installed system-wide, you can instead run:
 

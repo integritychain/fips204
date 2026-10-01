@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Temporary `_internal_sign` and `_internal_verify`.
 
+### Fixed
+- The `ml-dsa-65` and `ml-dsa-87` features now gate their modules. Before, `ml_dsa_65` and `ml_dsa_87` were always compiled. A build that uses either module must enable its feature.
+- `ffi/fips204.h` compiles as C++ (C++11 and later). The header has an `extern "C"` block for C++ callers, but parameters named `private` and `public` are C++ keywords, so every C++ build failed. They are now `private_key` and `public_key`, as in `fips205.h`. The inline `*_deterministic` wrappers zero their seed with `{ { 0 } }`. The designated initializer they used before is C++20 only, and a `-pedantic -Werror` build rejected it. Parameter names are not part of the C ABI, so C callers and the shared library are unchanged.
+- In the Rust FFI, `ml_dsa_*_get_public_key` borrows the private key as `&`, matching the `const` pointer in `fips204.h`. It never writes the key. The old `&mut` claimed exclusive write access that a caller passing a `const` key does not grant.
+- The seed parameter of `ml_dsa_*_keygen_from_seed` in `fips204.h` is `seed`, not `d_z`. `d_z` named the ML-KEM seed (`d || z`), but ML-DSA key generation takes a single 32-byte seed, ξ.
+
 ## 0.4.6 (2024-12-21)
 
 - Added support deterministic signatures via `_seed`

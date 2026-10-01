@@ -11,4 +11,6 @@
 ffi/tests/nist-tests.c
 ffi/tests/nist-tests
 ffi/tests/baseline-*
+ffi/tests/link-two
+ffi/tests/cplusplus
 **/__pycache__/

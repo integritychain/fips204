@@ -87,7 +87,7 @@ macro_rules! parameter_set {
             }
 
             pub fn get_public_key(
-                private: Option<&mut c_private_key>,
+                private: Option<&c_private_key>,
                 public_out: Option<&mut c_public_key>,
             ) -> u8 {
                 use fips204::traits::{Signer, SerDes};
@@ -255,7 +255,7 @@ macro_rules! parameter_set {
 
         #[no_mangle]
         pub extern "C" fn [<$pc _get_public_key>] (
-            private: Option<&mut $pc::c_private_key>,
+            private: Option<&$pc::c_private_key>,
             public_out: Option<&mut $pc::c_public_key>,
         ) -> u8 {
             $pc::get_public_key(private, public_out)
