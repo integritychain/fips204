@@ -1,11 +1,10 @@
 An example constant-time workbench. It can be sensitive to config/defaults, so is
 not entirely definitive. A work in progress.
 
-Uses a vendored [dudect-bencher](vendor/dudect-bencher/) 0.6 patched for **`rand` 0.9**
-so the dependency tree shares a single `rand_core` with `fips204`.
+Depends on crates.io `dudect-bencher` 0.6 and `rand_core` 0.6.4, the same RNG
+line as `fips204`.
 
-See <https://docs.rs/dudect-bencher/0.6.0/dudect_bencher/> (upstream docs; this tree
-does not use crates.io 0.6’s `rand` 0.8 line).
+See <https://docs.rs/dudect-bencher/0.6.0/dudect_bencher/>
 
 > t-values greater than 5 are generally considered a good indication that the function is not constant time. t-values less than 5 does not necessarily imply that the function is constant-time, since there may be other input distributions under which the function behaves significantly differently.
 
