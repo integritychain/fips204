@@ -43,18 +43,22 @@ $(SO_LOCATION)libfips204.so.0: $(SO_LOCATION)$(LINK_LIB)
 endif
 endif
 
-# C HashML-DSA tests need libmd *and* <sha3.h>. Ubuntu 24.04 libmd-dev
-# does not ship sha3.h; enabling HAVE_LIBMD from libmd alone would fail
-# to compile nist-tests.c. HashML-DSA is covered by ffi/python/test/nist.py.
+# C HashML-DSA tests need libmd. But Ubuntu 24.04 libmd-dev does not ship sha3.h,
+# and libmd < 1.3.0 didn't have SHA2-512/224 either.
+# HashML-DSA is covered for more digest algorithms by ffi/python/test/nist.py.
 LIBMD_CFLAGS := $(shell pkgconf --cflags libmd 2>/dev/null || true)
 LIBMD_LIBS := $(shell pkgconf --libs libmd 2>/dev/null || true)
 HAS_LIBMD = No
-# -include avoids a '#' in this Makefile (which would start a comment).
-HAS_SHA3_H := $(shell $(CC) $(LIBMD_CFLAGS) -E -include sha3.h -x c /dev/null -o /dev/null 2>/dev/null && echo yes)
-ifeq ($(HAS_SHA3_H),yes)
+ifneq ($(LIBMD_LIBS),)
   COMPILE_FLAGS += $(LIBMD_CFLAGS) $(LIBMD_LIBS) -DHAVE_LIBMD
   FRAMES += hash_sign hash_verify
   HAS_LIBMD = Yes
+  # -include avoids a '#' in this Makefile (which would start a comment).
+  HAS_SHA3_H := $(shell $(CC) $(LIBMD_CFLAGS) -E -include sha3.h -x c /dev/null -o /dev/null 2>/dev/null && echo yes)
+ifeq ($(HAS_SHA3_H),yes)
+  COMPILE_FLAGS += -DHAVE_SHA3
+  HAS_LIBMD += +SHA3
+endif
 endif
 
 

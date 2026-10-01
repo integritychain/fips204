@@ -82,8 +82,6 @@ results keygen() {
 
 class hasher:
     def __init__(self, tid: int, algo: str) -> None:
-        if algo in ["SHA2-512/224"]:
-            raise NISTTestException(f"{algo} not supported")
         self.tid = tid
         self.algo = algo
         algo = algo.replace("/", "_")
@@ -91,14 +89,19 @@ class hasher:
         self.prefix = algo.replace("SHA2-", "SHA").replace("-", "_")
         self.hashoid = "ML_DSA_" + algo.replace("-", "_")
         self.hashlen = self.prefix + "_DIGEST_LENGTH"
+        self._ifdef = "HAVE_LIBMD"
+        if algo == "SHA2-512_224":
+            self._ifdef = "SHA512_224_DIGEST_LENGTH"
         if algo.startswith("SHA2"):
             self.ctx = "SHA2_CTX"
         elif algo.startswith("SHAKE"):
             self.ctx = algo.replace("-", "") + "_CTX"
             self.hashlen = int(algo.split("-")[1]) // 4
             self.prefix = algo.replace("-", "") + "_"
+            self._ifdef = "HAVE_SHA3"
         elif algo.startswith("SHA3"):
             self.prefix += "_"
+            self._ifdef = "HAVE_SHA3"
 
     def prep(self) -> str:
         out = f"""
@@ -116,6 +119,14 @@ class hasher:
     @property
     def oid(self) -> str:
         return self.hashoid
+
+    @property
+    def ifdef(self) -> str:
+        return f"#ifdef {self._ifdef}"
+
+    @property
+    def endif(self) -> str:
+        return f"#endif // {self._ifdef}"
 
 
 def sigver(f: str) -> str:
@@ -145,15 +156,14 @@ results sigver() {
   {ctx}
 """
                 if tg["preHash"] == "preHash":
-                    try:
-                        h = hasher(tid, t["hashAlg"])
-                        out += (
-                            """
-#ifdef HAVE_LIBMD
+                    h = hasher(tid, t["hashAlg"])
+                    out += (
+                        f"""
+{h.ifdef}
   ret.tests++;
 """
-                            + start
-                            + f"""
+                        + start
+                        + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
@@ -162,16 +172,11 @@ results sigver() {
       {str(t['testPassed']).lower()}))
      ret.failed++;
 #else
-  /* Skipping test {tid}: no libmd available */
+  /* Skipping test {tid}: hash algorithm unavailable */
   ret.skipped ++;
-#endif
+{h.endif}
 """
-                        )
-                    except NISTTestException as e:
-                        out += f"""
-  /* Skipping test {tid}: {e} */
-  ret.skipped ++;
-"""
+                    )
                 else:
                     out += (
                         """
@@ -227,15 +232,14 @@ results siggen() {
   {struct(rnd, "seed", ps, tid)}
 """
                 if tg["preHash"] == "preHash":
-                    try:
-                        h = hasher(tid, t["hashAlg"])
-                        out += (
-                            """
-#ifdef HAVE_LIBMD
+                    h = hasher(tid, t["hashAlg"])
+                    out += (
+                        f"""
+{h.ifdef}
   ret.tests++;
 """
-                            + start
-                            + f"""
+                        + start
+                        + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
@@ -244,16 +248,11 @@ results siggen() {
       &seed_{tid}))
      ret.failed++;
 #else
-  /* Skipping test {tid}: no libmd available */
+  /* Skipping test {tid}: hash algorithm unavailable */
   ret.skipped ++;
-#endif
+{h.endif}
 """
-                        )
-                    except Exception as e:
-                        out += f"""
-  /* Skipping test {tid}: {e} */
-  ret.skipped ++;
-"""
+                    )
                 else:
                     out += (
                         """
@@ -289,7 +288,9 @@ def prefix() -> str:
 
 #ifdef HAVE_LIBMD
 #include <sha2.h>
+#ifdef HAVE_SHA3
 #include <sha3.h>
+#endif
 #endif
 
 typedef struct {
