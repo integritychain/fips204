@@ -126,7 +126,7 @@ class hasher:
 
     @property
     def endif(self) -> str:
-        return f"#endif // {self._ifdef}"
+        return f"#endif /* {self._ifdef} */"
 
 
 def sigver(f: str) -> str:
