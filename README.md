@@ -12,7 +12,7 @@ constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared 
 
 This crate implements [the FIPS 204 **released** standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf) in
 pure Rust with minimal and mainstream dependencies, and without any unsafe code. All three security parameter sets are
-fully functional and tested. The implementation's key- and signature-generation functionality operates in constant-time,
+fully functional and tested. The implementation's key- and signature-generation functionality
 does not require the standard library, e.g. `#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes
 the `RNG` so it is suitable for the full range of applications down to the bare-metal. The API is stabilized and the
 code is heavily biased towards safety and correctness; further performance optimizations may be implemented over time.
@@ -79,14 +79,14 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   from `rand_core` 0.6 (`CryptoRng` + `RngCore`). This crate re-exports `CryptoRng`,
   `RngCore`, and `RngError`. Signing and key generation call `try_fill_bytes`, so
   handle that error or use the seed-based APIs.
-* Constant-time assurances target the source-code level only, with manual confirmation via
-  review/inspection, the embedded target, and the `dudect` dynamic/statistical measurements.
+* Constant-time assurances are from source-level review, the embedded target, and the
+  `dudect` measurements. Rejection sampling may repeat, so the number of attempts is not
+  constant. Within one attempt, key generation and signing avoid branches on secret data.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
 * Requires Rust **1.85** or higher (aligned with Debian stable / trixie). The minimum
   supported Rust version may be changed in the future, but it will be done with a minor
   version bump once the major version is larger than 0.
 * All on-by-default features of this library are covered by `SemVer`.
-* Until it matures further, the FIPS 204 standard and this software should be considered experimental.
 
 ## License
 
