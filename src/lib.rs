@@ -547,7 +547,8 @@ macro_rules! functionality {
                 let message1 = [0u8, 1, 2, 3, 4, 5, 6, 7];
                 let message2 = [7u8, 7, 7, 7, 7, 7, 7, 7];
 
-                for _i in 0..32 {
+                // A few iterations. The ACVP vectors cover these paths at length.
+                for _i in 0..4 {
                     let (pk, sk) = try_keygen_with_rng(&mut rng).unwrap();
                     let sig = sk.try_sign_with_rng(&mut rng, &message1, &[]).unwrap();
                     assert!(pk.verify(&message1, &sig, &[]));

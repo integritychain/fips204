@@ -382,6 +382,9 @@ pub trait SerDes {
 
     /// Produces a byte array of fixed-size specific to the struct being serialized.
     ///
+    /// Encoding undoes the cached transform. Encode a key once when the bytes are
+    /// needed, and verify from the `PublicKey` rather than serializing it on each verify.
+    ///
     /// # Examples
     /// ```rust
     /// # use std::error::Error;
