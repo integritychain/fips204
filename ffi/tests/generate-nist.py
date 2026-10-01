@@ -8,6 +8,7 @@ import json
 class NISTTestException(Exception):
     pass
 
+
 def convert_bytes(h: str, nybblesperline: int = 16, indent: int = 4) -> str:
     """convert a hex string into a C representation of an array"""
     out = ""
@@ -78,14 +79,15 @@ results keygen() {
 }
 """
 
+
 class hasher:
     def __init__(self, tid: int, algo: str) -> None:
-        if algo in ['SHA2-512/224']:
+        if algo in ["SHA2-512/224"]:
             raise NISTTestException(f"{algo} not supported")
         self.tid = tid
         self.algo = algo
-        algo = algo.replace('/', '_')
-        self.ctx = algo.replace('-', '_') + "_CTX"
+        algo = algo.replace("/", "_")
+        self.ctx = algo.replace("-", "_") + "_CTX"
         self.prefix = algo.replace("SHA2-", "SHA").replace("-", "_")
         self.hashoid = "ML_DSA_" + algo.replace("-", "_")
         self.hashlen = self.prefix + "_DIGEST_LENGTH"
@@ -93,10 +95,11 @@ class hasher:
             self.ctx = "SHA2_CTX"
         elif algo.startswith("SHAKE"):
             self.ctx = algo.replace("-", "") + "_CTX"
-            self.hashlen = int(algo.split('-')[1])//4
-            self.prefix = algo.replace("-","") + "_"
+            self.hashlen = int(algo.split("-")[1]) // 4
+            self.prefix = algo.replace("-", "") + "_"
         elif algo.startswith("SHA3"):
             self.prefix += "_"
+
     def prep(self) -> str:
         out = f"""
   uint8_t hash_{self.tid}[{self.hashlen}];
@@ -109,6 +112,7 @@ class hasher:
         else:
             out += f"  {self.prefix}Final(hash_{self.tid}, &hashctx_{self.tid});\n"
         return out
+
     @property
     def oid(self) -> str:
         return self.hashoid
@@ -143,10 +147,13 @@ results sigver() {
                 if tg["preHash"] == "preHash":
                     try:
                         h = hasher(tid, t["hashAlg"])
-                        out += """
+                        out += (
+                            """
 #ifdef HAVE_LIBMD
   ret.tests++;
-""" + start + f"""
+"""
+                            + start
+                            + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
@@ -159,21 +166,26 @@ results sigver() {
   ret.skipped ++;
 #endif
 """
+                        )
                     except NISTTestException as e:
                         out += f"""
   /* Skipping test {tid}: {e} */
   ret.skipped ++;
 """
                 else:
-                    out += """
+                    out += (
+                        """
   ret.tests++;
-""" + start + f"""
+"""
+                        + start
+                        + f"""
   if (ml_dsa_{ps}_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen},
       {str(t['testPassed']).lower()}))
      ret.failed++;
 """
+                    )
 
     return out + f"""
   if (ret.failed) {{
@@ -206,7 +218,7 @@ results siggen() {
             else:
                 msg, msglen = buf(t["message"], "message", tid)
                 ctx, ctxlen = buf(t["context"], "ctx", tid)
-                rnd = t.get("rnd", "0"*64)
+                rnd = t.get("rnd", "0" * 64)
                 start = f"""
   {struct(t["sk"], "private_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
@@ -217,10 +229,13 @@ results siggen() {
                 if tg["preHash"] == "preHash":
                     try:
                         h = hasher(tid, t["hashAlg"])
-                        out += """
+                        out += (
+                            """
 #ifdef HAVE_LIBMD
   ret.tests++;
-""" + start + f"""
+"""
+                            + start
+                            + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
@@ -233,21 +248,26 @@ results siggen() {
   ret.skipped ++;
 #endif
 """
+                        )
                     except Exception as e:
                         out += f"""
   /* Skipping test {tid}: {e} */
   ret.skipped ++;
 """
                 else:
-                    out += """
+                    out += (
+                        """
   ret.tests ++;
-""" + start + f"""
+"""
+                        + start
+                        + f"""
   if (ml_dsa_{ps}_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen},
       &seed_{tid}))
      ret.failed++;
 """
+                    )
 
     return out + f"""
   if (ret.failed) {{
