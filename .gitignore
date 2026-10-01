@@ -8,3 +8,7 @@
 **/pkg
 **/Cargo.lock
 **/package-lock.json
+ffi/tests/nist-tests.c
+ffi/tests/nist-tests
+ffi/tests/baseline-*
+**/__pycache__/

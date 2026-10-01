@@ -3,7 +3,7 @@
 
 From the ffi/python/ directory, do:
 
-PYTHONPATH=. test/nist/keygen.py
+FIPS204_PYTHON_TESTING_LIBRARY=../../target/debug/libfips204.so PYTHONPATH=. python3 test/nist.py
 
 """
 

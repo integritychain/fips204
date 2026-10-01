@@ -60,14 +60,14 @@ A deserialization example, followed by use:
 ```
 import fips204
 
-with open('priv.bin', 'b') as f:
+with open('priv.bin', 'rb') as f:
     privdata = f.read()
 
 context = b'abc'
-priv = fips204.PrivateKey(pubdata)
+priv = fips204.PrivateKey(privdata)
 with open('msg', 'rb') as m:
     with open ('msg.sig', 'wb') as s:
-        s.write(priv.sign(m.read(), context)
+        s.write(priv.sign(m.read(), context))
 ```
 
 The expected sizes (in bytes) of the different objects in each
@@ -85,7 +85,8 @@ print(f"ML-DSA-65 Signature size (in bytes) is {ML_DSA_65.SIG_SIZE}")
 This is a wrapper around libfips204, built from the Rust fips204-ffi crate.
 
 If that library is not installed in the expected path for libraries on
-your system, any attempt to use this module will fail.
+your system, importing this module will fail.  For in-tree tests, set
+`FIPS204_PYTHON_TESTING_LIBRARY` to the built `libfips204.so`.
 
 This module should have reasonable type annotations and docstrings for
 the public interface.  If you discover a problem with type

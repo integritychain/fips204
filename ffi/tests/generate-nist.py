@@ -4,7 +4,6 @@
 
 import json
 
-from typing import Tuple
 
 class NISTTestException(Exception):
     pass
@@ -33,7 +32,7 @@ def struct(h: str, typ: str, ps: int, x: int) -> str:
     return f"const {cls} {typ}_{x} = " + "{ .data = {\n" + convert_bytes(h) + "  } };\n"
 
 
-def buf(h: str, name: str, x: int) -> Tuple[str, str]:
+def buf(h: str, name: str, x: int) -> tuple[str, str]:
     """returns a buffer and sizeof the buffer, with a special case for empty buffer"""
     if len(h):
         return (
@@ -51,7 +50,7 @@ results keygen() {
   results ret = { 0,0,0 };
     """
     if d["mode"] != "keyGen":
-        raise NISTTestException(f"expected keyGen data, got {d["mode"]}")
+        raise NISTTestException(f"expected keyGen data, got {d['mode']}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
 
@@ -122,22 +121,19 @@ results sigver() {
    results ret = { 0,0,0 };
     """
     if d["mode"] != "sigVer":
-        raise NISTTestException(f"expected sigVer data, got {d["mode"]}")
+        raise NISTTestException(f"expected sigVer data, got {d['mode']}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
             tid = int(t["tcId"])
             if tg["signatureInterface"] != "external":
                 out += f"""
-  /* Skipping {tg["signatureInterface"]} interface test {tid} */
+  /* Skipping {tg['signatureInterface']} interface test {tid} */
   ret.skipped++;
 """
             else:
                 msg, msglen = buf(t["message"], "message", tid)
                 ctx, ctxlen = buf(t["context"], "ctx", tid)
-                out += """
-  ret.tests++;
-"""
                 start = f"""
   {struct(t["pk"], "public_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
@@ -149,13 +145,14 @@ results sigver() {
                         h = hasher(tid, t["hashAlg"])
                         out += """
 #ifdef HAVE_LIBMD
+  ret.tests++;
 """ + start + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       hash_{tid}, sizeof(hash_{tid}),
       ctx_{tid}, {ctxlen},
       {h.oid}, sizeof({h.oid}),
-      {str(t["testPassed"]).lower()}))
+      {str(t['testPassed']).lower()}))
      ret.failed++;
 #else
   /* Skipping test {tid}: no libmd available */
@@ -168,11 +165,13 @@ results sigver() {
   ret.skipped ++;
 """
                 else:
-                    out += start + f"""
+                    out += """
+  ret.tests++;
+""" + start + f"""
   if (ml_dsa_{ps}_sigver_test ({tid}, &public_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen},
-      {str(t["testPassed"]).lower()}))
+      {str(t['testPassed']).lower()}))
      ret.failed++;
 """
 
@@ -194,23 +193,20 @@ results siggen() {
   results ret = { 0,0,0 };
     """
     if d["mode"] != "sigGen":
-        raise NISTTestException(f"expected sigGen data, got {d["mode"]}")
+        raise NISTTestException(f"expected sigGen data, got {d['mode']}")
     for tg in d["testGroups"]:
         ps = int(tg["parameterSet"][-2:])
         for t in tg["tests"]:
             tid = int(t["tcId"])
             if tg["signatureInterface"] != "external":
                 out += f"""
-  /* Skipping {tg["signatureInterface"]} interface test {tid} */
+  /* Skipping {tg['signatureInterface']} interface test {tid} */
   ret.skipped++;
 """
             else:
                 msg, msglen = buf(t["message"], "message", tid)
                 ctx, ctxlen = buf(t["context"], "ctx", tid)
                 rnd = t.get("rnd", "0"*64)
-                out += """
-  ret.tests ++;
-"""
                 start = f"""
   {struct(t["sk"], "private_key", ps, tid)}
   {struct(t["signature"], "signature", ps, tid)}
@@ -223,6 +219,7 @@ results siggen() {
                         h = hasher(tid, t["hashAlg"])
                         out += """
 #ifdef HAVE_LIBMD
+  ret.tests++;
 """ + start + f"""
   {h.prep()}
   if (ml_dsa_{ps}_hash_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
@@ -242,7 +239,9 @@ results siggen() {
   ret.skipped ++;
 """
                 else:
-                    out += start + f"""
+                    out += """
+  ret.tests ++;
+""" + start + f"""
   if (ml_dsa_{ps}_siggen_test ({tid}, &private_key_{tid}, &signature_{tid},
       message_{tid}, {msglen},
       ctx_{tid}, {ctxlen},

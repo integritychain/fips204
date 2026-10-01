@@ -26,10 +26,9 @@ non-goals are:
 # Outstanding work
 
 - better internal error handling
-- more testing
-- reduce symbol visibility in shared object
-- export hash_sign and hash_verify
-- Python bindings (planned; not in-tree yet)
+- HashML-DSA coverage in the C NIST harness requires libmd with `<sha3.h>`
+  (not present on Ubuntu 24.04). Use `ffi/python/test/nist.py` for HashML-DSA
+  on that platform.
 
 
 # Paths considered but discarded

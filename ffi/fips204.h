@@ -17,14 +17,14 @@
 
 typedef uint8_t ml_dsa_err;
 
-const ml_dsa_err ML_DSA_OK = 0;
-const ml_dsa_err ML_DSA_NULL_PTR_ERROR = 1;
-const ml_dsa_err ML_DSA_SERIALIZATION_ERROR = 2;
-const ml_dsa_err ML_DSA_DESERIALIZATION_ERROR = 3;
-const ml_dsa_err ML_DSA_KEYGEN_ERROR = 4;
-const ml_dsa_err ML_DSA_SIGN_ERROR = 5;
-const ml_dsa_err ML_DSA_VERIFICATION_ERROR = 6;
-const ml_dsa_err ML_DSA_VERIFICATION_FAILURE = 7;
+static const ml_dsa_err ML_DSA_OK = 0;
+static const ml_dsa_err ML_DSA_NULL_PTR_ERROR = 1;
+static const ml_dsa_err ML_DSA_SERIALIZATION_ERROR = 2;
+static const ml_dsa_err ML_DSA_DESERIALIZATION_ERROR = 3;
+static const ml_dsa_err ML_DSA_KEYGEN_ERROR = 4;
+static const ml_dsa_err ML_DSA_SIGN_ERROR = 5;
+static const ml_dsa_err ML_DSA_VERIFICATION_ERROR = 6;
+static const ml_dsa_err ML_DSA_VERIFICATION_FAILURE = 7;
 
 
 typedef struct ml_dsa_seed {
@@ -33,18 +33,18 @@ typedef struct ml_dsa_seed {
 
 
 /* DER-encoded OIDs for convenience for hash_sign and hash_verify */
-const uint8_t ML_DSA_SHA2_224[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04 };
-const uint8_t ML_DSA_SHA2_256[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01 };
-const uint8_t ML_DSA_SHA2_384[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02 };
-const uint8_t ML_DSA_SHA2_512[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03 };
-const uint8_t ML_DSA_SHA2_512_224[] = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05 };
-const uint8_t ML_DSA_SHA2_512_256[] = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06 };
-const uint8_t ML_DSA_SHA3_224[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07 };
-const uint8_t ML_DSA_SHA3_256[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08 };
-const uint8_t ML_DSA_SHA3_384[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x09 };
-const uint8_t ML_DSA_SHA3_512[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0a };
-const uint8_t ML_DSA_SHAKE_128[]    = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0b };
-const uint8_t ML_DSA_SHAKE_256[]    = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0c };
+static const uint8_t ML_DSA_SHA2_224[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04 };
+static const uint8_t ML_DSA_SHA2_256[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01 };
+static const uint8_t ML_DSA_SHA2_384[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02 };
+static const uint8_t ML_DSA_SHA2_512[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03 };
+static const uint8_t ML_DSA_SHA2_512_224[] = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05 };
+static const uint8_t ML_DSA_SHA2_512_256[] = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06 };
+static const uint8_t ML_DSA_SHA3_224[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07 };
+static const uint8_t ML_DSA_SHA3_256[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08 };
+static const uint8_t ML_DSA_SHA3_384[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x09 };
+static const uint8_t ML_DSA_SHA3_512[]     = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0a };
+static const uint8_t ML_DSA_SHAKE_128[]    = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0b };
+static const uint8_t ML_DSA_SHAKE_256[]    = { 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0c };
 
 
 typedef struct ml_dsa_44_private_key {
@@ -89,7 +89,7 @@ ml_dsa_err ml_dsa_44_keygen_from_seed(const ml_dsa_seed *d_z,
                                       ml_dsa_44_public_key *public_out,
                                       ml_dsa_44_private_key *private_out);
 
-ml_dsa_err ml_dsa_44_keygen(ml_dsa_44_public_key *public_out,
+static inline ml_dsa_err ml_dsa_44_keygen(ml_dsa_44_public_key *public_out,
                             ml_dsa_44_private_key *private_out) {
   return ml_dsa_44_keygen_from_seed(NULL,
                                     public_out,
@@ -108,7 +108,7 @@ ml_dsa_err ml_dsa_44_sign_with_seed(const ml_dsa_44_private_key *private,
                                     const ml_dsa_seed *seed,
                                     ml_dsa_44_signature *signature_out);
 
-ml_dsa_err ml_dsa_44_sign_deterministic(const ml_dsa_44_private_key *private,
+static inline ml_dsa_err ml_dsa_44_sign_deterministic(const ml_dsa_44_private_key *private,
                                         const uint8_t *message,
                                         size_t message_size,
                                         const uint8_t *context,
@@ -120,7 +120,7 @@ ml_dsa_err ml_dsa_44_sign_deterministic(const ml_dsa_44_private_key *private,
                                   context, context_size,
                                   &seed, signature_out);
 }
-ml_dsa_err ml_dsa_44_sign(const ml_dsa_44_private_key *private,
+static inline ml_dsa_err ml_dsa_44_sign(const ml_dsa_44_private_key *private,
                                  const uint8_t *message,
                                  size_t message_size,
                                  const uint8_t *context,
@@ -151,7 +151,7 @@ ml_dsa_err ml_dsa_44_hash_sign_with_seed(const ml_dsa_44_private_key *private,
                                          const ml_dsa_seed *seed,
                                          ml_dsa_44_signature *signature_out);
 
-ml_dsa_err ml_dsa_44_hash_sign_deterministic(const ml_dsa_44_private_key *private,
+static inline ml_dsa_err ml_dsa_44_hash_sign_deterministic(const ml_dsa_44_private_key *private,
                                              const uint8_t *hash,
                                              size_t hash_size,
                                              const uint8_t *context,
@@ -166,7 +166,7 @@ ml_dsa_err ml_dsa_44_hash_sign_deterministic(const ml_dsa_44_private_key *privat
                                        hash_oid, hash_oid_size,
                                        &seed, signature_out);
 }
-ml_dsa_err ml_dsa_44_hash_sign(const ml_dsa_44_private_key *private,
+static inline ml_dsa_err ml_dsa_44_hash_sign(const ml_dsa_44_private_key *private,
                                       const uint8_t *hash,
                                       size_t hash_size,
                                       const uint8_t *context,
@@ -196,7 +196,7 @@ ml_dsa_err ml_dsa_65_keygen_from_seed(const ml_dsa_seed *d_z,
                                       ml_dsa_65_public_key *public_out,
                                       ml_dsa_65_private_key *private_out);
 
-ml_dsa_err ml_dsa_65_keygen(ml_dsa_65_public_key *public_out,
+static inline ml_dsa_err ml_dsa_65_keygen(ml_dsa_65_public_key *public_out,
                             ml_dsa_65_private_key *private_out) {
   return ml_dsa_65_keygen_from_seed(NULL,
                                     public_out,
@@ -213,7 +213,7 @@ ml_dsa_err ml_dsa_65_sign_with_seed(const ml_dsa_65_private_key *private,
                                     const ml_dsa_seed *seed,
                                     ml_dsa_65_signature *signature_out);
 
-ml_dsa_err ml_dsa_65_sign_deterministic(const ml_dsa_65_private_key *private,
+static inline ml_dsa_err ml_dsa_65_sign_deterministic(const ml_dsa_65_private_key *private,
                                         const uint8_t *message,
                                         size_t message_size,
                                         const uint8_t *context,
@@ -226,7 +226,7 @@ ml_dsa_err ml_dsa_65_sign_deterministic(const ml_dsa_65_private_key *private,
                                   &seed, signature_out);
 }
 
-  ml_dsa_err ml_dsa_65_sign(const ml_dsa_65_private_key *private,
+static inline ml_dsa_err ml_dsa_65_sign(const ml_dsa_65_private_key *private,
                                  const uint8_t *message,
                                  size_t message_size,
                                  const uint8_t *context,
@@ -256,7 +256,7 @@ ml_dsa_err ml_dsa_65_hash_sign_with_seed(const ml_dsa_65_private_key *private,
                                          const ml_dsa_seed *seed,
                                          ml_dsa_65_signature *signature_out);
 
-ml_dsa_err ml_dsa_65_hash_sign_deterministic(const ml_dsa_65_private_key *private,
+static inline ml_dsa_err ml_dsa_65_hash_sign_deterministic(const ml_dsa_65_private_key *private,
                                              const uint8_t *hash,
                                              size_t hash_size,
                                              const uint8_t *context,
@@ -272,7 +272,7 @@ ml_dsa_err ml_dsa_65_hash_sign_deterministic(const ml_dsa_65_private_key *privat
                                        &seed, signature_out);
 }
 
-ml_dsa_err ml_dsa_65_hash_sign(const ml_dsa_65_private_key *private,
+static inline ml_dsa_err ml_dsa_65_hash_sign(const ml_dsa_65_private_key *private,
                                const uint8_t *hash,
                                size_t hash_size,
                                const uint8_t *context,
@@ -301,7 +301,7 @@ ml_dsa_err ml_dsa_87_keygen_from_seed(const ml_dsa_seed *d_z,
                                       ml_dsa_87_public_key *public_out,
                                       ml_dsa_87_private_key *private_out);
 
-ml_dsa_err ml_dsa_87_keygen(ml_dsa_87_public_key *public_out,
+static inline ml_dsa_err ml_dsa_87_keygen(ml_dsa_87_public_key *public_out,
                             ml_dsa_87_private_key *private_out) {
   return ml_dsa_87_keygen_from_seed(NULL,
                                     public_out,
@@ -319,7 +319,7 @@ ml_dsa_err ml_dsa_87_sign_with_seed(const ml_dsa_87_private_key *private,
                                     const ml_dsa_seed *seed,
                                     ml_dsa_87_signature *signature_out);
 
-ml_dsa_err ml_dsa_87_sign_deterministic(const ml_dsa_87_private_key *private,
+static inline ml_dsa_err ml_dsa_87_sign_deterministic(const ml_dsa_87_private_key *private,
                                         const uint8_t *message,
                                         size_t message_size,
                                         const uint8_t *context,
@@ -331,7 +331,7 @@ ml_dsa_err ml_dsa_87_sign_deterministic(const ml_dsa_87_private_key *private,
                                   context, context_size,
                                   &seed, signature_out);
 }
-ml_dsa_err ml_dsa_87_sign(const ml_dsa_87_private_key *private,
+static inline ml_dsa_err ml_dsa_87_sign(const ml_dsa_87_private_key *private,
                           const uint8_t *message,
                           size_t message_size,
                           const uint8_t *context,
@@ -361,7 +361,7 @@ ml_dsa_err ml_dsa_87_hash_sign_with_seed(const ml_dsa_87_private_key *private,
                                          const ml_dsa_seed *seed,
                                          ml_dsa_87_signature *signature_out);
 
-ml_dsa_err ml_dsa_87_hash_sign_deterministic(const ml_dsa_87_private_key *private,
+static inline ml_dsa_err ml_dsa_87_hash_sign_deterministic(const ml_dsa_87_private_key *private,
                                                     const uint8_t *hash,
                                                     size_t hash_size,
                                                     const uint8_t *context,
@@ -378,7 +378,7 @@ ml_dsa_err ml_dsa_87_hash_sign_deterministic(const ml_dsa_87_private_key *privat
 
 }
 
-ml_dsa_err ml_dsa_87_hash_sign(const ml_dsa_87_private_key *private,
+static inline ml_dsa_err ml_dsa_87_hash_sign(const ml_dsa_87_private_key *private,
                                       const uint8_t *hash,
                                       size_t hash_size,
                                       const uint8_t *context,

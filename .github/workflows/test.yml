@@ -162,3 +162,19 @@ jobs:
       - run: ${{ matrix.deps }}
       - run: cargo check --target ${{ matrix.target }} --all-features
       - run: cargo test --target ${{ matrix.target }}
+
+
+  ffi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build shared library and run C tests
+        run: |
+          cargo build -p fips204-ffi
+          make -C ffi/tests check
+      - name: Python NIST vectors
+        run: |
+          cd ffi/python
+          FIPS204_PYTHON_TESTING_LIBRARY=../../target/debug/libfips204.so \
+            PYTHONPATH=. python3 test/nist.py

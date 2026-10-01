@@ -43,7 +43,7 @@ A signature itself is already just a bytes object.
 A serialization example:
 
 ```
-from fips204 import ML_DSA_65, seed
+from fips204 import ML_DSA_65, Seed
 
 seed = Seed()
 (pub,priv) = ML_DSA_65.keygen(seed)
@@ -60,14 +60,14 @@ A deserialization example, followed by use:
 ```
 import fips204
 
-with open('priv.bin', 'b') as f:
+with open('priv.bin', 'rb') as f:
     privdata = f.read()
 
 context = b'abc'
-priv = fips204.PrivateKey(pubdata)
+priv = fips204.PrivateKey(privdata)
 with open('msg', 'rb') as m:
     with open ('msg.sig', 'wb') as s:
-        s.write(priv.sign(m.read(), context)
+        s.write(priv.sign(m.read(), context))
 ```
 
 The expected sizes (in bytes) of the different objects in each
@@ -85,7 +85,8 @@ print(f"ML-DSA-65 Signature size (in bytes) is {ML_DSA_65.SIG_SIZE}")
 This is a wrapper around libfips204, built from the Rust fips204-ffi crate.
 
 If that library is not installed in the expected path for libraries on
-your system, any attempt to use this module will fail.
+your system, importing this module will fail.  For in-tree tests, set
+`FIPS204_PYTHON_TESTING_LIBRARY` to the built `libfips204.so`.
 
 This module should have reasonable type annotations and docstrings for
 the public interface.  If you discover a problem with type
@@ -105,7 +106,7 @@ Please report issues at https://github.com/integritychain/fips204/issues
 from __future__ import annotations
 
 """__version__ should track package.version from  ../Cargo.toml"""
-__version__ = "0.4.6"
+__version__ = "0.5.0"
 __author__ = "Daniel Kahn Gillmor <dkg@fifthhorseman.net>"
 __all__ = [
     "ML_DSA_44",
@@ -151,20 +152,25 @@ class HashOID(Enum):
     SHAKE_256 = b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x0c"
 
 
+def _alias_hashoid(member: HashOID, name: str) -> None:
+    """Register HashOID[name]. Enum._add_alias_ exists only in Python 3.13+."""
+    HashOID._member_map_[name] = member
+
+
 # allow hyphens instead of underscores when looking up as a dict:
 for h in HashOID:
     rep = h.name.replace("_", "-")
     if rep != h.name:
-        h._add_alias_(rep)
+        _alias_hashoid(h, rep)
 # add common aliases for SHA2 variants:
-HashOID.SHA2_224._add_alias_("SHA224")
-HashOID.SHA2_256._add_alias_("SHA256")
-HashOID.SHA2_384._add_alias_("SHA384")
-HashOID.SHA2_512._add_alias_("SHA512")
-HashOID.SHA2_512_224._add_alias_("SHA512/224")
-HashOID.SHA2_512_256._add_alias_("SHA512/256")
-HashOID.SHA2_512_224._add_alias_("SHA2-512/224")
-HashOID.SHA2_512_256._add_alias_("SHA2-512/256")
+_alias_hashoid(HashOID.SHA2_224, "SHA224")
+_alias_hashoid(HashOID.SHA2_256, "SHA256")
+_alias_hashoid(HashOID.SHA2_384, "SHA384")
+_alias_hashoid(HashOID.SHA2_512, "SHA512")
+_alias_hashoid(HashOID.SHA2_512_224, "SHA512/224")
+_alias_hashoid(HashOID.SHA2_512_256, "SHA512/256")
+_alias_hashoid(HashOID.SHA2_512_224, "SHA2-512/224")
+_alias_hashoid(HashOID.SHA2_512_256, "SHA2-512/256")
 
 
 class _Seed(ctypes.Structure):
@@ -526,7 +532,14 @@ class _ML_DSA:
     if testlibpath is not None:
         lib = ctypes.CDLL(testlibpath)
     else:
-        lib = ctypes.CDLL(ctypes.util.find_library("fips204"))
+        libname = ctypes.util.find_library("fips204")
+        if libname is None:
+            raise OSError(
+                "libfips204 shared library not found. Install it, or set "
+                "FIPS204_PYTHON_TESTING_LIBRARY to the path of libfips204.so "
+                "for in-tree tests."
+            )
+        lib = ctypes.CDLL(libname)
 
     # use Any below because i don't know how to specify the type of the FuncPtr
     ffi: Dict[int, Dict[str, Any]] = {}
@@ -655,7 +668,7 @@ class ML_DSA(ABC):
 
     @classmethod
     def keygen(cls, seed: Optional[Seed] = None) -> Tuple[PublicKey, PrivateKey]:
-        """Generate a pair of Encapsulation and Decapsulation Keys.
+        """Generate a pair of public and private keys.
 
         If a Seed is supplied, do a deterministic generation from the seed.
         Otherwise, randomly generate the key."""
