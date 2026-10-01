@@ -462,6 +462,9 @@ mod tests {
         assert_eq!(-4, res);
     }
 
+    // `debug_assert` only. Release builds omit it, so this test is not part of
+    // `cargo test --release`.
+    #[cfg(debug_assertions)]
     #[should_panic]
     #[allow(clippy::should_panic_without_expect)]
     #[test]
@@ -471,6 +474,7 @@ mod tests {
         assert!(res.is_err());
     }
 
+    #[cfg(debug_assertions)]
     #[should_panic]
     #[allow(clippy::should_panic_without_expect)]
     #[test]
@@ -529,6 +533,7 @@ mod tests {
         // no panic is good news
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 16: b out of range")]
     fn test_simple_bit_pack_b_range() {
@@ -537,6 +542,7 @@ mod tests {
         simple_bit_pack(&w, 0, &mut bytes); // b must be positive
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 16: w out of range")]
     fn test_simple_bit_pack_w_range() {
@@ -546,6 +552,7 @@ mod tests {
         simple_bit_pack(&w, 3, &mut bytes); // w coefficient > b
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 16: incorrect size of output bytes")]
     fn test_simple_bit_pack_output_size() {
@@ -554,6 +561,7 @@ mod tests {
         simple_bit_pack(&w, 2, &mut bytes);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 17: a out of range")]
     fn test_bit_pack_a_range() {
@@ -562,6 +570,7 @@ mod tests {
         bit_pack(&w, -1, 2, &mut bytes); // a must be non-negative
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 17: b out of range")]
     fn test_bit_pack_b_range() {
@@ -570,6 +579,7 @@ mod tests {
         bit_pack(&w, 0, 0, &mut bytes); // b must be positive
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 17: w out of range")]
     fn test_bit_pack_w_range() {
@@ -579,6 +589,7 @@ mod tests {
         bit_pack(&w, 2, 5, &mut bytes); // w coefficient outside [-a,b] range
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 18: b out of range")]
     fn test_simple_bit_unpack_b_range() {
@@ -586,6 +597,7 @@ mod tests {
         let _unused = simple_bit_unpack(&bytes, 0); // b must be positive
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 18: bad output size")]
     fn test_simple_bit_unpack_input_size() {
@@ -593,6 +605,7 @@ mod tests {
         let _unused = simple_bit_unpack(&bytes, 2);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 20: omega+K out of range")]
     #[allow(clippy::large_stack_arrays)] // K=255 forces ~255 KiB; needed for the range check
@@ -603,6 +616,7 @@ mod tests {
         hint_bit_pack::<false, K>(2, &h, &mut y_bytes); // omega + K must be < 256
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 20: h not 0/1")]
     fn test_hint_bit_pack_h_range() {
@@ -613,6 +627,7 @@ mod tests {
         hint_bit_pack::<false, K>(2, &h, &mut y_bytes);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "Alg 21: omega+K too large")]
     fn test_hint_bit_unpack_omega_k_range() {

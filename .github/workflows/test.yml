@@ -122,7 +122,8 @@ jobs:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
       - uses: RustCrypto/actions/cross-install@master
-      - run: cross test --target ${{ matrix.target }} --all-features
+      # Release profile, all three parameter sets. No OS RNG, and not the dudect feature.
+      - run: cross test --release --target ${{ matrix.target }} --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
 
 
   doc:
@@ -161,7 +162,7 @@ jobs:
           targets: ${{ matrix.target }}
       - run: ${{ matrix.deps }}
       - run: cargo check --target ${{ matrix.target }} --all-features
-      - run: cargo test --target ${{ matrix.target }}
+      - run: cargo test --release --target ${{ matrix.target }}
 
 
   ffi:

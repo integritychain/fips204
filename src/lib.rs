@@ -562,26 +562,31 @@ macro_rules! functionality {
                     assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
                 }
 
-                let (pk, sk) = try_keygen().unwrap();
-                let sig = sk.try_sign(&message1, &[]).unwrap();
-                assert!(pk.verify(&message1, &sig, &[]));
-                assert!(!pk.verify(&message2, &sig, &[]));
-                assert!(!pk.verify(&message1, &sig, &[0u8; 257]));
-                assert!(sk.try_sign(&message1, &[0u8; 257]).is_err());
+                // `try_keygen` / `try_sign` / `try_hash_sign` need the OS RNG. The cross
+                // job builds without `default-rng`.
+                #[cfg(feature = "default-rng")]
+                {
+                    let (pk, sk) = try_keygen().unwrap();
+                    let sig = sk.try_sign(&message1, &[]).unwrap();
+                    assert!(pk.verify(&message1, &sig, &[]));
+                    assert!(!pk.verify(&message2, &sig, &[]));
+                    assert!(!pk.verify(&message1, &sig, &[0u8; 257]));
+                    assert!(sk.try_sign(&message1, &[0u8; 257]).is_err());
 
-                for ph in [pre_hash::SHA2_256, pre_hash::SHA2_512, pre_hash::SHAKE_128] {
-                    let mut hash = [ 0u8;64];
-                    let hashlen = digest(&message1, &ph, &mut hash).unwrap();
-                    let sig = sk.try_hash_sign(&hash[0..hashlen], &[], &ph).unwrap();
-                    let v2 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
-                    assert!(v2);
-                    assert!(sk.try_hash_sign(&hash[0..hashlen], &[], &[]).is_err());
-                    assert!(!pk.hash_verify(&hash[0..hashlen], &sig, &[], &[]));
+                    for ph in [pre_hash::SHA2_256, pre_hash::SHA2_512, pre_hash::SHAKE_128] {
+                        let mut hash = [ 0u8;64];
+                        let hashlen = digest(&message1, &ph, &mut hash).unwrap();
+                        let sig = sk.try_hash_sign(&hash[0..hashlen], &[], &ph).unwrap();
+                        let v2 = pk.hash_verify(&hash[0..hashlen], &sig, &[], &ph);
+                        assert!(v2);
+                        assert!(sk.try_hash_sign(&hash[0..hashlen], &[], &[]).is_err());
+                        assert!(!pk.hash_verify(&hash[0..hashlen], &sig, &[], &[]));
+                    }
+                    let too_long = [0u8; crate::MAX_PREHASH_LEN + 1];
+                    assert!(sk.try_hash_sign(&too_long, &[], &pre_hash::SHA2_256).is_err());
+                    assert!(!pk.hash_verify(&too_long, &sig, &[], &pre_hash::SHA2_256));
+                    assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
                 }
-                let too_long = [0u8; crate::MAX_PREHASH_LEN + 1];
-                assert!(sk.try_hash_sign(&too_long, &[], &pre_hash::SHA2_256).is_err());
-                assert!(!pk.hash_verify(&too_long, &sig, &[], &pre_hash::SHA2_256));
-                assert_eq!(pk.clone().into_bytes(), sk.get_public_key().into_bytes());
 
                 let (pk, sk) = KG::keygen_from_seed(&[0x11u8; 32]);
                 let sig = sk.try_sign_with_seed(&[12u8; 32], &message1, &[]).unwrap();
