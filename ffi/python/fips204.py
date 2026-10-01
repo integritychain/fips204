@@ -188,6 +188,20 @@ class Err(enum.IntEnum):
     VERIFICATION_FAILURE = 7
 
 
+def _buf(data: bytes) -> Tuple[Optional[Any], int]:
+    """Pointer and length that keep embedded NUL bytes."""
+    if len(data) == 0:
+        return None, 0
+    raw = (ctypes.c_uint8 * len(data)).from_buffer_copy(data)
+    return raw, len(data)
+
+
+def _as_ptr(raw: Optional[Any]) -> Optional[Any]:
+    if raw is None:
+        return None
+    return ctypes.cast(raw, ctypes.POINTER(ctypes.c_uint8))
+
+
 class Seed:
     """ML-DSA Seed
 
@@ -281,14 +295,16 @@ class PublicKey:
             )
         for i in range(len(sig_param.data)):
             sig_param.data[i] = sig[i]
+        msg, msg_len = _buf(message)
+        ctx, ctx_len = _buf(context)
         ret = Err(
             self._ffi["verify"](
                 ctypes.byref(self._pubkey),
                 ctypes.byref(sig_param),
-                ctypes.cast(ctypes.c_char_p(message), ctypes.POINTER(ctypes.c_uint8)),
-                len(message),
-                ctypes.cast(ctypes.c_char_p(context), ctypes.POINTER(ctypes.c_uint8)),
-                len(context),
+                _as_ptr(msg),
+                msg_len,
+                _as_ptr(ctx),
+                ctx_len,
             )
         )
         if ret not in {Err.OK, Err.VERIFICATION_FAILURE}:
@@ -336,16 +352,19 @@ class PublicKey:
             )
         for i in range(len(sig_param.data)):
             sig_param.data[i] = sig[i]
+        dig, dig_len = _buf(digest)
+        ctx, ctx_len = _buf(context)
+        oid, oid_len = _buf(hashoid)
         ret = Err(
             self._ffi["hash_verify"](
                 ctypes.byref(self._pubkey),
                 ctypes.byref(sig_param),
-                ctypes.cast(ctypes.c_char_p(digest), ctypes.POINTER(ctypes.c_uint8)),
-                len(digest),
-                ctypes.cast(ctypes.c_char_p(context), ctypes.POINTER(ctypes.c_uint8)),
-                len(context),
-                ctypes.cast(ctypes.c_char_p(hashoid), ctypes.POINTER(ctypes.c_uint8)),
-                len(hashoid),
+                _as_ptr(dig),
+                dig_len,
+                _as_ptr(ctx),
+                ctx_len,
+                _as_ptr(oid),
+                oid_len,
             )
         )
         if ret not in {Err.OK, Err.VERIFICATION_FAILURE}:
@@ -428,13 +447,15 @@ class PrivateKey:
             seed = _Seed()
             for i in range(ML_DSA.SEED_SIZE):
                 seed.data[i] = hedged[i]
+        msg, msg_len = _buf(message)
+        ctx, ctx_len = _buf(context)
         ret = Err(
             self._ffi["sign"](
                 ctypes.byref(self._privkey),
-                ctypes.cast(ctypes.c_char_p(message), ctypes.POINTER(ctypes.c_uint8)),
-                len(message),
-                ctypes.cast(ctypes.c_char_p(context), ctypes.POINTER(ctypes.c_uint8)),
-                len(context),
+                _as_ptr(msg),
+                msg_len,
+                _as_ptr(ctx),
+                ctx_len,
                 None if hedged is True else ctypes.byref(seed),
                 ctypes.byref(sig),
             )
@@ -490,15 +511,18 @@ class PrivateKey:
             seed = _Seed()
             for i in range(ML_DSA.SEED_SIZE):
                 seed.data[i] = hedged[i]
+        dig, dig_len = _buf(digest)
+        ctx, ctx_len = _buf(context)
+        oid, oid_len = _buf(hashoid)
         ret = Err(
             self._ffi["hash_sign"](
                 ctypes.byref(self._privkey),
-                ctypes.cast(ctypes.c_char_p(digest), ctypes.POINTER(ctypes.c_uint8)),
-                len(digest),
-                ctypes.cast(ctypes.c_char_p(context), ctypes.POINTER(ctypes.c_uint8)),
-                len(context),
-                ctypes.cast(ctypes.c_char_p(hashoid), ctypes.POINTER(ctypes.c_uint8)),
-                len(hashoid),
+                _as_ptr(dig),
+                dig_len,
+                _as_ptr(ctx),
+                ctx_len,
+                _as_ptr(oid),
+                oid_len,
                 None if hedged is True else ctypes.byref(seed),
                 ctypes.byref(sig),
             )
