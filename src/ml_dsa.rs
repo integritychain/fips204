@@ -134,6 +134,17 @@ pub(crate) fn key_gen_internal<
 }
 
 
+/// Message representative 𝜇 ← H(BytesToBits(𝑡𝑟)||𝑀′, 64), step 6 of Algorithm 7 and step 7 of
+/// Algorithm 8. The caller passes `tr` followed by the pieces of 𝑀′ in order, so nothing is
+/// concatenated.
+pub(crate) fn mu(tr_and_mp: &[&[u8]]) -> [u8; 64] {
+    let mut h = h256_xof(tr_and_mp);
+    let mut mu = [0u8; 64];
+    h.read(&mut mu);
+    mu
+}
+
+
 /// # Algorithm 7: ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑) on page 25.
 /// Deterministic algorithm to generate a signature for a formatted message 𝑀 ′.
 ///
@@ -141,7 +152,8 @@ pub(crate) fn key_gen_internal<
 ///             formatted message 𝑀′ ∈ {0, 1}∗, and
 ///             per message randomness or dummy variable rnd ∈ 𝔹^{32}. <br>
 /// **Output**: Signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1−1))+𝜔+𝑘}.
-// Note the M' is assembled here from provided elements, rather than by caller.
+// Note the caller assembles M' and passes the message representative µ (step 6, see `mu()`),
+// so that pure, pre-hash, internal and external-µ signing all share this function.
 // Further, a deserialized private key struct has a variety of pre-computed
 // elements ready-to-go.
 #[allow(
@@ -160,13 +172,13 @@ pub(crate) fn sign_internal<
     const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, esk: &PrivateKey<K, L>,
-    message: &[u8], ctx: &[u8], oid: &[u8], phm: &[u8], rnd: [u8; 32],
+    mu: &[u8; 64], rnd: [u8; 32],
 ) -> [u8; SIG_LEN] {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
     // --> calculated in `expand_private()` near the bottom of this file
-    // Extract elements from private key
-    let PrivateKey { rho, cap_k, tr, s_1_hat_mont, s_2_hat_mont, t_0_hat_mont } = esk;
+    // Extract elements from private key (tr is used by the caller, for µ)
+    let PrivateKey { rho, cap_k, tr: _, s_1_hat_mont, s_2_hat_mont, t_0_hat_mont } = esk;
     //
     // 2: s_1_hat ← NTT(s_1)
     // --> the montgomery form is extracted from the private key struct above
@@ -181,19 +193,10 @@ pub(crate) fn sign_internal<
     let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(rho);
 
     // 6: 𝜇 ← H(BytesToBits(𝑡𝑟)||𝑀 , 64)    ▷ Compute message representative µ
-    // Calculate mu based on which of the three different paths led us here
-    let mut h6 = if oid.is_empty() {
-        // 6b. From ML-DSA.Sign():  𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message])
-    } else {
-        // 6c. From HashML-DSA.Sign(): 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h256_xof(&[tr, &[1u8], &[ctx.len().to_le_bytes()[0]], ctx, oid, phm])
-    };
-    let mut mu = [0u8; 64];
-    h6.read(&mut mu);
+    // --> computed by the caller with `mu()` and passed in
 
     // 7: ρ′' ← H(K || rnd || µ, 64)    ▷ Compute private random seed
-    let mut h7 = h256_xof(&[cap_k, &rnd, &mu]);
+    let mut h7 = h256_xof(&[cap_k, &rnd, mu]);
     let mut rho_prime = [0u8; 64];
     h7.read(&mut rho_prime);
 
@@ -227,7 +230,7 @@ pub(crate) fn sign_internal<
         // 15: c_tildẽ ← H(mu||w1Encode(w_1), 𝜆/4)    ▷ commitment hash
         let mut w1_tilde = [0u8; W1_LEN];
         w1_encode::<K>(gamma2, &w_1, &mut w1_tilde);
-        let mut h15 = h256_xof(&[&mu, &w1_tilde]);
+        let mut h15 = h256_xof(&[mu, &w1_tilde]);
         h15.read(&mut c_tilde);
 
         // 16: c ∈ 𝑅𝑞 ← SampleInBall(c_tilde_1)    ▷ Verifier’s challenge
@@ -341,7 +344,8 @@ pub(crate) fn sign_internal<
 ///             message 𝑀′ ∈ {0, 1}∗,
 ///             Signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1 −1))+𝜔+𝑘}. <br>
 /// **Output**: Boolean
-// Note the M' is assembled here from provided elements, rather than by caller.
+// Note the caller assembles M' and passes the message representative µ (step 7, see `mu()`),
+// so that pure, pre-hash, internal and external-µ verification all share this function.
 // Further, a deserialized public key struct has a variety of pre-computed
 // elements ready-to-go.
 #[allow(clippy::too_many_arguments, clippy::similar_names, clippy::type_complexity)]
@@ -354,12 +358,12 @@ pub(crate) fn verify_internal<
     const SIG_LEN: usize,
     const W1_LEN: usize,
 >(
-    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &PublicKey<K, L>, m: &[u8],
-    sig: &[u8; SIG_LEN], ctx: &[u8], oid: &[u8], phm: &[u8],
+    beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, epk: &PublicKey<K, L>,
+    mu: &[u8; 64], sig: &[u8; SIG_LEN],
 ) -> bool {
     //
     // 1: (ro, t_1) ← pkDecode(pk)  pull out pre-computed elements
-    let PublicKey { rho, tr, t1_d2_hat_mont } = epk;
+    let PublicKey { rho, tr: _, t1_d2_hat_mont } = epk;
 
     // 2: (c_tilde, z, h) ← sigDecode(σ)    ▷ Signer’s commitment hash c_tilde, response z and hint h
     let Ok((c_tilde, z, h)): Result<([u8; LAMBDA_DIV4], [R; L], Option<[R; K]>), &'static str> =
@@ -376,19 +380,10 @@ pub(crate) fn verify_internal<
 
 
     // 6: tr ← H(pk, 64)
-    // --> extracted from public key pre-computes in step 1 above
+    // --> extracted from public key pre-computes, and used by the caller for µ
 
     // 7: 𝜇 ← (H(BytesToBits(tr)||𝑀′, 64))    ▷ Compute message representative µ
-    // Calculate mu based on which of the three different paths led us here
-    let mut h7 = if oid.is_empty() {
-        // 7b. From ML-DSA.Verify(): 5: 𝑀′ ← BytesToBits(IntegerToBytes(0,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
-        h256_xof(&[tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, m])
-    } else {
-        // 7c. From HashML-DSA.Verify(): 18: 𝑀′ ← BytesToBits(IntegerToBytes(1,1) ∥ IntegerToBytes(|𝑐𝑡𝑥|,1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
-        h256_xof(&[tr, &[1u8], &[ctx.len().to_le_bytes()[0]], ctx, oid, phm])
-    };
-    let mut mu = [0u8; 64];
-    h7.read(&mut mu);
+    // --> computed by the caller with `mu()` and passed in
 
     // 8: c ∈ 𝑅𝑞 ← SampleInBall(c_tilde_1)    ▷ Compute verifier’s challenge from c_tilde
     let c: R = sample_in_ball::<false>(tau, &c_tilde); // CTEST is always false (as no CT guarantees)
@@ -420,7 +415,7 @@ pub(crate) fn verify_internal<
     // 12: c_tilde_′ ← H(µ || w1Encode(w′_1), λ/4)     ▷ Hash it; this should match c_tilde
     let mut tmp = [0u8; W1_LEN];
     w1_encode::<K>(gamma2, &wp_1, &mut tmp);
-    let mut h12 = h256_xof(&[&mu, &tmp]);
+    let mut h12 = h256_xof(&[mu, &tmp]);
     let mut c_tilde_p = [0u8; LAMBDA_DIV4];
     h12.read(&mut c_tilde_p);
 

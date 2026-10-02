@@ -88,6 +88,12 @@
 // `false`) except for the single function (per namespace) `dudect_keygen_sign_with_rng()`
 // which is only exposed when the non-default `dudect` feature is enabled.
 
+// Test and measurement hooks are `#[deprecated]` and live behind non-default features, so a
+// normal build never has them. The `acvp-internal` feature adds `#[doc(hidden)]` methods
+// `sign_internal()`, `sign_mu()`, `verify_internal()` and `verify_mu()`, so that every NIST
+// vector runs, including the internal and external-µ groups. The crate's own tests enable it
+// through a dev-dependency on the crate itself. The dudect harness enables `dudect`.
+
 /// The `rand_core` types are re-exported so that users of fips204 do not
 /// have to worry about using the exact correct version of `rand_core`.
 pub use rand_core::{CryptoRng, Error as RngError, RngCore};
@@ -285,11 +291,13 @@ macro_rules! functionality {
 
                 // 9:  (blank line in spec)
 
-                // Note: step 10 is done within sign_internal() and 'below'
                 // 10: 𝑀 ′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥) ∥ 𝑀
+                // Note: step 6 of sign_internal() is done here, as µ ← H(BytesToBits(tr)||𝑀′, 64)
+                let mu = ml_dsa::mu(&[&self.tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message]);
+
                 // 11: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, message, ctx, &[], &[], rnd
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, rnd
                 );
 
                 // 12: return 𝜎
@@ -308,8 +316,7 @@ macro_rules! functionality {
             ///
             /// # Errors
             /// Returns an error when the random number generator fails, the context is too long,
-            /// the OID is empty, or the digest is longer than 1024 bytes. An empty OID would select
-            /// pure ML-DSA inside `sign_internal`.
+            /// the OID is empty, or the digest is longer than 1024 bytes.
             fn try_hash_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
             ) -> Result<Self::Signature, &'static str> {
@@ -317,7 +324,7 @@ macro_rules! functionality {
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
                 // 3: end if
                 helpers::ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
-                // An empty OID selects the pure ML-DSA domain separator (0x00) inside sign_internal.
+                // An empty OID names no pre-hash function.
                 helpers::ensure!(!hash_oid.is_empty(), "HashML-DSA.Sign: OID is empty");
 
                 // 4:  (blank line in spec)
@@ -337,11 +344,13 @@ macro_rules! functionality {
                     return Err("Hash of message is too long, should not be more than 1KiB");
                 }
 
-                // Note: step 23 is performed within `sign_internal()` and below.
                 // 23: 𝑀 ′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
+                // Note: step 6 of sign_internal() is done here, as µ ← H(BytesToBits(tr)||𝑀′, 64)
+                let mu = ml_dsa::mu(&[&self.tr, &[1u8], &[ctx.len().to_le_bytes()[0]], ctx, hash_oid, hash]);
+
                 // 24: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &[], ctx, &hash_oid, &hash, rnd
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, rnd
                 );
 
                 // 25: return 𝜎
@@ -378,11 +387,13 @@ macro_rules! functionality {
 
                 // 4:  (blank line in spec)
 
-                // Note: step 5 is performed within `verify_internal()` and below.
                 // 5: 𝑀′ ← BytesToBits(IntegerToBytes(0, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx) ∥ 𝑀
+                // Note: step 7 of verify_internal() is done here, as µ ← H(BytesToBits(tr)||𝑀′, 64)
+                let mu = ml_dsa::mu(&[&self.tr, &[0u8], &[ctx.len().to_le_bytes()[0]], ctx, message]);
+
                 // 6: return ML-DSA.Verify_internal(pk, 𝑀′, 𝜎)
                 ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &message, &sig, ctx, &[], &[]
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, &sig
                 )
             }
 
@@ -402,7 +413,7 @@ macro_rules! functionality {
                 if ctx.len() > 255 {
                     return false;
                 };
-                // An empty OID selects the pure ML-DSA domain separator (0x00) inside verify_internal.
+                // An empty OID names no pre-hash function.
                 if hash_oid.is_empty() {
                     return false;
                 }
@@ -414,11 +425,88 @@ macro_rules! functionality {
                 // 4:  (blank line in spec)
                 // steps 5-18 are performed outside of this module.
 
-                // Note: step 18 is performed within `verify_internal()` and below.
                 // 18: 𝑀′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|ctx|, 1) ∥ ctx ∥ OID ∥ PH𝑀 )
+                // Note: step 7 of verify_internal() is done here, as µ ← H(BytesToBits(tr)||𝑀′, 64)
+                let mu = ml_dsa::mu(&[&self.tr, &[1u8], &[ctx.len().to_le_bytes()[0]], ctx, hash_oid, hash]);
+
                 // 19: return ML-DSA.Verify_internal(𝑝𝑘, 𝑀′ , 𝜎)
                 ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &[], &sig, ctx, &hash_oid, &hash
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, &sig
+                )
+            }
+        }
+
+
+        // ----- SUPPORT FOR THE NIST ACVP INTERNAL TEST GROUPS ---
+
+        #[cfg(feature = "acvp-internal")]
+        impl PrivateKey {
+            /// Algorithm 7 `ML-DSA.Sign_internal(sk, 𝑀′, rnd)`: sign a caller-formatted 𝑀′.
+            /// With `hedged` false, `rnd` is {0}^32 and `rng` is not used.
+            ///
+            /// Hidden from the docs and not part of [`crate::traits::Signer`]. The NIST internal
+            /// groups in `tests/nist_vectors` call this hook. `cargo test --test` does not set
+            /// `cfg(test)` on this library, so the crate's tests enable the `acvp-internal`
+            /// feature through a dev-dependency on the crate itself.
+            ///
+            /// # Errors
+            /// Returns an error when the random number generator fails.
+            #[deprecated = "Hook for the NIST ACVP internal test groups; do not use elsewhere"]
+            #[doc(hidden)]
+            pub fn sign_internal(
+                &self, rng: &mut impl CryptoRngCore, m: &[u8], hedged: bool,
+            ) -> Result<[u8; SIG_LEN], &'static str> {
+                // 6: µ ← H(BytesToBits(tr)||𝑀′, 64)
+                let mu = ml_dsa::mu(&[&self.tr, m]);
+                #[allow(deprecated)]
+                self.sign_mu(rng, &mu, hedged)
+            }
+
+            /// Algorithm 7 from step 7 on, with the message representative µ given by the
+            /// caller (the NIST `externalMu` groups). See [`PrivateKey::sign_internal`].
+            ///
+            /// # Errors
+            /// Returns an error when the random number generator fails.
+            #[deprecated = "Hook for the NIST ACVP internal test groups; do not use elsewhere"]
+            #[doc(hidden)]
+            pub fn sign_mu(
+                &self, rng: &mut impl CryptoRngCore, mu: &[u8; 64], hedged: bool,
+            ) -> Result<[u8; SIG_LEN], &'static str> {
+                let mut rnd = [0u8; 32];
+                if hedged {
+                    rng.try_fill_bytes(&mut rnd)
+                        .map_err(|_| "ML-DSA.Sign_internal: random number generator failed")?;
+                }
+                Ok(ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, mu, rnd
+                ))
+            }
+        }
+
+
+        #[cfg(feature = "acvp-internal")]
+        impl PublicKey {
+            /// Algorithm 8 `ML-DSA.Verify_internal(pk, 𝑀′, 𝜎)`: verify a caller-formatted 𝑀′.
+            ///
+            /// See [`PrivateKey::sign_internal`].
+            #[deprecated = "Hook for the NIST ACVP internal test groups; do not use elsewhere"]
+            #[doc(hidden)]
+            #[must_use]
+            pub fn verify_internal(&self, m: &[u8], sig: &[u8; SIG_LEN]) -> bool {
+                // 7: µ ← H(BytesToBits(tr)||𝑀′, 64)
+                let mu = ml_dsa::mu(&[&self.tr, m]);
+                #[allow(deprecated)]
+                self.verify_mu(&mu, sig)
+            }
+
+            /// Algorithm 8 from step 8 on, with the message representative µ given by the
+            /// caller (the NIST `externalMu` groups). See [`PrivateKey::sign_internal`].
+            #[deprecated = "Hook for the NIST ACVP internal test groups; do not use elsewhere"]
+            #[doc(hidden)]
+            #[must_use]
+            pub fn verify_mu(&self, mu: &[u8; 64], sig: &[u8; SIG_LEN]) -> bool {
+                ml_dsa::verify_internal::<CTEST, K, L, LAMBDA_DIV4, PK_LEN, SIG_LEN, W1_LEN>(
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, mu, sig
                 )
             }
         }
@@ -624,8 +712,10 @@ macro_rules! functionality {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
             let mut rnd = [0u8; 32];
             rng.try_fill_bytes(&mut rnd).map_err(|_| "Random number generator failed")?;
+            // Pure ML-DSA framing of `message` with an empty context
+            let mu = ml_dsa::mu(&[&sk.tr, &[0u8], &[0u8], message]);
             let sig = ml_dsa::sign_internal::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, message, &[1], &[2], &[3], rnd
+                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, &mu, rnd
             );
             Ok(sig)
         }
