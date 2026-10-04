@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `libfips204` for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
 
 ### Changed
+- `Verifier::verify` and `Verifier::hash_verify` are `#[must_use]`, as in `fips205`. Ignoring the result is now a compiler warning.
 - Release builds use opt-level 3.
 - The constant-time claim covers one attempt. Rejection sampling may repeat. Within an attempt, key generation and signing do not branch on secret data.
 

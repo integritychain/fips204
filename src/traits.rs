@@ -236,6 +236,28 @@ pub trait Signer {
     /// # Errors
     /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
     /// `hash_oid` is empty, or `hash` is longer than 1024 bytes; propagates internal errors.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(all(feature = "ml-dsa-65", feature = "default-rng"))] {
+    /// use fips204::pre_hash;
+    /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    /// use sha2::{Digest, Sha256};
+    ///
+    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    /// let digest = Sha256::digest(message); // The caller hashes the message
+    ///
+    /// // Generate key pair and signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
+    /// let sig = sk.try_hash_sign(&digest, &[0], &pre_hash::SHA2_256)?; // Use the secret key to sign the digest
+    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_256); // Use the public key to verify the digest signature
+    /// assert!(v);
+    /// # }
+    /// # Ok(())}
+    /// ```
     #[cfg(feature = "default-rng")]
     fn try_hash_sign(
         &self, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
@@ -256,6 +278,30 @@ pub trait Signer {
     /// # Errors
     /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
     /// `hash_oid` is empty, or `hash` is longer than 1024 bytes; propagates internal errors.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(feature = "ml-dsa-65")] {
+    /// use fips204::pre_hash;
+    /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    /// use rand_chacha::rand_core::SeedableRng;
+    /// use sha2::{Digest, Sha512};
+    ///
+    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    /// let digest = Sha512::digest(message); // The caller hashes the message
+    /// let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
+    ///
+    /// // Generate key pair and signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
+    /// let sig = sk.try_hash_sign_with_rng(&mut rng, &digest, &[0], &pre_hash::SHA2_512)?;  // Use the secret key to sign the digest
+    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_512); // Use the public key to verify the digest signature
+    /// assert!(v);
+    /// # }
+    /// # Ok(())}
+    /// ```
     fn try_hash_sign_with_rng(
         &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str>;
@@ -273,6 +319,30 @@ pub trait Signer {
     /// # Errors
     /// Returns an error when the `ctx` is longer than 255 bytes, `hash_oid` is empty, or `hash` is
     /// longer than 1024 bytes; propagates internal errors.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(feature = "ml-dsa-65")] {
+    /// use fips204::pre_hash;
+    /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    /// use rand_chacha::rand_core::SeedableRng;
+    /// use sha2::{Digest, Sha512};
+    ///
+    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    /// let digest = Sha512::digest(message); // The caller hashes the message
+    /// let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(123);
+    ///
+    /// // Generate key pair and signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
+    /// let sig = sk.try_hash_sign_with_seed(&[0u8;32], &digest, &[0], &pre_hash::SHA2_512)?;  // Use the secret key to sign the digest
+    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_512); // Use the public key to verify the digest signature
+    /// assert!(v);
+    /// # }
+    /// # Ok(())}
+    /// ```
     fn try_hash_sign_with_seed(
         &self, seed: &[u8;32], hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str> {
@@ -348,6 +418,7 @@ pub trait Verifier {
     /// # }
     /// # Ok(())}
     /// ```
+    #[must_use]
     fn verify(&self, message: &[u8], signature: &Self::Signature, ctx: &[u8]) -> bool;
 
 
@@ -357,7 +428,30 @@ pub trait Verifier {
     /// purely public data, it does not provide constant-time assurances. Returns `false` when `ctx`
     /// is longer than 255 bytes, `hash_oid` is empty, `hash` is longer than 1024 bytes, or the
     /// signature does not verify.
-    fn hash_verify(&self, hash: &[u8], sig: &Self::Signature, ctx: &[u8], hash_oid: &[u8]) -> bool;
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # #[cfg(all(feature = "ml-dsa-65", feature = "default-rng"))] {
+    /// use fips204::pre_hash;
+    /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
+    /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+    /// use sha2::{Digest, Sha256};
+    ///
+    /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
+    /// let digest = Sha256::digest(message); // The caller hashes the message
+    ///
+    /// // Generate key pair and signature
+    /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
+    /// let sig = sk.try_hash_sign(&digest, &[0], &pre_hash::SHA2_256)?; // Use the secret key to sign the digest
+    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_256); // Use the public key to verify the digest signature
+    /// assert!(v);
+    /// # }
+    /// # Ok(())}
+    /// ```
+    #[must_use]
+    fn hash_verify(&self, hash: &[u8], signature: &Self::Signature, ctx: &[u8], hash_oid: &[u8]) -> bool;
 }
 
 

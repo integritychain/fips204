@@ -12,7 +12,7 @@ fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
     let sig_good = sk_good.try_sign(&[0u8, 1, 2, 3], &[]).unwrap();
 
     let sig_bad = core::array::from_fn(|i| sig_good[i] ^ data[i]);
-    pk_good.verify(&[0u8, 1, 2, 3], &sig_bad, &[]);
+    let _ = pk_good.verify(&[0u8, 1, 2, 3], &sig_bad, &[]); // Any result is fine; the fuzzer looks for panics
 
     // Extract then deserialize a 'fuzzy' secret key
     let sk_bytes = data[0..2560].try_into().unwrap();
