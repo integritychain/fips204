@@ -326,6 +326,11 @@ macro_rules! functionality {
                 helpers::ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
                 // An empty OID names no pre-hash function.
                 helpers::ensure!(!hash_oid.is_empty(), "HashML-DSA.Sign: OID is empty");
+                // Reject an oversized digest before drawing randomness.
+                helpers::ensure!(
+                    hash.len() <= crate::MAX_PREHASH_LEN,
+                    "Hash of message is too long, should not be more than 1KiB"
+                );
 
                 // 4:  (blank line in spec)
 
@@ -338,11 +343,6 @@ macro_rules! functionality {
 
                 // 9:  (blank line in spec)
                 // steps 10-22 are performed outside of this module
-
-                if hash.len() > crate::MAX_PREHASH_LEN {
-                    // this is a safety check
-                    return Err("Hash of message is too long, should not be more than 1KiB");
-                }
 
                 // 23: 𝑀 ′ ← BytesToBits(IntegerToBytes(1, 1) ∥ IntegerToBytes(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PH𝑀 )
                 // Note: step 6 of sign_internal() is done here, as µ ← H(BytesToBits(tr)||𝑀′, 64)
