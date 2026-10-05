@@ -280,11 +280,11 @@ def process(testtype: str) -> None:
                 tests += len(group)
             except TestGroupException as e:
                 logging.info(e)
-        print(f"Passed {tests} tests in {len(groups)} {testtype} groups")
+        print(f"{tests} {testtype} tests passed in {len(groups)} groups")
 
 
 if os.environ.get("VERBOSE", None) is not None:
     logging.basicConfig(level=logging.DEBUG)
 
-for t in ["keyGen", "sigGen", "sigVer"]:
+for t in ["keyGen", "sigVer", "sigGen"]:
     process(t)

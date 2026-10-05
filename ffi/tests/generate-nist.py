@@ -71,9 +71,9 @@ results keygen() {
 """
     return out + """
   if (ret.failed) {
-    fprintf(stderr, "%d/%d keygen tests failed\\n", ret.failed, ret.tests);
+    fprintf(stderr, "%d/%d keyGen tests failed\\n", ret.failed, ret.tests);
   } else {
-    fprintf(stderr, "%d keygen tests passed\\n", ret.tests);
+    fprintf(stderr, "%d keyGen tests passed\\n", ret.tests);
   }
   return ret;
 }
@@ -194,9 +194,9 @@ results sigver() {
 
     return out + f"""
   if (ret.failed) {{
-    fprintf(stderr, "%d/%d sigver tests failed (%d skipped)\\n", ret.failed, ret.tests, ret.skipped);
+    fprintf(stderr, "%d/%d sigVer tests failed (%d skipped)\\n", ret.failed, ret.tests, ret.skipped);
   }} else {{
-    fprintf(stderr, "%d sigver tests passed (%d skipped)\\n", ret.tests, ret.skipped);
+    fprintf(stderr, "%d sigVer tests passed (%d skipped)\\n", ret.tests, ret.skipped);
   }}
   return ret;
 }}
@@ -270,9 +270,9 @@ results siggen() {
 
     return out + f"""
   if (ret.failed) {{
-    fprintf(stderr, "%d/%d siggen tests failed (%d skipped)\\n", ret.failed, ret.tests, ret.skipped);
+    fprintf(stderr, "%d/%d sigGen tests failed (%d skipped)\\n", ret.failed, ret.tests, ret.skipped);
   }} else {{
-    fprintf(stderr, "%d siggen tests passed (%d skipped)\\n", ret.tests, ret.skipped);
+    fprintf(stderr, "%d sigGen tests passed (%d skipped)\\n", ret.tests, ret.skipped);
   }}
   return ret;
 }}
