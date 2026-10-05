@@ -94,7 +94,8 @@ class TestGroup:
     def __init__(self, d: TestGroupData) -> None:
         self.tgId = d["tgId"]
         self.testType: str = d["testType"]
-        assert self.testType == "AFT"  # i don't know what AFT means
+        # https://pages.nist.gov/ACVP/draft-hammett-acvp-kas-ssc-ecc.html#name-test-types
+        assert self.testType == "AFT"  # Algorithm Functional Test
         self.parameterSet: str = d["parameterSet"]
         m = self.param_matcher.match(self.parameterSet)
         assert m
