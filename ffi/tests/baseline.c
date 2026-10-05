@@ -92,15 +92,15 @@ int main(int argc, const char **argv) {
   printf("\n");
 
   if (! MLDSA_keygen (&pub, NULL)) {
-    fprintf (stderr, "keygen should have failed with NULL decaps\n");
+    fprintf (stderr, "keygen should have failed with NULL private key\n");
     return 1;
   }
   if (! MLDSA_keygen (NULL, &priv)) {
-    fprintf (stderr, "keygen should have failed with NULL encaps\n");
+    fprintf (stderr, "keygen should have failed with NULL public key\n");
     return 1;
   }
   if (! MLDSA_keygen (NULL, NULL)) {
-    fprintf (stderr, "keygen should have failed with NULL encaps and decaps\n");
+    fprintf (stderr, "keygen should have failed with NULL public and private keys\n");
     return 1;
   }
 
@@ -130,7 +130,7 @@ int main(int argc, const char **argv) {
   }
 
   if ((err = MLDSA_verify(&pub, &sig, msg, msglen, ctx, ctxlen))) {
-    fprintf (stderr, "verify should have succeeeded! (got %d)\n", err);
+    fprintf (stderr, "verify should have succeeded! (got %d)\n", err);
     return 3;
   }
   if (! MLDSA_verify(&pub, &sig, msg, msglen, badctx, badctxlen)) {

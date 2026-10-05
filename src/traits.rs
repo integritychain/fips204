@@ -58,7 +58,7 @@ pub trait KeyGen {
     /// ```rust
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// # #[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))] {
+    /// # #[cfg(feature = "ml-dsa-44")] {
     /// use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
     /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
     /// use rand_chacha::rand_core::SeedableRng;
@@ -68,8 +68,8 @@ pub trait KeyGen {
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_44::KG::try_keygen_with_rng(&mut rng)?;  // Generate both public and secret keys
-    /// let sig = sk.try_sign(&message, &[0])?;  // Use the secret key to generate a message signature
-    /// }
+    /// let sig = sk.try_sign_with_rng(&mut rng, &message, &[0])?;  // Use the secret key to generate a message signature
+    /// # }
     /// # Ok(())}
     /// ```
     fn try_keygen_with_rng(
@@ -457,10 +457,10 @@ pub trait Verifier {
 
 /// The `SerDes` trait provides for validated serialization and deserialization of fixed- and correctly-size elements.
 ///
-/// Note that FIPS 204 currently states that outside of exact length checks "ML-DSA is not designed to require any
-/// additional public-key validity checks" (perhaps "...designed not to require..." would be better). Nonetheless, a
-/// `Result()` is returned during all deserialization operations to preserve the ability to add future checks (and for
-/// symmetry across structures). Note that for the current implementation, both of the private and public key
+/// Note that FIPS 204 (section 3.6.2) specifies only exact length checks for the public key and signature, which the
+/// fixed-size byte arrays enforce. Nonetheless, a `Result()` is returned during all deserialization operations to
+/// preserve the ability to add future checks (and for symmetry across structures). Note that for the current
+/// implementation, both of the private and public key
 /// deserialization routines invoke an internal decode that catches over-sized coefficients (for early detection).
 pub trait SerDes {
     /// The fixed-size byte array to be serialized or deserialized

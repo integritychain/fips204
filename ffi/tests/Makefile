@@ -10,7 +10,7 @@
 SIZES = 44 65 87
 FRAMES = sign signature verify public_key private_key keygen keygen_from_seed get_public_key
 # Link name produced by cargo (libfips204.so / .dylib). ELF SONAME from
-# build.rs is libfips204.so.0 — see RUNTIME_LIB below.
+# build.rs is libfips204.so.0 — see ADDITIONAL_RUN_DEPENDS below.
 LINK_LIB = libfips204.$(SO_EXT)
 
 OS := $(shell uname)

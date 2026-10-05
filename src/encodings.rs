@@ -65,16 +65,16 @@ pub(crate) fn pk_decode<const K: usize, const PK_LEN: usize>(
     let mut t1 = [R0; K]; // cannot use `?` inside a closure
     for i in 0..K {
         //
-        // 4: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1))    ▷ This is always in the correct range
+        // 3: t1[i] ← SimpleBitUnpack(zi, 2^{bitlen(q−1)−d} − 1))    ▷ This is always in the correct range
         t1[i] =
             simple_bit_unpack(&pk[32 + 32 * i * BLQD..32 + 32 * (i + 1) * BLQD], (1 << BLQD) - 1)?;
         //
-        // 5: end for
+        // 4: end for
     }
 
     debug_assert!(t1.iter().all(|t| is_in_range(t, 0, (1 << BLQD) - 1)), "Alg 23: t1 out of range");
 
-    // 6: return (ρ, t1)
+    // 5: return (ρ, t1)
     Ok((rho, t1))
 }
 

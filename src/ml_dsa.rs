@@ -14,7 +14,7 @@ use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
 
 
-/// # Algorithm: 1 `ML-DSA.KeyGen()` on page 17.
+/// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
 /// Generates a public-private key pair.
 ///
 /// **Input**: `rng` a cryptographically-secure random number generator. <br>
@@ -45,15 +45,12 @@ pub(crate) fn key_gen<
 }
 
 
-/// # Algorithm: 6 `ML-DSA.KeyGen_internal()` on page 15.
+/// # Algorithm 6: `ML-DSA.KeyGen_internal(ξ)` on page 23.
 /// Generates a public-private key pair.
 ///
-/// **Input**: `rng` a cryptographically-secure random number generator. <br>
+/// **Input**: Seed `ξ ∈ B^{32}` (`xi`). <br>
 /// **Output**: Public key, `pk ∈ B^{32+32·k·(bitlen(q−1)−d)}`, and
 ///             private key, `sk ∈ B^{32+32+64+32·((ℓ+k)·bitlen(2·η)+d·k)}`
-///
-/// # Errors
-/// Returns an error when the random number generator fails.
 pub(crate) fn key_gen_internal<
     const CTEST: bool,
     const K: usize,

@@ -95,7 +95,8 @@ pub(crate) fn center_mod(m: i32) -> i32 {
 }
 
 
-/// Matrix by vector multiplication; e.g., fips 203 top of page 10, first row: `w_hat` = `A_hat` mul `u_hat`
+/// # Algorithm 48: `MatrixVectorNTT(M_hat, v_hat)` on page 46.
+/// Matrix by vector multiplication: `w_hat` = `A_hat` mul `u_hat`.
 #[must_use]
 pub(crate) fn mat_vec_mul<const K: usize, const L: usize>(
     a_hat: &[[T; L]; K], u_hat: &[T; L],

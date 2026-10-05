@@ -176,10 +176,10 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
         // 5: 𝑧 ← H.Squeeze(ctx, 1)
         xof.read(&mut z);
 
-        // 6: z0 ← CoefFromHalfByte(z mod 16, η)
+        // 6: z0 ← CoeffFromHalfByte(z mod 16)
         let z0 = coeff_from_half_byte::<CTEST>(eta, z[0] & 0x0f);
 
-        // 7: z1 ← CoefFromHalfByte(⌊z/16⌋, η)
+        // 7: z1 ← CoeffFromHalfByte(⌊z/16⌋)
         let z1 = coeff_from_half_byte::<CTEST>(eta, z[0] >> 4);
 
         // 8: if z0 != ⊥ then

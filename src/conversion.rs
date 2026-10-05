@@ -8,16 +8,16 @@ use crate::Q;
 // Algorithm 9: `IntegerToBits(x,a)` on page 28 is not needed because the pack and unpack
 // algorithms have been reimplemented at a higher level.
 
-// Algorithm 10: `BitsToInteger(y)` on page 28 is not needed because the pack and unpack
+// Algorithm 10: `BitsToInteger(y,a)` on page 28 is not needed because the pack and unpack
 // algorithms have been reimplemented at a higher level.
 
-// Algorithm 11: `IntegerToBytes(x,a) on page 28 is not needed because the standard
+// Algorithm 11: `IntegerToBytes(x,a)` on page 28 is not needed because the standard
 // `.to_le_bytes()` function is just called instead.
 
 // Algorithm 12: `BitsToBytes(y)` on page 29 is not needed because the pack and unpack
 // algorithms have been reimplemented at a higher level.
 
-// Algorithm 13: `BytesToBits(z)` on page 21 is not needed because the pack and unpack
+// Algorithm 13: `BytesToBits(z)` on page 29 is not needed because the pack and unpack
 // algorithms have been reimplemented at a higher level.
 
 

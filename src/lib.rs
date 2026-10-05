@@ -37,8 +37,8 @@
 // Algorithm 11 IntegerToBytes(x,a) on page 28              --> (optimized away) conversion.rs
 // Algorithm 12 BitsToBytes(y) on page 29                   --> (optimized away) conversion.rs
 // Algorithm 13 BytesToBits(z) on page 29                   --> (optimized away) conversion.rs
-// Algorithm 14 CoefFromThreeBytes(b0,b1,b2) on page 29     --> conversion.rs
-// Algorithm 15 CoefFromHalfByte(b) on page 30              --> conversion.rs
+// Algorithm 14 CoeffFromThreeBytes(b0,b1,b2) on page 29    --> conversion.rs
+// Algorithm 15 CoeffFromHalfByte(b) on page 30             --> conversion.rs
 // Algorithm 16 SimpleBitPack(w,b) on page 30               --> conversion.rs
 // Algorithm 17 BitPack(w,a,b) on page 30                   --> conversion.rs
 // Algorithm 18 SimpleBitUnpack(v,b) on page 31             --> conversion.rs
@@ -66,12 +66,12 @@
 // Algorithm 40 UseHint(h,r) on page 41                     --> high_low.rs
 // Algorithm 41 NTT(w) on page 43                           --> ntt.rs
 // Algorithm 42 NTT−1(wˆ) on page 44                        --> ntt.rs
-// Algorithm 43 BitRev8(m) on page 44                       --> not needed to zeta table
+// Algorithm 43 BitRev8(m) on page 44                       --> not needed (precomputed zeta table)
 // Algorithm 44 AddNTT(a,b)̂ on page 45                      --> helpers.rs within 46:AddVectorNTT
 // Algorithm 45 MultiplyNTT(a,b)̂ on page 45                 --> helpers.rs
 // Algorithm 46 AddVectorNTT(v,w) on page 45                --> helpers.rs
 // Algorithm 47 ScalarVectorNTT(c,v)̂ on page 46             --> not implemented standalone
-// Algorithm 48 MatrixVectorNTT(M,v) on page 46             --> not implemented standalone
+// Algorithm 48 MatrixVectorNTT(M,v) on page 46             --> helpers.rs
 // Algorithm 49 MontgomeryReduce(a) on page 50              --> helpers.rs
 // Types are in types.rs, traits are in traits.rs...
 
@@ -276,7 +276,7 @@ macro_rules! functionality {
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
                 // 1: if |ctx| > 255 then
-                // 2:   return ⊥    ▷ return an error indication if the context string is too long
+                // 2:   return false
                 // 3: end if
                 helpers::ensure!(ctx.len() < 256, "ML-DSA.Sign: ctx too long");
 

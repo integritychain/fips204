@@ -7,8 +7,9 @@
 ![Rust Version][rustc-image]
 
 [FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure/safe Rust for server, desktop, browser and
-embedded applications. The source repository includes examples demonstrating benchmarking, an embedded target,
-constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared library, and robust test coverage.
+embedded applications. The source repository includes examples demonstrating benchmarking, code provenance, an
+embedded target, constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared library, Python
+bindings, and robust test coverage.
 
 This crate implements [the FIPS 204 **released** standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf) in
 pure Rust with minimal and mainstream dependencies, and without any unsafe code. All three security parameter sets are
@@ -79,9 +80,9 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   from `rand_core` 0.6 (`CryptoRng` + `RngCore`). This crate re-exports `CryptoRng`,
   `RngCore`, and `RngError`. Signing and key generation call `try_fill_bytes`, so
   handle that error or use the seed-based APIs.
-* Constant-time assurances are from source-level review, the embedded target, and the
-  `dudect` measurements. Rejection sampling may repeat, so the number of attempts is not
-  constant. Within one attempt, key generation and signing avoid branches on secret data.
+* Constant-time assurances are from source-level review and the `dudect` measurements.
+  Rejection sampling may repeat, so the number of attempts is not constant. Within one
+  attempt, key generation and signing avoid branches on secret data.
 * Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
 * Requires Rust **1.85** or higher (aligned with Debian stable / trixie). The minimum
   supported Rust version may be changed in the future, but it will be done with a minor
