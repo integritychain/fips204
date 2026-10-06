@@ -17,7 +17,7 @@ import logging
 import os
 import hashlib
 
-from typing import Dict, Union, List, TypedDict
+from typing import Dict, Union, List, Sequence, TypedDict, Optional
 
 
 class TestData(TypedDict):
@@ -35,12 +35,16 @@ class SigTestData(TestData):
     message: str
     context: str
     hashAlg: str
+    signature: str
+    rnd: Optional[str]
 
 
-class SigTestData(TestData):
-    message: str
-    context: str
-    hashAlg: str
+class SigGenTestData(SigTestData):
+    pass
+
+
+class SigVerTestData(SigTestData):
+    testPassed: bool
 
 
 class Test:
@@ -63,15 +67,18 @@ class TestGroupData(TypedDict):
 
 
 class KeyGenTestGroupData(TestGroupData):
-    tests: List[KeyGenTestData]
+    tests: Sequence[KeyGenTestData]
 
 
 class SigGenTestGroupData(TestGroupData):
-    tests: List[SigGenTestData]
+    signatureInterface: str
+    tests: Sequence[SigGenTestData]
 
 
 class SigVerTestGroupData(TestGroupData):
-    tests: List[SigVerTestData]
+    signatureInterface: str
+    preHash: str
+    tests: Sequence[SigVerTestData]
 
 
 class TestGroupException(Exception):
@@ -82,11 +89,13 @@ class TestGroup:
     param_matcher = re.compile("^ML-DSA-(?P<strength>44|65|87)$")
     tgId: int
     testType: str
+    tests: Sequence[Test]
 
     def __init__(self, d: TestGroupData) -> None:
         self.tgId = d["tgId"]
         self.testType: str = d["testType"]
-        assert self.testType == "AFT"  # i don't know what AFT means
+        # https://pages.nist.gov/ACVP/draft-hammett-acvp-kas-ssc-ecc.html#name-test-types
+        assert self.testType == "AFT"  # Algorithm Functional Test
         self.parameterSet: str = d["parameterSet"]
         m = self.param_matcher.match(self.parameterSet)
         assert m
@@ -135,7 +144,8 @@ class SigTest(Test):
 def digest_message(alg: str, msg: bytes) -> bytes:
     if alg.startswith("SHAKE-"):
         dlen = int(alg[6:]) // 4
-        return hashlib.new(alg, msg).digest(dlen)
+        return hashlib.new(alg, msg).digest(dlen)  # type: ignore[call-arg] # https://github.com/python/typeshed/issues/16480
+
     else:
         return hashlib.new(alg, msg).digest()
 
@@ -200,7 +210,7 @@ class SigVerTest(SigTest):
 class KeyGenTestGroup(TestGroup):
     def __init__(self, d: KeyGenTestGroupData) -> None:
         super().__init__(d)
-        self.tests: List[KeyGenTest] = []
+        self.tests: Sequence[KeyGenTest] = []
         for t in d["tests"]:
             self.tests.append(KeyGenTest(t))
 
@@ -208,7 +218,7 @@ class KeyGenTestGroup(TestGroup):
 class SigGenTestGroup(TestGroup):
     def __init__(self, d: SigGenTestGroupData) -> None:
         super().__init__(d)
-        self.tests: List[SigGenTest] = []
+        self.tests: Sequence[SigGenTest] = []
         self.external = d["signatureInterface"] == "external"
         if self.external:
             for t in d["tests"]:
@@ -226,7 +236,7 @@ class SigGenTestGroup(TestGroup):
 class SigVerTestGroup(TestGroup):
     def __init__(self, d: SigVerTestGroupData) -> None:
         super().__init__(d)
-        self.tests: List[SigGenTest] = []
+        self.tests: Sequence[SigVerTest] = []
         self.external = d["signatureInterface"] == "external"
         self.prehash = d["preHash"] == "preHash"
         if self.external:
@@ -271,11 +281,11 @@ def process(testtype: str) -> None:
                 tests += len(group)
             except TestGroupException as e:
                 logging.info(e)
-        print(f"Passed {tests} tests in {len(groups)} {testtype} groups")
+        print(f"{tests} {testtype} tests passed in {len(groups)} groups")
 
 
 if os.environ.get("VERBOSE", None) is not None:
     logging.basicConfig(level=logging.DEBUG)
 
-for t in ["keyGen", "sigGen", "sigVer"]:
+for t in ["keyGen", "sigVer", "sigGen"]:
     process(t)
