@@ -23,7 +23,10 @@ pub extern "C" fn ml_dsa_populate_seed(seed_out: Option<&mut ml_dsa_seed>) -> u8
     let Some(seed_out) = seed_out else {
         return ret::NULL_PTR_ERROR;
     };
-    OsRng.fill_bytes(&mut seed_out.data);
+    if OsRng.try_fill_bytes(&mut seed_out.data).is_err() {
+        seed_out.data = [0u8; 32]; // the OS RNG may have partly filled it
+        return ret::KEYGEN_ERROR;
+    }
     ret::OK
 }
 

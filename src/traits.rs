@@ -1,6 +1,7 @@
 //! Public traits for key generation, signing, verification, and serialization.
 
 use rand_core::{CryptoRng, CryptoRngCore, RngCore};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "default-rng")]
 use rand_core::OsRng;
 
@@ -373,6 +374,8 @@ pub trait Signer {
 }
 
 // This is for the deterministic signing functions
+// It holds a copy of the signing seed rnd, so it wipes itself on drop (FIPS 204 §3.6.3).
+#[derive(Zeroize, ZeroizeOnDrop)]
 struct DummyRng { data: [u8; 32] }
 
 impl RngCore for DummyRng {

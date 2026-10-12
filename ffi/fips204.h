@@ -82,6 +82,8 @@ extern "C" {
 #endif
 
 
+/* Fills seed_out from the OS RNG. Returns ML_DSA_KEYGEN_ERROR, with
+   seed_out zeroed, if the RNG fails. */
 ml_dsa_err ml_dsa_populate_seed(ml_dsa_seed *seed_out);
 
 /* ML-DSA-44 */
