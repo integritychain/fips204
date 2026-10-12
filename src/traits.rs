@@ -462,9 +462,9 @@ pub trait Verifier {
 ///
 /// Note that FIPS 204 (section 3.6.2) specifies only exact length checks for the public key and signature, which the
 /// fixed-size byte arrays enforce. Nonetheless, a `Result()` is returned during all deserialization operations to
-/// preserve the ability to add future checks (and for symmetry across structures). Note that for the current
-/// implementation, both of the private and public key
-/// deserialization routines invoke an internal decode that catches over-sized coefficients (for early detection).
+/// preserve the ability to add future checks (and for symmetry across structures). Private key deserialization
+/// also rejects a key whose `s1` or `s2` has a coefficient outside `[−η, η]`, which a malformed key can encode
+/// (FIPS 204 section 7.2).
 pub trait SerDes {
     /// The fixed-size byte array to be serialized or deserialized
     type ByteArray;

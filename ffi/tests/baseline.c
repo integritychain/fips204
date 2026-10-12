@@ -168,19 +168,15 @@ int main(int argc, const char **argv) {
   }
 #endif
 
-  /* this ought to fail if BitUnpack aborts in skDecode, but it doesn't seem to.
-     Is it possible that the parameters for ML-DSA-44 neatly avoid
-     unrepresentable coefficients in this byte-representation? */
+  /* An all-0xff private key decodes every s1 and s2 coefficient to
+     eta - (2^c - 1), outside [-eta, eta], so deserialization rejects it. */
   for (int i = 0; i < sizeof(priv_weird.data); i++)
     priv_weird.data[i] = 0xff;
   err = MLDSA_sign (&priv_weird, msg, msglen, ctx, ctxlen, &sig);
-  fprintf(stderr, "signing weird yielded %d\n", err);
-#if 0
   if (err != ML_DSA_DESERIALIZATION_ERROR) {
     fprintf (stderr, "Signing with a private_key of all 0xff octets should have failed with deserialization error, got %d\n", err);
     return 1;
   }
-#endif
 
   /* this ought to fail if BitUnpack aborts in pkDecode, but it
      doesn't seem to.  Is it possible that the parameters for

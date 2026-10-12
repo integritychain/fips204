@@ -3,7 +3,7 @@
 use crate::conversion::{
     bit_pack, bit_unpack, hint_bit_pack, hint_bit_unpack, simple_bit_pack, simple_bit_unpack,
 };
-use crate::helpers::{bit_length, is_in_range};
+use crate::helpers::{bit_length, ensure, is_in_range};
 use crate::types::{R, R0};
 use crate::{D, Q};
 
@@ -162,7 +162,7 @@ pub(crate) fn sk_encode<const K: usize, const L: usize, const SK_LEN: usize>(
 ///             `s_1 ∈ R^ℓ`, `s_2 ∈ R^k`, `t_0 ∈ R^k` with coefficients in `[−2^{d−1}+1, 2^{d−1}]`.
 ///
 /// # Errors
-/// Returns an error when any of the output coefficients are out of range. <br>
+/// Returns an error when an `s_1` or `s_2` coefficient is outside `[−η, η]`. <br>
 #[allow(clippy::similar_names, clippy::type_complexity)]
 pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
     eta: i32, sk: &[u8; SK_LEN],
@@ -203,6 +203,15 @@ pub(crate) fn sk_decode<const K: usize, const L: usize, const SK_LEN: usize>(
 
         // 7: end for
     }
+
+    // Beyond pg 34: reject s1 and s2 coefficients outside [−η, η], which steps 3 and 6 allow for
+    // malformed input. Constant time over the secret s1 and s2: (η − x) | (x + η) is negative
+    // exactly when x is outside [−η, η].
+    let mut bad = 0i32;
+    for &x in s_1.iter().chain(s_2.iter()).flat_map(|p| p.0.iter()) {
+        bad |= (eta - x) | (x + eta);
+    }
+    ensure!(bad >= 0, "Alg 25: s1 or s2 out of range");
 
     // 8: for i from 0 to k − 1 do
     let start = start + K * step;
