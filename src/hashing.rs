@@ -6,7 +6,7 @@ use crate::types::{R, R0, T, T0};
 use sha3::digest::core_api::{Buffer, ExtendableOutputCore, UpdateCore, XofReaderCore};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::{Shake128, Shake256, Shake256Core};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// # Function H(v,d) of section 3.7 item 1 at bottom of page 14.
 /// Takes a reference to a list of byte-slice references and runs them through Shake256.
@@ -20,12 +20,12 @@ pub(crate) fn h256_xof(v: &[&[u8]]) -> impl XofReader {
 }
 
 
-/// SHAKE256 over the concatenation of `inputs`, squeezed into `out`, for the uses of H that derive
-/// secret seeds: ρ′ and K from ξ in key generation, and ρ″ from K and rnd in signing. As in
-/// `fips203`, it absorbs through the `core_api`, with no wrapper to move or copy, so that the block
-/// buffer (which keeps the unprocessed tail of the input) and each squeezed block can be wiped
-/// (FIPS 204 §3.6.3). The Keccak state is wiped on drop by the sha3 `zeroize` feature. Callers
-/// follow it with `scrub_hash_stack()`, so it must not be inlined.
+/// SHAKE256 over the concatenation of `inputs`, squeezed into `out`, for the uses of H with secret
+/// output: ρ′ and K from ξ in key generation, ρ″ from K and rnd in signing, and the mask y from ρ″
+/// in `ExpandMask`. As in `fips203`, it absorbs through the `core_api`, with no wrapper to move or
+/// copy, so that the block buffer (which keeps the unprocessed tail of the input) and each squeezed
+/// block can be wiped (FIPS 204 §3.6.3). The Keccak state is wiped on drop by the sha3 `zeroize`
+/// feature. Callers follow it with `scrub_hash_stack()`, so it must not be inlined.
 #[inline(never)]
 pub(crate) fn shake256_wiped(inputs: &[&[u8]], out: &mut [u8]) {
     let mut core = Shake256Core::default();
@@ -197,9 +197,13 @@ pub(crate) fn rej_ntt_poly<const CTEST: bool>(rhos: &[&[u8]]) -> T {
 ///
 /// **Input**: A seed `ρ ∈B^{66}`. <br>
 /// **Output**: A polynomial `a ∈ Rq`.
+///
+/// `ρ` holds the secret ρ′, so this squeezes as `shake256_wiped()` does, wiping the block buffer
+/// and each squeezed block (FIPS 204 §3.6.3). The caller follows it with `scrub_hash_stack()`, so
+/// it must not be inlined.
+#[inline(never)]
 pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R {
     debug_assert_eq!(rhos.iter().map(|&i| i.len()).sum::<usize>(), 528 / 8, "Alg 31: bad rho size");
-    let mut z = [0u8];
     let mut a = R0;
 
     // 1: j ← 0
@@ -207,19 +211,33 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
 
     // 2: ctx ← H.Init()
     // 3: ctx ← H.Absorb(ctx, 𝜌)
-    let mut xof = h256_xof(rhos);
+    let mut core = Shake256Core::default();
+    let mut buffer = Buffer::<Shake256Core>::default();
+    for r in rhos {
+        buffer.digest_blocks(r, |blocks| core.update_blocks(blocks));
+    }
+    let mut reader = core.finalize_xof_core(&mut buffer);
+    buffer.pad_with_zeros().as_mut_slice().zeroize();
+    let mut block = reader.read_block();
+    let mut pos = 0;
 
     // 4: while j < 256 do
     while j < 256 {
         //
         // 5: 𝑧 ← H.Squeeze(ctx, 1)
-        xof.read(&mut z);
+        if pos == block.len() {
+            block.as_mut_slice().zeroize();
+            block = reader.read_block();
+            pos = 0;
+        }
+        let z = block[pos];
+        pos += 1;
 
         // 6: z0 ← CoeffFromHalfByte(z mod 16)
-        let z0 = coeff_from_half_byte::<CTEST>(eta, z[0] & 0x0f);
+        let z0 = coeff_from_half_byte::<CTEST>(eta, z & 0x0f);
 
         // 7: z1 ← CoeffFromHalfByte(⌊z/16⌋)
-        let z1 = coeff_from_half_byte::<CTEST>(eta, z[0] >> 4);
+        let z1 = coeff_from_half_byte::<CTEST>(eta, z >> 4);
 
         // 8: if z0 != ⊥ then
         if let Ok(z0) = z0 {
@@ -249,6 +267,7 @@ pub(crate) fn rej_bounded_poly<const CTEST: bool>(eta: i32, rhos: &[&[u8]]) -> R
 
         // 16: end while
     }
+    block.as_mut_slice().zeroize();
 
     // 17: return a
     a
@@ -298,14 +317,20 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
     // 1: for r from 0 to ℓ − 1 do
     // 2: s1[r] ← RejBoundedPoly(ρ || IntegerToBits(r, 16))
     // 3: end for
-    let s1: [R; L] =
-        core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[r as u8], &[0]]));
+    let s1: [R; L] = core::array::from_fn(|r| {
+        let s = rej_bounded_poly::<CTEST>(eta, &[rho, &[r as u8], &[0]]);
+        scrub_hash_stack();
+        s
+    });
 
     // 4: for r from 0 to k − 1 do
     // 5: s2[r] ← RejBoundedPoly(ρ || IntegerToBits(r + ℓ, 16))
     // 6: end for
-    let s2: [R; K] =
-        core::array::from_fn(|r| rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]));
+    let s2: [R; K] = core::array::from_fn(|r| {
+        let s = rej_bounded_poly::<CTEST>(eta, &[rho, &[(r + L) as u8], &[0]]);
+        scrub_hash_stack();
+        s
+    });
 
     // 7: return (s_1 , s_2)
     debug_assert!(s1.iter().all(|r| is_in_range(r, eta, eta)), "Alg 33: s1 out of range");
@@ -322,7 +347,7 @@ pub(crate) fn expand_s<const CTEST: bool, const K: usize, const L: usize>(
 /// **Output**: Vector `y ∈ R^ℓ`.
 pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) -> [R; L] {
     let mut y = [R0; L];
-    let mut v = [0u8; 32 * 20]; // leaving a few bytes on the table
+    let mut v = Zeroizing::new([0u8; 32 * 20]); // leaving a few bytes on the table
 
     // 1: c ← 1 + bitlen (γ_1 − 1)    ▷ γ_1 is always a power of 2
     let c = 1 + bit_length(gamma1 - 1); // c will either be 18 or 20
@@ -334,9 +359,9 @@ pub(crate) fn expand_mask<const L: usize>(gamma1: i32, rho: &[u8; 64], mu: u16) 
         // 3: rho′ ← rho || IntegerToBytes(mu + r, 2)
         let n = mu + r; // This will perform overflow check in debug, which removes need for above assert
 
-        // 4: v ← H(rho′, 32*c)
-        let mut xof = h256_xof(&[rho, &n.to_le_bytes()]);
-        xof.read(&mut v);
+        // 4: v ← H(rho′, 32*c)    ▷ rho′ and v are secret (FIPS 204 §3.6.3)
+        shake256_wiped(&[rho, &n.to_le_bytes()], &mut v[..]);
+        scrub_hash_stack();
 
         // 5: y[r] ← BitUnpack(v, γ_1 − 1, γ_1)
         y[r as usize] =
