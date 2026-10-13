@@ -1,4 +1,4 @@
-"""FIPS 204 (ML-DSA) Asymmetric Post-Quantum Digital Signatures
+r"""FIPS 204 (ML-DSA) Asymmetric Post-Quantum Digital Signatures
 
 This Python module provides an implementation of FIPS 204, the
 Module-Lattice-based Digital Signature Standard.
@@ -257,14 +257,17 @@ class PublicKey:
             self._pubkey.data[i] = data[i]
 
     def verify(self, sig: bytes, message: bytes, context: bytes = b"") -> bool:
-        """Verify a signature over a given message."""
+        """Verify a signature over a given message.
+
+        Returns False if the signature does not verify, including when it has the wrong length.
+        """
         if not isinstance(sig, bytes):
             raise TypeError(
                 f"{self}.verify wants a signature of type bytes, got {type(sig)}"
             )
         if not isinstance(message, bytes):
             raise TypeError(
-                f"{self}.verify wants a signature of type bytes, got {type(message)}"
+                f"{self}.verify wants a message of type bytes, got {type(message)}"
             )
         if not isinstance(context, bytes):
             raise TypeError(
@@ -272,9 +275,7 @@ class PublicKey:
             )
         sig_param = self._ffi["Signature"]()
         if len(sig) != len(sig_param.data):
-            raise ValueError(
-                f"{self} expects a signature of {len(sig_param.data)} bytes, got {len(sig)} bytes"
-            )
+            return False  # FIPS 204 section 3.6.2: a signature of any other length is invalid
         for i in range(len(sig_param.data)):
             sig_param.data[i] = sig[i]
         msg, msg_len = _buf(message)
@@ -299,14 +300,16 @@ class PublicKey:
         self,
         sig: bytes,
         digest: bytes,
-        hashoid: Union[bytes, str],
+        hash_oid: Union[bytes, str],
         context: bytes = b"",
     ) -> bool:
         """Verify a signature over the digest of a message.
 
         Pass this function the digest of the message, not the message itself.
 
-        `hashoid` is a DER-encoded OID, or a name in `HASH_OIDS`.
+        `hash_oid` is a DER-encoded OID, or a name in `HASH_OIDS`.
+
+        Returns False if the signature does not verify, including when it has the wrong length.
         """
         if not isinstance(sig, bytes):
             raise TypeError(
@@ -320,22 +323,20 @@ class PublicKey:
             raise TypeError(
                 f"{self}.hash_verify wants a context of type bytes, got {type(context)}"
             )
-        if isinstance(hashoid, str):
-            hashoid = HASH_OIDS[hashoid]
-        if not isinstance(hashoid, bytes):
+        if isinstance(hash_oid, str):
+            hash_oid = HASH_OIDS[hash_oid]
+        if not isinstance(hash_oid, bytes):
             raise TypeError(
-                f"{self}.hash_verify wants a hashoid of type bytes or str, got {type(hashoid)}"
+                f"{self}.hash_verify wants a hash_oid of type bytes or str, got {type(hash_oid)}"
             )
         sig_param = self._ffi["Signature"]()
         if len(sig) != len(sig_param.data):
-            raise ValueError(
-                f"{self} expects a signature of {len(sig_param.data)} bytes, got {len(sig)} bytes"
-            )
+            return False  # FIPS 204 section 3.6.2: a signature of any other length is invalid
         for i in range(len(sig_param.data)):
             sig_param.data[i] = sig[i]
         dig, dig_len = _buf(digest)
         ctx, ctx_len = _buf(context)
-        oid, oid_len = _buf(hashoid)
+        oid, oid_len = _buf(hash_oid)
         ret = Err(
             self._ffi["hash_verify"](
                 ctypes.byref(self._pubkey),
@@ -422,12 +423,14 @@ class PrivateKey:
             seed = hedged._seed
         elif isinstance(hedged, bytes):
             if len(hedged) != ML_DSA.SEED_SIZE:
-                raise Exception(
+                raise ValueError(
                     f"Expected a seed of length {ML_DSA.SEED_SIZE}, got {len(hedged)} bytes"
                 )
             seed = _Seed()
             for i in range(ML_DSA.SEED_SIZE):
                 seed.data[i] = hedged[i]
+        elif hedged is not True:
+            raise TypeError(f"hedged must be bool, Seed or bytes, got {type(hedged)}")
         msg, msg_len = _buf(message)
         ctx, ctx_len = _buf(context)
         ret = Err(
@@ -450,13 +453,13 @@ class PrivateKey:
     def hash_sign(
         self,
         digest: bytes,
-        hashoid: Union[bytes, str],
+        hash_oid: Union[bytes, str],
         context: bytes = b"",
         hedged: Union[bool, Seed, bytes] = True,
     ) -> bytes:
         """Sign a message hash `digest` in the given `context`, producing a bytes representation of a signature.
 
-        `hashoid` is a DER-encoded OID, or a name in `HASH_OIDS`.
+        `hash_oid` is a DER-encoded OID, or a name in `HASH_OIDS`.
 
         For normal hedged signatures, leave `hedged` set to `True` (the default).
         For deterministic signatures, pass `hedged=False`.
@@ -470,11 +473,11 @@ class PrivateKey:
             raise TypeError(
                 f"{self}.hash_sign wants a context of type bytes, got {type(context)}"
             )
-        if isinstance(hashoid, str):
-            hashoid = HASH_OIDS[hashoid]
-        if not isinstance(hashoid, bytes):
+        if isinstance(hash_oid, str):
+            hash_oid = HASH_OIDS[hash_oid]
+        if not isinstance(hash_oid, bytes):
             raise TypeError(
-                f"{self}.hash_sign wants a hashoid of type bytes or str, got {type(hashoid)}"
+                f"{self}.hash_sign wants a hash_oid of type bytes or str, got {type(hash_oid)}"
             )
         sig = self._ffi["Signature"]()
         seed: _Seed
@@ -485,15 +488,17 @@ class PrivateKey:
             seed = hedged._seed
         elif isinstance(hedged, bytes):
             if len(hedged) != ML_DSA.SEED_SIZE:
-                raise Exception(
+                raise ValueError(
                     f"Expected a seed of length {ML_DSA.SEED_SIZE}, got {len(hedged)} bytes"
                 )
             seed = _Seed()
             for i in range(ML_DSA.SEED_SIZE):
                 seed.data[i] = hedged[i]
+        elif hedged is not True:
+            raise TypeError(f"hedged must be bool, Seed or bytes, got {type(hedged)}")
         dig, dig_len = _buf(digest)
         ctx, ctx_len = _buf(context)
-        oid, oid_len = _buf(hashoid)
+        oid, oid_len = _buf(hash_oid)
         ret = Err(
             self._ffi["hash_sign"](
                 ctypes.byref(self._privkey),
