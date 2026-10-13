@@ -12,6 +12,7 @@ jobs:
       id-token: write
       contents: read
       attestations: write
+      artifact-metadata: write
     strategy:
       matrix:
         rust:
@@ -20,18 +21,18 @@ jobs:
           - thumbv7em-none-eabi
           - x86_64-pc-windows-gnu
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
       - run: cargo build --target ${{ matrix.target }} --release --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
       - name: Attest
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: '${{ github.workspace }}/target/*/release/libfips204.rlib'
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.target }}--libfips204.rlib
           path: '${{ github.workspace }}/target/*/release/libfips204.rlib'

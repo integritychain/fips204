@@ -4,6 +4,10 @@ name: test
 on: [ push, pull_request ]
 
 
+permissions:
+  contents: read
+
+
 env:
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: "-Dwarnings"
@@ -28,8 +32,8 @@ jobs:
           - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
@@ -38,9 +42,14 @@ jobs:
 
   cargo_audit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write  # audit-check creates a "Security audit" check run when it finds advisories
     steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v1.4.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # audit-check v2 reads Cargo.lock but no longer creates it, and this repo does not commit one
+      - run: cargo generate-lockfile
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -48,15 +57,17 @@ jobs:
   cargo_deny:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
 
 
   cargo_outdated:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
+        with:
+          toolchain: stable
       - name: Install cargo outdated
         run: cargo install --locked cargo-outdated
       - name: Run cargo outdated
@@ -67,9 +78,10 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
+          toolchain: stable
           components: clippy
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features
@@ -80,10 +92,14 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
+        with:
+          toolchain: stable
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+        with:
+          tool: cargo-llvm-cov
       # The FFI is tested from C and Python (the `ffi` job), which llvm-cov cannot see.
       # Including it would only add a 0% crate to the total.
       - name: Generate code coverage
@@ -117,13 +133,13 @@ jobs:
             rust: stable
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: ${{ matrix.deps }}
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
-      - uses: RustCrypto/actions/cross-install@master
+      - uses: RustCrypto/actions/cross-install@efc9b5d1c965d13258baa76a080e85a7c495c658 # master 2026-08-04
       # Release profile, all three parameter sets. No OS RNG, and not the dudect feature.
       - run: cross test --release --target ${{ matrix.target }} --no-default-features --features "ml-dsa-44 ml-dsa-65 ml-dsa-87"
 
@@ -131,9 +147,9 @@ jobs:
   doc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: RustCrypto/actions/cargo-cache@efc9b5d1c965d13258baa76a080e85a7c495c658 # master 2026-08-04
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
           toolchain: stable
       - run: cargo doc --all-features
@@ -157,8 +173,8 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             rust: stable
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
           toolchain: ${{ matrix.rust }}
           targets: ${{ matrix.target }}
@@ -170,8 +186,10 @@ jobs:
   ffi:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
+        with:
+          toolchain: stable
       - name: Build shared library and run C tests
         run: |
           cargo build -p fips204-ffi

@@ -1,0 +1,14 @@
+# Keeps the SHA-pinned actions in .github/workflows current. RustCrypto/actions has no tags,
+# so Dependabot cannot bump it; update that pin by hand.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
