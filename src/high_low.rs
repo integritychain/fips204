@@ -190,3 +190,112 @@ pub(crate) fn use_hint(gamma2: i32, h: Zq, r: Zq) -> Zq {
     // 5: return r1
     // r1 see first 'if' above
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // gamma2 for ML-DSA-44, and for ML-DSA-65 and ML-DSA-87 (Table 1 on page 15)
+    const GAMMA2S: [i32; 2] = [(Q - 1) / 88, (Q - 1) / 32];
+
+    // m mod± α for even α: the m' ≡ m (mod α) with −α/2 < m' ≤ α/2 (section 2.3)
+    fn mod_pm(m: i32, alpha: i32) -> i32 {
+        let r = m.rem_euclid(alpha);
+        if r > alpha / 2 {
+            r - alpha
+        } else {
+            r
+        }
+    }
+
+    // Algorithm 36, step by step
+    fn spec_decompose(gamma2: i32, r: i32) -> (i32, i32) {
+        let rp = r.rem_euclid(Q);
+        let r0 = mod_pm(rp, 2 * gamma2);
+        if rp - r0 == Q - 1 {
+            (0, r0 - 1)
+        } else {
+            ((rp - r0) / (2 * gamma2), r0)
+        }
+    }
+
+    // Algorithm 40, step by step
+    fn spec_use_hint(gamma2: i32, h: i32, r: i32) -> i32 {
+        let m = (Q - 1) / (2 * gamma2);
+        let (r1, r0) = spec_decompose(gamma2, r);
+        if h == 1 && r0 > 0 {
+            return (r1 + 1).rem_euclid(m);
+        }
+        if h == 1 && r0 <= 0 {
+            return (r1 - 1).rem_euclid(m);
+        }
+        r1
+    }
+
+    // Every r in [0, q), and r − q as callers pass it after `partial_reduce32()`
+    #[test]
+    fn decompose_and_use_hint_exhaustive() {
+        for gamma2 in GAMMA2S {
+            for r in 0..Q {
+                let (r1, r0) = spec_decompose(gamma2, r);
+                assert_eq!(decompose(gamma2, r), (r1, r0), "Decompose({r}), gamma2 {gamma2}");
+                assert_eq!(
+                    decompose(gamma2, r - Q),
+                    (r1, r0),
+                    "Decompose({r} - q), gamma2 {gamma2}"
+                );
+                assert_eq!(high_bits(gamma2, r), r1, "HighBits({r}), gamma2 {gamma2}");
+                assert_eq!(low_bits(gamma2, r), r0, "LowBits({r}), gamma2 {gamma2}");
+                for h in 0..=1 {
+                    let expected = spec_use_hint(gamma2, h, r);
+                    assert_eq!(
+                        use_hint(gamma2, h, r),
+                        expected,
+                        "UseHint({h}, {r}), gamma2 {gamma2}"
+                    );
+                }
+            }
+        }
+        // Hand-computed values: either side of the step-3 edge q − γ2 for ML-DSA-44, and
+        // UseHint(1, r) with r0 = 0, which must step down (r1 − 1) mod m
+        assert_eq!(decompose(GAMMA2S[0], 8_285_184), (43, 95_232));
+        assert_eq!(decompose(GAMMA2S[0], 8_285_185), (0, -95_232));
+        assert_eq!(use_hint(GAMMA2S[0], 1, 0), 43);
+        assert_eq!(use_hint(GAMMA2S[1], 1, 0), 15);
+    }
+
+    // Algorithm 35 over every r in [0, q): r0 = r mod± 2^d and r1 = (r − r0)/2^d
+    #[test]
+    fn power2round_exhaustive() {
+        for start in (0..Q).step_by(256) {
+            let r = [R(core::array::from_fn(|n| {
+                (start + i32::try_from(n).unwrap()).min(Q - 1)
+            }))];
+            let (r_1, r_0) = power2round(&r);
+            for ((&x, &x1), &x0) in r[0].0.iter().zip(&r_1[0].0).zip(&r_0[0].0) {
+                let e0 = mod_pm(x, 1 << D);
+                assert_eq!((x1, x0), ((x - e0) / (1 << D), e0), "Power2Round({x})");
+            }
+        }
+    }
+
+    // Algorithm 39 around every HighBits bin edge, with z as given and as Q + z (signing
+    // passes Q − c·t0)
+    #[test]
+    fn make_hint_bin_edges() {
+        for gamma2 in GAMMA2S {
+            for k in 0..(Q - 1) / (2 * gamma2) {
+                let edge = k * 2 * gamma2 + gamma2; // r0 = γ2, the top of bin k
+                for r in edge - 2..=edge + 2 {
+                    for z in -2..=2 {
+                        let expected =
+                            spec_decompose(gamma2, r).0 != spec_decompose(gamma2, r + z).0;
+                        assert_eq!(make_hint(gamma2, z, r), expected, "MakeHint({z}, {r})");
+                        assert_eq!(make_hint(gamma2, Q + z, r), expected, "MakeHint(q + {z}, {r})");
+                    }
+                }
+            }
+        }
+    }
+}
