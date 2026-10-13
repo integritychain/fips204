@@ -3,8 +3,10 @@
 use crate::conversion::{bit_unpack, coeff_from_half_byte, coeff_from_three_bytes};
 use crate::helpers::{bit_length, is_in_range};
 use crate::types::{R, R0, T, T0};
+use sha3::digest::core_api::{Buffer, ExtendableOutputCore, UpdateCore, XofReaderCore};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
-use sha3::{Shake128, Shake256};
+use sha3::{Shake128, Shake256, Shake256Core};
+use zeroize::Zeroize;
 
 /// # Function H(v,d) of section 3.7 item 1 at bottom of page 14.
 /// Takes a reference to a list of byte-slice references and runs them through Shake256.
@@ -15,6 +17,43 @@ pub(crate) fn h256_xof(v: &[&[u8]]) -> impl XofReader {
         hasher.update(b);
     }
     hasher.finalize_xof()
+}
+
+
+/// SHAKE256 over the concatenation of `inputs`, squeezed into `out`, for the uses of H that derive
+/// secret seeds: ρ′ and K from ξ in key generation, and ρ″ from K and rnd in signing. As in
+/// `fips203`, it absorbs through the `core_api`, with no wrapper to move or copy, so that the block
+/// buffer (which keeps the unprocessed tail of the input) and each squeezed block can be wiped
+/// (FIPS 204 §3.6.3). The Keccak state is wiped on drop by the sha3 `zeroize` feature. Callers
+/// follow it with `scrub_hash_stack()`, so it must not be inlined.
+#[inline(never)]
+pub(crate) fn shake256_wiped(inputs: &[&[u8]], out: &mut [u8]) {
+    let mut core = Shake256Core::default();
+    let mut buffer = Buffer::<Shake256Core>::default();
+    for i in inputs {
+        buffer.digest_blocks(i, |blocks| core.update_blocks(blocks));
+    }
+    let mut reader = core.finalize_xof_core(&mut buffer);
+    buffer.pad_with_zeros().as_mut_slice().zeroize();
+    for chunk in out.chunks_mut(136) {
+        let mut block = reader.read_block();
+        chunk.copy_from_slice(&block[..chunk.len()]);
+        block.as_mut_slice().zeroize();
+    }
+}
+
+
+/// Overwrites the stack area that `shake256_wiped()` just used. sha3 0.10 returns each squeezed
+/// block by value and permutes on stack copies of the state, so its own frames can still hold
+/// secret-derived bytes that no wipe in this crate can reach (FIPS 204 §3.6.3). It is called from
+/// the same frame as the hash function, so this frame overlays the hash's.
+#[inline(never)]
+pub(crate) fn scrub_hash_stack() {
+    // 2 KiB, wiped a word at a time, as in `fips203`. It covers the hash frames of an optimized
+    // build, but not those of an unoptimized one.
+    let mut area = [0u64; 256];
+    area.zeroize();
+    let _ = core::hint::black_box(&area);
 }
 
 

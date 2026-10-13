@@ -1,7 +1,9 @@
 // This file implements functionality from FIPS 204 sections 6/7: Key Generation, Signing, Verification
 
 use crate::encodings::{pk_decode, pk_encode, sig_decode, sig_encode, sk_decode, w1_encode};
-use crate::hashing::{expand_a, expand_mask, expand_s, h256_xof, sample_in_ball};
+use crate::hashing::{
+    expand_a, expand_mask, expand_s, h256_xof, sample_in_ball, scrub_hash_stack, shake256_wiped,
+};
 use crate::helpers::{
     add_vector_ntt, center_mod, full_reduce32, infinity_norm, mat_vec_mul, mont_reduce,
     partial_reduce32, to_mont,
@@ -64,19 +66,19 @@ pub(crate) fn key_gen_internal<
 ) -> (PublicKey<K, L>, PrivateKey<K, L>) {
     //
     // 1: (rho, rho′, 𝐾) ∈ 𝔹^{32} × 𝔹^{64} × 𝔹^{32} ← H(𝜉||IntegerToBytes(𝑘,1)||IntegerToBytes(ℓ,1),128)
-    let mut h2 = h256_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
-    let mut rho = [0u8; 32];
-    h2.read(&mut rho);
-    // ρ′ and K are wiped when they go out of scope (FIPS 204 §3.6.3); K is copied into sk
-    let mut rho_prime = Zeroizing::new([0u8; 64]);
-    h2.read(&mut rho_prime[..]);
-    let mut cap_k = Zeroizing::new([0u8; 32]);
-    h2.read(&mut cap_k[..]);
+    // ρ′ and K are wiped when they go out of scope, and the hash leaves no copy of them
+    // (FIPS 204 §3.6.3); K is copied into sk
+    let mut h2 = Zeroizing::new([0u8; 128]);
+    shake256_wiped(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]], &mut h2[..]);
+    scrub_hash_stack();
+    let rho: [u8; 32] = h2[0..32].try_into().expect("Alg 6: try_into fail");
+    let rho_prime: &[u8; 64] = h2[32..96].try_into().expect("Alg 6: try_into fail");
+    let cap_k: &[u8; 32] = h2[96..128].try_into().expect("Alg 6: try_into fail");
 
     // There is effectively no step 2 due to formatting error in spec
 
     // 4: (s_1, s_2) ← ExpandS(ρ′)
-    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, &rho_prime);
+    let (s_1, s_2): ([R; L], [R; K]) = expand_s::<CTEST, K, L>(eta, rho_prime);
 
     // 3: cap_a_hat ← ExpandA(ρ)    ▷ A is generated and stored in NTT representation as Â
     // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
@@ -203,10 +205,10 @@ pub(crate) fn sign_internal<
     // --> computed by the caller with `mu()` and passed in
 
     // 7: ρ′' ← H(K || rnd || µ, 64)    ▷ Compute private random seed
-    // ρ″ is wiped when it goes out of scope (FIPS 204 §3.6.3)
-    let mut h7 = h256_xof(&[cap_k, rnd, mu]);
+    // ρ″ is wiped when it goes out of scope, and the hash leaves no copy of it (FIPS 204 §3.6.3)
     let mut rho_prime = Zeroizing::new([0u8; 64]);
-    h7.read(&mut rho_prime[..]);
+    shake256_wiped(&[cap_k, rnd, mu], &mut rho_prime[..]);
+    scrub_hash_stack();
 
     // 8: κ ← 0    ▷ Initialize counter κ
     let mut kappa_ctr = 0u16;
