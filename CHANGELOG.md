@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Verifier::verify` and `Verifier::hash_verify` are `#[must_use]`, as in `fips205`. Ignoring the result is now a compiler warning.
 - Release builds use opt-level 3.
 - The constant-time claim covers one attempt. Rejection sampling may repeat. Within an attempt, key generation and signing do not branch on secret data.
-- The SHAKE (Keccak) state, and the copy of `rnd` that `try_sign_with_seed` and `try_hash_sign_with_seed` hold, are wiped on drop (FIPS 204 §3.6.3). This needs `sha3` 0.10.9 or later.
+- Key generation and signing wipe their seeds and random values on drop: ξ, ρ′, K, ρ″ and `rnd`, including the copy of `rnd` that `try_sign_with_seed` and `try_hash_sign_with_seed` hold. The SHAKE (Keccak) state is wiped on drop too (FIPS 204 §3.6.3). This needs `sha3` 0.10.9 or later.
 
 ### Removed
 - Temporary `_internal_sign` and `_internal_verify`.

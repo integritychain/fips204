@@ -12,6 +12,7 @@ use crate::types::{PrivateKey, PublicKey, R, T};
 use crate::{D, Q};
 use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
+use zeroize::Zeroizing;
 
 
 /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
@@ -37,8 +38,9 @@ pub(crate) fn key_gen<
     // 2: if ξ = NULL then
     // 3:   return ⊥    ▷ return an error indication if random bit generation failed
     // 4: end if
-    let mut xi = [0u8; 32];
-    rng.try_fill_bytes(&mut xi).map_err(|_| "KeyGen: Random number generator failed")?;
+    // ξ is wiped when it goes out of scope, including on an RNG failure (FIPS 204 §3.6.3)
+    let mut xi = Zeroizing::new([0u8; 32]);
+    rng.try_fill_bytes(&mut xi[..]).map_err(|_| "KeyGen: Random number generator failed")?;
 
     // 5: return ML-DSA.KeyGen_internal(𝜉)
     Ok(key_gen_internal::<CTEST, K, L, PK_LEN, SK_LEN>(eta, &xi))
@@ -65,10 +67,11 @@ pub(crate) fn key_gen_internal<
     let mut h2 = h256_xof(&[xi, &[K.to_le_bytes()[0]], &[L.to_le_bytes()[0]]]);
     let mut rho = [0u8; 32];
     h2.read(&mut rho);
-    let mut rho_prime = [0u8; 64];
-    h2.read(&mut rho_prime);
-    let mut cap_k = [0u8; 32];
-    h2.read(&mut cap_k);
+    // ρ′ and K are wiped when they go out of scope (FIPS 204 §3.6.3); K is copied into sk
+    let mut rho_prime = Zeroizing::new([0u8; 64]);
+    h2.read(&mut rho_prime[..]);
+    let mut cap_k = Zeroizing::new([0u8; 32]);
+    h2.read(&mut cap_k[..]);
 
     // There is effectively no step 2 due to formatting error in spec
 
@@ -124,7 +127,14 @@ pub(crate) fn key_gen_internal<
     let t_0_hat_mont: [T; K] = to_mont(&ntt(&t_0));
 
     // Now we have everything we need for private key struct
-    let sk = PrivateKey { rho, cap_k, tr, s_1_hat_mont, s_2_hat_mont, t_0_hat_mont };
+    let sk = PrivateKey {
+        rho,
+        cap_k: *cap_k,
+        tr,
+        s_1_hat_mont,
+        s_2_hat_mont,
+        t_0_hat_mont,
+    };
 
     // 11: return (pk, sk)
     (pk, sk)
@@ -169,7 +179,7 @@ pub(crate) fn sign_internal<
     const W1_LEN: usize,
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, esk: &PrivateKey<K, L>,
-    mu: &[u8; 64], rnd: [u8; 32],
+    mu: &[u8; 64], rnd: &[u8; 32],
 ) -> [u8; SIG_LEN] {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
@@ -193,9 +203,10 @@ pub(crate) fn sign_internal<
     // --> computed by the caller with `mu()` and passed in
 
     // 7: ρ′' ← H(K || rnd || µ, 64)    ▷ Compute private random seed
-    let mut h7 = h256_xof(&[cap_k, &rnd, mu]);
-    let mut rho_prime = [0u8; 64];
-    h7.read(&mut rho_prime);
+    // ρ″ is wiped when it goes out of scope (FIPS 204 §3.6.3)
+    let mut h7 = h256_xof(&[cap_k, rnd, mu]);
+    let mut rho_prime = Zeroizing::new([0u8; 64]);
+    h7.read(&mut rho_prime[..]);
 
     // 8: κ ← 0    ▷ Initialize counter κ
     let mut kappa_ctr = 0u16;

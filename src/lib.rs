@@ -286,8 +286,9 @@ macro_rules! functionality {
                 // 6: if rnd = NULL then
                 // 7:   return ⊥    ▷ return an error indication if random bit generation failed
                 // 8: end if
-                let mut rnd = [0u8; 32];
-                rng.try_fill_bytes(&mut rnd).map_err(|_| "ML-DSA.Sign: random number generator failed")?;
+                // rnd is wiped when it goes out of scope (FIPS 204 §3.6.3)
+                let mut rnd = zeroize::Zeroizing::new([0u8; 32]);
+                rng.try_fill_bytes(&mut rnd[..]).map_err(|_| "ML-DSA.Sign: random number generator failed")?;
 
                 // 9:  (blank line in spec)
 
@@ -297,7 +298,7 @@ macro_rules! functionality {
 
                 // 11: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, rnd
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, &rnd
                 );
 
                 // 12: return 𝜎
@@ -338,8 +339,9 @@ macro_rules! functionality {
                 // 6: if rnd = NULL then
                 // 7:   return ⊥    ▷ return an error indication if random bit generation failed
                 // 8: end if
-                let mut rnd = [0u8; 32];
-                rng.try_fill_bytes(&mut rnd).map_err(|_| "HashML-DSA.Sign: random number generator failed")?;
+                // rnd is wiped when it goes out of scope (FIPS 204 §3.6.3)
+                let mut rnd = zeroize::Zeroizing::new([0u8; 32]);
+                rng.try_fill_bytes(&mut rnd[..]).map_err(|_| "HashML-DSA.Sign: random number generator failed")?;
 
                 // 9:  (blank line in spec)
                 // steps 10-22 are performed outside of this module
@@ -350,7 +352,7 @@ macro_rules! functionality {
 
                 // 24: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, rnd
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, &rnd
                 );
 
                 // 25: return 𝜎
@@ -472,13 +474,14 @@ macro_rules! functionality {
             pub fn sign_mu(
                 &self, rng: &mut impl CryptoRngCore, mu: &[u8; 64], hedged: bool,
             ) -> Result<[u8; SIG_LEN], &'static str> {
-                let mut rnd = [0u8; 32];
+                // rnd is wiped when it goes out of scope (FIPS 204 §3.6.3)
+                let mut rnd = zeroize::Zeroizing::new([0u8; 32]);
                 if hedged {
-                    rng.try_fill_bytes(&mut rnd)
+                    rng.try_fill_bytes(&mut rnd[..])
                         .map_err(|_| "ML-DSA.Sign_internal: random number generator failed")?;
                 }
                 Ok(ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, mu, rnd
+                    BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, mu, &rnd
                 ))
             }
         }
@@ -710,12 +713,13 @@ macro_rules! functionality {
             rng: &mut impl CryptoRngCore, message: &[u8],
         ) -> Result<[u8; SIG_LEN], &'static str> {
             let (_pk, sk) = ml_dsa::key_gen::<true, K, L, PK_LEN, SK_LEN>(rng, ETA)?;
-            let mut rnd = [0u8; 32];
-            rng.try_fill_bytes(&mut rnd).map_err(|_| "Random number generator failed")?;
+            // rnd is wiped when it goes out of scope (FIPS 204 §3.6.3)
+            let mut rnd = zeroize::Zeroizing::new([0u8; 32]);
+            rng.try_fill_bytes(&mut rnd[..]).map_err(|_| "Random number generator failed")?;
             // Pure ML-DSA framing of `message` with an empty context
             let mu = ml_dsa::mu(&[&sk.tr, &[0u8], &[0u8], message]);
             let sig = ml_dsa::sign_internal::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
-                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, &mu, rnd
+                BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, &mu, &rnd
             );
             Ok(sig)
         }
