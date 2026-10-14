@@ -1,34 +1,38 @@
-An example constant-time workbench. It can be sensitive to config/defaults, so is
-not entirely definitive. A work in progress.
+Constant-time measurement of `fips204` key generation and signing with
+[dudect-bencher](https://docs.rs/dudect-bencher/0.6.0/dudect_bencher/). Each sample generates an
+ML-DSA-44 key pair and signs a fixed message with it, five times. The `dudect` feature's
+`dudect_keygen_sign_with_rng` makes each signature a single attempt and removes timing variation
+that comes only from non-secret data, such as rejection sampling of values derived from rho. The two
+classes use different fixed seeds and signing randomness (every byte 0xAA, or every byte 0x55) and
+alternate sample by sample, so a timing difference between two keys shows up as a large t-value.
+Results depend on the machine and configuration; they are evidence, not proof.
 
 Depends on crates.io `dudect-bencher` 0.6 and `rand_core` 0.6.4, the same RNG
 line as `fips204`.
 
-See <https://docs.rs/dudect-bencher/0.6.0/dudect_bencher/>
-
 > t-values greater than 5 are generally considered a good indication that the function is not constant time. t-values less than 5 does not necessarily imply that the function is constant-time, since there may be other input distributions under which the function behaves significantly differently.
 
 ~~~
-October 16, 2024
-Intel® Core™ i7-7700K CPU @ 4.20GHz × 8  Circa 2017  Rust 1.81
+October 14, 2026
+13th Gen Intel® Core™ i7-13700K × 24  Circa 2022  Rust 1.98.1  fips204 v0.5.0
 
 $ cd dudect  # this directory
-$ cargo clean
-$ time RUSTFLAGS="-C target-cpu=native" cargo run --release
+$ cargo +stable clean
+     Removed 0 files
+$ time RUSTFLAGS="-C target-cpu=native" taskset -c 12 cargo +stable run --release  # A ~8 minute run on one P-core
 
 ...
-   Compiling fips204 v0.5.0 (/home/eric/work/fips204)
-   Compiling fips204-dudect v0.5.0 (/home/eric/work/fips204/dudect)
-    Finished `release` profile [optimized + debuginfo] target(s) in 20.92s
+    Finished `release` profile [optimized + debuginfo] target(s) in 19.12s
      Running `target/release/fips204-dudect`
 
 running 1 bench
-bench keygen_and_sign seeded with 0xef78035f1caaa970
-bench keygen_and_sign ... : n == +1.049M, max t = +0.89328, max tau = +0.00087, (5/tau)^2 = 32852562
+bench keygen_and_sign seeded with 0x5eeb98ba6db29056
+bench keygen_and_sign ... : n == +1.044M, max t = +1.58916, max tau = +0.00156, (5/tau)^2 = 10336778
 
 dudect benches complete
 
 
-real	14m5.190s
-user	14m20.882s
+real	8m22.583s
+user	8m21.036s
+sys	0m1.416s
 ~~~
