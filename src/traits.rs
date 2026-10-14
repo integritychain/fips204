@@ -1,9 +1,9 @@
 //! Public traits for key generation, signing, verification, and serialization.
 
-use rand_core::{CryptoRng, CryptoRngCore, RngCore};
-use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "default-rng")]
 use rand_core::OsRng;
+use rand_core::{CryptoRng, CryptoRngCore, RngCore};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 
 /// The `KeyGen` trait is defined to allow trait objects for keygen.
@@ -221,7 +221,7 @@ pub trait Signer {
     fn try_sign_with_seed(
         &self, seed: &[u8; 32], message: &[u8], ctx: &[u8],
     ) -> Result<Self::Signature, &'static str> {
-        self.try_sign_with_rng(&mut DummyRng {data: *seed}, message, ctx)
+        self.try_sign_with_rng(&mut DummyRng { data: *seed }, message, ctx)
     }
 
 
@@ -345,9 +345,9 @@ pub trait Signer {
     /// # Ok(())}
     /// ```
     fn try_hash_sign_with_seed(
-        &self, seed: &[u8;32], hash: &[u8], ctx: &[u8], hash_oid: &[u8],
+        &self, seed: &[u8; 32], hash: &[u8], ctx: &[u8], hash_oid: &[u8],
     ) -> Result<Self::Signature, &'static str> {
-        self.try_hash_sign_with_rng(&mut DummyRng {data: *seed}, hash, ctx, hash_oid)
+        self.try_hash_sign_with_rng(&mut DummyRng { data: *seed }, hash, ctx, hash_oid)
     }
 
 
@@ -376,7 +376,9 @@ pub trait Signer {
 // This is for the deterministic signing functions
 // It holds a copy of the signing seed rnd, so it wipes itself on drop (FIPS 204 §3.6.3).
 #[derive(Zeroize, ZeroizeOnDrop)]
-struct DummyRng { data: [u8; 32] }
+struct DummyRng {
+    data: [u8; 32],
+}
 
 impl RngCore for DummyRng {
     fn next_u32(&mut self) -> u32 { unimplemented!() }
@@ -454,7 +456,9 @@ pub trait Verifier {
     /// # Ok(())}
     /// ```
     #[must_use]
-    fn hash_verify(&self, hash: &[u8], signature: &Self::Signature, ctx: &[u8], hash_oid: &[u8]) -> bool;
+    fn hash_verify(
+        &self, hash: &[u8], signature: &Self::Signature, ctx: &[u8], hash_oid: &[u8],
+    ) -> bool;
 }
 
 

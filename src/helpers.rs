@@ -43,7 +43,7 @@ pub(crate) const fn partial_reduce64(a: i64) -> i32 {
     res as i32
 }
 
-#[allow(dead_code, clippy::cast_possible_truncation)]  // I may come back to this and experiment more
+#[allow(dead_code, clippy::cast_possible_truncation)] // I may come back to this and experiment more
 pub(crate) const fn partial_reduce64b(a: i64) -> i32 {
     const MM: i64 = ((1 << 64) / (Q as i128)) as i64;
     let q = (a as i128 * MM as i128) >> 64; // only top half is relevant

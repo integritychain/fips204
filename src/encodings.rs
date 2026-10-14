@@ -429,12 +429,7 @@ mod tests {
         tr.fill_with(rand::random);
         let s1 = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
         let s2 = [get_vec(2), get_vec(2), get_vec(2), get_vec(2)];
-        let t0 = [
-            get_vec(1 << 11),
-            get_vec(1 << 11),
-            get_vec(1 << 11),
-            get_vec(1 << 11),
-        ];
+        let t0 = [get_vec(1 << 11), get_vec(1 << 11), get_vec(1 << 11), get_vec(1 << 11)];
         //let mut sk = [0u8; 2560];
         let sk = sk_encode::<4, 4, 2560>(2, &rho, &k, &tr, &s1, &s2, &t0);
         let res = sk_decode::<4, 4, 2560>(2, &sk);

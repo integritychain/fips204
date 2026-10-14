@@ -1,11 +1,12 @@
 #![no_main]
-use libfuzzer_sys::fuzz_target;
 use fips204::ml_dsa_44::{PrivateKey, PublicKey, KG, SIG_LEN};
-use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 use fips204::pre_hash;
+use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
+use libfuzzer_sys::fuzz_target;
 use rand_core::OsRng;
 
-fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
+fuzz_target!(|data: [u8; 2560 + 2420 + 1312]| {
+    // sk_len + sig_len + pk_len = 6292
 
     // A good reference set
     let (pk_good, sk_good) = KG::try_keygen().unwrap();
@@ -19,10 +20,10 @@ fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
     let sk_fuzz = PrivateKey::try_from_bytes(sk_bytes);
 
     // Extract a 'fuzzy' signature
-    let sig_fuzz: [u8; SIG_LEN] = data[2560..2560+2420].try_into().unwrap();
+    let sig_fuzz: [u8; SIG_LEN] = data[2560..2560 + 2420].try_into().unwrap();
 
     // Extract then deserialize a 'fuzzy' public key
-    let pk_bytes = data[2560+2420..2560+2420+1312].try_into().unwrap();
+    let pk_bytes = data[2560 + 2420..2560 + 2420 + 1312].try_into().unwrap();
     let pk_fuzz = PublicKey::try_from_bytes(pk_bytes);
 
     // Try to use 'fuzzy' sk
@@ -49,5 +50,5 @@ fuzz_target!(|data: [u8; 2560+2420+1312]| {  // sk_len + sig_len + pk_len = 6292
         let digest = [0u8, 1, 2, 3];
         let sig = sk.try_hash_sign_with_rng(&mut OsRng, &digest, &[], oid).unwrap();
         let _res = pk.hash_verify(&digest, &sig, &[], oid);
-}
+    }
 });

@@ -269,9 +269,7 @@ mod tests {
     #[test]
     fn power2round_exhaustive() {
         for start in (0..Q).step_by(256) {
-            let r = [R(core::array::from_fn(|n| {
-                (start + i32::try_from(n).unwrap()).min(Q - 1)
-            }))];
+            let r = [R(core::array::from_fn(|n| (start + i32::try_from(n).unwrap()).min(Q - 1)))];
             let (r_1, r_0) = power2round(&r);
             for ((&x, &x1), &x0) in r[0].0.iter().zip(&r_1[0].0).zip(&r_0[0].0) {
                 let e0 = mod_pm(x, 1 << D);

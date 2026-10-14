@@ -26,13 +26,16 @@ use fips204::ml_dsa_65;
 #[cfg(feature = "ml-dsa-87")]
 use fips204::ml_dsa_87;
 
-use fips204::traits::{SerDes,KeyGen,Verifier,Signer};
+use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 
 use fips204::pre_hash;
 
 use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake128, Shake256,
+};
 use sha3::{Sha3_224, Sha3_256, Sha3_384, Sha3_512};
-use sha3::{Shake128, Shake256, digest::{Update, ExtendableOutput, XofReader}};
 
 // ----- CUSTOM RNG TO REPLAY VALUES -----
 struct TestRng {
@@ -81,13 +84,23 @@ impl Tally {
     }
 
     fn count(&mut self, handled: bool) {
-        if handled { self.ran += 1 } else { self.feature_skipped += 1 }
+        if handled {
+            self.ran += 1
+        } else {
+            self.feature_skipped += 1
+        }
     }
 
     fn finish(&self, which: &str) {
-        println!("NIST {which}: ran {}, feature-skipped {}, of {}", self.ran, self.feature_skipped, self.total);
+        println!(
+            "NIST {which}: ran {}, feature-skipped {}, of {}",
+            self.ran, self.feature_skipped, self.total
+        );
         if self.hook_skipped > 0 {
-            println!("NIST {which}: skipped {} internal cases; rerun with --features acvp-internal", self.hook_skipped);
+            println!(
+                "NIST {which}: skipped {} internal cases; rerun with --features acvp-internal",
+                self.hook_skipped
+            );
         }
         assert_eq!(
             self.ran + self.feature_skipped + self.hook_skipped,
@@ -104,11 +117,20 @@ macro_rules! dispatch {
     ($set:expr, $run:ident) => {
         match $set {
             #[cfg(feature = "ml-dsa-44")]
-            "ML-DSA-44" => { $run!(ml_dsa_44); true }
+            "ML-DSA-44" => {
+                $run!(ml_dsa_44);
+                true
+            }
             #[cfg(feature = "ml-dsa-65")]
-            "ML-DSA-65" => { $run!(ml_dsa_65); true }
+            "ML-DSA-65" => {
+                $run!(ml_dsa_65);
+                true
+            }
             #[cfg(feature = "ml-dsa-87")]
-            "ML-DSA-87" => { $run!(ml_dsa_87); true }
+            "ML-DSA-87" => {
+                $run!(ml_dsa_87);
+                true
+            }
             #[allow(unreachable_patterns)]
             "ML-DSA-44" | "ML-DSA-65" | "ML-DSA-87" => false,
             other => panic!("unknown parameter set {other}"),
@@ -156,7 +178,11 @@ fn cases(group: &Value) -> &Vec<Value> { group["tests"].as_array().expect("tests
 /// Fails on a group field that this harness does not know, and on any `testType` but AFT.
 fn check_group(group: &Value, known: &[&str]) {
     for key in group.as_object().expect("group").keys() {
-        assert!(known.contains(&key.as_str()), "tgId {}: unknown group field {key}", group["tgId"]);
+        assert!(
+            known.contains(&key.as_str()),
+            "tgId {}: unknown group field {key}",
+            group["tgId"]
+        );
     }
     assert_eq!(group["testType"], "AFT", "tgId {}: testType", group["tgId"]);
 }
@@ -171,8 +197,12 @@ fn get_ph(hashname: &str, message: &[u8]) -> Result<(&'static [u8], Box<[u8]>), 
         "SHA2-256" => Ok((&pre_hash::SHA2_256, Sha256::digest(message).as_slice().into())),
         "SHA2-384" => Ok((&pre_hash::SHA2_384, Sha384::digest(message).as_slice().into())),
         "SHA2-512" => Ok((&pre_hash::SHA2_512, Sha512::digest(message).as_slice().into())),
-        "SHA2-512/224" => Ok((&pre_hash::SHA2_512_224, Sha512_224::digest(message).as_slice().into())),
-        "SHA2-512/256" => Ok((&pre_hash::SHA2_512_256, Sha512_256::digest(message).as_slice().into())),
+        "SHA2-512/224" => {
+            Ok((&pre_hash::SHA2_512_224, Sha512_224::digest(message).as_slice().into()))
+        }
+        "SHA2-512/256" => {
+            Ok((&pre_hash::SHA2_512_256, Sha512_256::digest(message).as_slice().into()))
+        }
 
         "SHA3-224" => Ok((&pre_hash::SHA3_224, Sha3_224::digest(message).as_slice().into())),
         "SHA3-256" => Ok((&pre_hash::SHA3_256, Sha3_256::digest(message).as_slice().into())),
@@ -259,36 +289,48 @@ fn test_siggen() {
 
             macro_rules! runtest {
                 ($pc:ident) => {{
-                    let sk = $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap()).unwrap();
+                    let sk = $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
+                        .unwrap();
                     let pk2 = sk.get_public_key();
                     assert_eq!(pk_bytes, pk2.into_bytes(), "{loc}");
-                    let pk1 = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap()).unwrap();
+                    let pk1 = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
+                        .unwrap();
                     let sig: [u8; $pc::SIG_LEN] = sig_exp.clone().try_into().unwrap();
                     let (sig_act, verified) = match kind {
                         Kind::Pure => {
                             let message = hex(test, "message", &loc);
                             let context = hex(test, "context", &loc);
-                            (sk.try_sign_with_rng(&mut rnd, &message, &context).unwrap(),
-                             pk1.verify(&message, &sig, &context))
+                            (
+                                sk.try_sign_with_rng(&mut rnd, &message, &context).unwrap(),
+                                pk1.verify(&message, &sig, &context),
+                            )
                         }
                         Kind::PreHash => {
                             let message = hex(test, "message", &loc);
                             let context = hex(test, "context", &loc);
-                            let (hash_oid, digest) = get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
-                            (sk.try_hash_sign_with_rng(&mut rnd, &digest, &context, &hash_oid).unwrap(),
-                             pk1.hash_verify(&digest, &sig, &context, &hash_oid))
+                            let (hash_oid, digest) =
+                                get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
+                            (
+                                sk.try_hash_sign_with_rng(&mut rnd, &digest, &context, &hash_oid)
+                                    .unwrap(),
+                                pk1.hash_verify(&digest, &sig, &context, &hash_oid),
+                            )
                         }
                         #[cfg(feature = "acvp-internal")]
                         Kind::Internal => {
                             let message = hex(test, "message", &loc);
-                            (sk.sign_internal(&mut rnd, &message, !tg_deterministic).unwrap(),
-                             pk1.verify_internal(&message, &sig))
+                            (
+                                sk.sign_internal(&mut rnd, &message, !tg_deterministic).unwrap(),
+                                pk1.verify_internal(&message, &sig),
+                            )
                         }
                         #[cfg(feature = "acvp-internal")]
                         Kind::ExternalMu => {
                             let mu: [u8; 64] = hex(test, "mu", &loc).try_into().unwrap();
-                            (sk.sign_mu(&mut rnd, &mu, !tg_deterministic).unwrap(),
-                             pk1.verify_mu(&mu, &sig))
+                            (
+                                sk.sign_mu(&mut rnd, &mu, !tg_deterministic).unwrap(),
+                                pk1.verify_mu(&mu, &sig),
+                            )
                         }
                         #[cfg(not(feature = "acvp-internal"))]
                         Kind::Internal | Kind::ExternalMu => unreachable!("skipped above"),
@@ -310,7 +352,8 @@ fn test_sigver() {
 
     for test_group in groups(&v) {
         check_group(test_group, &[
-            "externalMu", "parameterSet", "preHash", "signatureInterface", "testType", "tests", "tgId",
+            "externalMu", "parameterSet", "preHash", "signatureInterface", "testType", "tests",
+            "tgId",
         ]);
         let set = test_group["parameterSet"].as_str().expect("parameterSet");
         let kind = kind_of(test_group);
@@ -326,7 +369,8 @@ fn test_sigver() {
 
             macro_rules! runtest {
                 ($pc:ident) => {{
-                    let pk = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap()).unwrap();
+                    let pk = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
+                        .unwrap();
                     // A signature of the wrong length fails to verify.
                     let res = match signature.as_slice().try_into() {
                         Err(_) => false,
@@ -337,7 +381,8 @@ fn test_sigver() {
                             }
                             Kind::PreHash => {
                                 let message = hex(test, "message", &loc);
-                                let (hash_oid, digest) = get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
+                                let (hash_oid, digest) =
+                                    get_ph(test["hashAlg"].as_str().unwrap(), &message).unwrap();
                                 pk.hash_verify(&digest, sig, &hex(test, "context", &loc), &hash_oid)
                             }
                             #[cfg(feature = "acvp-internal")]
