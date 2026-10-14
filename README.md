@@ -6,18 +6,17 @@
 ![Apache2/MIT licensed][license-image]
 ![Rust Version][rustc-image]
 
-[FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure/safe Rust for server, desktop, browser and
+[FIPS 204] Module-Lattice-Based Digital Signature Standard written in pure Rust for server, desktop, browser and
 embedded applications. The source repository includes examples demonstrating benchmarking, code provenance, an
-embedded target, constant-time statistical measurements, fuzzing, WASM execution, a C FFI shared library, Python
-bindings, and robust test coverage.
+embedded target, constant-time statistical measurements, a fuzzing harness, WASM execution, a C FFI shared library and
+Python bindings.
 
-This crate implements [the FIPS 204 **released** standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf) in
-pure Rust with minimal and mainstream dependencies, and without any unsafe code. All three security parameter sets are
-fully functional and tested. The implementation's key- and signature-generation functionality
-does not require the standard library, e.g. `#[no_std]`, has no heap allocations, e.g. no `alloc` needed, and exposes
-the `RNG` so it is suitable for the full range of applications down to the bare-metal. The API is stabilized and the
-code is heavily biased towards safety and correctness; further performance optimizations may be implemented over time.
-This crate will quickly follow any changes related to FIPS 204 as they become available.
+This crate implements the released FIPS 204 standard in pure Rust with minimal and mainstream dependencies, and without
+any unsafe code. All three security parameter sets are fully functional and tested. Key generation and signing are
+constant-time within each attempt: they do not branch on secret data, though rejection sampling makes the number of
+attempts vary. The crate does not require the standard library (it is `#![no_std]`), makes no heap allocations (no
+`alloc` needed), and exposes the `RNG`, so it suits the full range of applications from server down to bare metal. The
+API is stabilized, and the code is heavily biased towards safety and correctness.
 
 See <https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf> for a full description of the target functionality.
 
@@ -27,9 +26,9 @@ The functionality is extremely simple to use, as demonstrated by the following e
 // Use the desired target parameter set.
 # use std::error::Error;
 #
-# fn main() -> Result<(), Box<dyn Error>> { 
-# #[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))] { 
-use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87. 
+# fn main() -> Result<(), Box<dyn Error>> {
+# #[cfg(all(feature = "ml-dsa-44", feature = "default-rng"))] {
+use fips204::ml_dsa_44; // Could also be ml_dsa_65 or ml_dsa_87.
 use fips204::traits::{SerDes, Signer, Verifier};
 let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
 
@@ -43,9 +42,9 @@ let (pk_recv, msg_recv, sig_recv) = (pk_send, msg_send, sig_send);
 
 // Deserialize the public key and signature, then verify the message
 let pk2 = ml_dsa_44::PublicKey::try_from_bytes(pk_recv)?;
-let v = pk2.verify(&msg_recv, &sig_recv, &[]); // Use the public to verify message signature
+let v = pk2.verify(&msg_recv, &sig_recv, &[]); // Use the public key to verify the message signature
 assert!(v);
-    
+
 // Note that the last argument to sign() and verify() is the (NIST specified) context
 // value which is typically empty for basic signature generation and verification.
 # }
@@ -59,36 +58,35 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 ## Notes
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
-* NIST ACVP test vectors (keyGen / sigGen / sigVer) are exercised against the public API,
-  including HashML-DSA and private keys given as seeds. `hash_sign` and `hash_verify` take a
-  precomputed digest and a DER-encoded OID (`pre_hash` lists the NIST CSOR encodings). The
-  vectors cover the SHA-2, SHA-3, and SHAKE functions in that list.
-* The C2SP Wycheproof ML-DSA vectors and the CCTV accumulated tests are applied too. The
-  vector files stay in the repository; the published crate omits them.
-* An optional `ffi` workspace member builds `libfips204`, a C ABI shared library for the
-  external ML-DSA and HashML-DSA interfaces (`hash_sign_with_seed` and `hash_verify` for
-  ML-DSA-44/65/87; see [`ffi/README.md`](ffi/README.md)). The C NIST harness does not hash,
-  because Ubuntu 24.04 libmd has no `<sha3.h>`. Those vectors run from
-  `ffi/python/test/nist.py`.
-* A WASM browser demo lives under [`wasm/`](wasm/) (see [`wasm/README.md`](wasm/README.md)).
-* RNG integration uses **`rand_core` 0.6**. The default features enable
-  `default-rng` plus all three parameter sets. That OS RNG
-  path is for hosted environments; it will **not** compile on bare-metal targets
-  that lack a `getrandom` backend (for example `thumbv7em-none-eabi`). So for
-  embedded / `no_std` builds, disable defaults and pick the sets you need, then
-  supply entropy via seeds or `*_with_rng`:
-  `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`
-  (see also [`ct_cm4/`](ct_cm4/)). Custom generators must implement `CryptoRngCore`
-  from `rand_core` 0.6 (`CryptoRng` + `RngCore`). This crate re-exports `CryptoRng`,
-  `RngCore`, and `RngError`. Signing and key generation call `try_fill_bytes`, so
-  handle that error or use the seed-based APIs.
-* Constant-time assurances are from source-level review and the `dudect` measurements.
-  Rejection sampling may repeat, so the number of attempts is not constant. Within one
-  attempt, key generation and signing avoid branches on secret data.
-* Note that FIPS 204 places specific requirements on randomness per section 3.6.1, hence the exposed `RNG`.
-* Requires Rust **1.85** or higher (aligned with Debian stable / trixie). The minimum
-  supported Rust version may be changed in the future, but it will be done with a minor
-  version bump once the major version is larger than 0.
+* Constant-time: within one attempt, key generation and signing do not branch on secret data. Two
+  steps use rejection sampling, so their number of iterations varies: sampling the secret vectors
+  (`ExpandS`), and the signing loop, which FIPS 204 restarts until a signature meets its bounds.
+  Expanding the matrix Â from the seed ρ varies too, but ρ is public, carried in the public key.
+  Checked by source review and by the [`dudect`](dudect/README.md) measurements. The claim is at
+  the source level: the compiler and CPU are trusted not to add secret-dependent timing, and the
+  caller's RNG is outside it. Verify uses only public data and makes no constant-time claim.
+* FIPS 204 places specific requirements on randomness (section 3.6.1), hence the exposed `RNG`. RNG
+  integration uses **`rand_core` 0.6**: custom generators implement `CryptoRngCore` (`CryptoRng` +
+  `RngCore`), which this crate re-exports along with `RngError`. Key generation and signing call
+  `try_fill_bytes`, so handle its error or use the seed-based functions.
+* The default features enable `default-rng` plus all three parameter sets. That OS RNG path is for
+  hosted environments; it will **not** compile on bare-metal targets that lack a `getrandom`
+  backend (for example `thumbv7em-none-eabi`). Embedded builds use `default-features = false`,
+  the parameter-set feature they need, and the seed-based functions or `*_with_rng`, as in
+  [`ct_cm4/`](ct_cm4/):
+  `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`.
+* `hash_sign` and `hash_verify` (HashML-DSA) take a precomputed digest and a DER-encoded OID
+  (`pre_hash` lists the NIST CSOR encodings). The library does not hash the message. An empty
+  OID or a digest longer than 1024 bytes is rejected.
+* Test vectors: the NIST ACVP keyGen, sigGen and sigVer vectors (including HashML-DSA and private
+  keys given as seeds), the C2SP Wycheproof ML-DSA vectors and the CCTV accumulated tests run in
+  the test suite, and the C and Python bindings apply the ACVP files through the C ABI. The vector
+  files stay in the repository; the published crate omits them.
+* A C shared library (`libfips204`) for the external ML-DSA and HashML-DSA interfaces, with Python
+  bindings, and a WASM browser demo, are described in [`ffi/README.md`](ffi/README.md) and
+  [`wasm/README.md`](wasm/README.md).
+* Requires Rust **1.85** or higher (Debian stable, trixie). The minimum supported Rust version may
+  change in the future, but only with a minor version bump (once the major version is above 0).
 * All on-by-default features of this library are covered by `SemVer`.
 
 ## License
@@ -98,7 +96,7 @@ or [MIT license](http://opensource.org/licenses/MIT) at your option.
 
 ### Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as 
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as
 defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 [//]: # (badges)

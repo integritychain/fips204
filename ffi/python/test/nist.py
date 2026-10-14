@@ -277,13 +277,22 @@ def process(testtype: str) -> None:
         else:
             raise Exception(f"Unknown Test Type {testtype}")
         tests = 0
-        for group in groups:
+        skipped = 0
+        for group, data in zip(groups, t["testGroups"]):
             try:
                 group.run()
                 tests += len(group)
             except TestGroupException as e:
                 logging.info(e)
-        print(f"{tests} {testtype} tests passed in {len(groups)} groups")
+                skipped += len(data["tests"])
+        total = sum(len(g["tests"]) for g in t["testGroups"])
+        print(
+            f"{tests} {testtype} tests passed in {len(groups)} groups ({skipped} skipped)"
+        )
+        assert (
+            tests + skipped == total
+        ), f"{testtype}: {tests} ran and {skipped} skipped, of {total}"
+        assert tests > 0, f"{testtype}: no tests ran"
 
 
 if os.environ.get("VERBOSE", None) is not None:
