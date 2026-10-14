@@ -10,6 +10,7 @@ FIPS204_PYTHON_TESTING_LIBRARY=../../target/debug/libfips204.so PYTHONPATH=. pyt
 from __future__ import annotations
 
 import fips204
+import gzip
 import json
 import re
 from binascii import a2b_hex, b2a_hex
@@ -253,8 +254,9 @@ class SigVerTestGroup(TestGroup):
 
 
 def process(testtype: str) -> None:
-    with open(
-        f"../../tests/nist_vectors/ML-DSA-{testtype}-FIPS204/internalProjection.json"
+    with gzip.open(
+        f"../../tests/nist_vectors/ML-DSA-{testtype}-FIPS204/internalProjection.json.gz",
+        "rt",
     ) as f:
         t = json.load(f)
         assert t["vsId"] == 42

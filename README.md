@@ -60,9 +60,11 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 
 * This crate is fully functional and corresponds to the final released FIPS 204 (August 13, 2024).
 * NIST ACVP test vectors (keyGen / sigGen / sigVer) are exercised against the public API,
-  including HashML-DSA. `hash_sign` and `hash_verify` take a precomputed digest and a
-  DER-encoded OID (`pre_hash` lists the NIST CSOR encodings). The vectors cover the
-  SHA-2, SHA-3, and SHAKE functions in that list.
+  including HashML-DSA and private keys given as seeds. `hash_sign` and `hash_verify` take a
+  precomputed digest and a DER-encoded OID (`pre_hash` lists the NIST CSOR encodings). The
+  vectors cover the SHA-2, SHA-3, and SHAKE functions in that list.
+* The C2SP Wycheproof ML-DSA vectors and the CCTV accumulated tests are applied too. The
+  vector files stay in the repository; the published crate omits them.
 * An optional `ffi` workspace member builds `libfips204`, a C ABI shared library for the
   external ML-DSA and HashML-DSA interfaces (`hash_sign_with_seed` and `hash_verify` for
   ML-DSA-44/65/87; see [`ffi/README.md`](ffi/README.md)). The C NIST harness does not hash,

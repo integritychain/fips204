@@ -1,23 +1,27 @@
-// This file applies the NIST ACVP vectors.
+// This file applies the NIST ACVP vectors, stored gzipped (gzip -9 -n).
 //   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-keyGen-FIPS204/internalProjection.json
 //   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-sigGen-FIPS204/internalProjection.json
+//   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-sigGen-FIPS204-tr1/internalProjection.json
 //   from: https://github.com/usnistgov/ACVP-Server/blob/975de31eb83d87039ec88934fdc47d8c312b892d/gen-val/json-files/ML-DSA-sigVer-FIPS204/internalProjection.json
 //
 // Every vector in each file is applied. Each test counts the cases in its file and fails unless
 // every one ran, apart from parameter sets whose feature is off. A group field or group kind
 // that this harness does not know fails the test, so a new kind of NIST group is never skipped.
+// The sigGen-tr1 file repeats each sigGen group with the private key given as a seed or in
+// expanded form (`keyFormat`); a seed must expand to the case's `sk` and `pk`.
 // The internal and external-µ groups call the `acvp-internal` hooks, which `cargo test`
-// enables through the dev-dependency on this crate in Cargo.toml. `cargo package` drops that
-// dev-dependency, so a test run from the published crate counts those groups as skipped unless
-// it passes `--features acvp-internal`.
+// enables through the dev-dependency on this crate in Cargo.toml. This harness and its vectors
+// are excluded from the published crate.
 
 // The `acvp-internal` hooks are deprecated so that nothing outside the tests calls them.
 #![allow(deprecated)]
 
+use flate2::read::GzDecoder;
 use hex::decode;
 use rand_core::{CryptoRng, RngCore};
 use serde_json::Value;
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 
 #[cfg(feature = "ml-dsa-44")]
 use fips204::ml_dsa_44;
@@ -166,8 +170,11 @@ fn needs_hooks(kind: Kind) -> bool {
 }
 
 fn load(name: &str) -> Value {
-    let path = format!("./tests/nist_vectors/{name}/internalProjection.json");
-    let vectors = fs::read_to_string(&path).expect("Unable to read file");
+    let path = format!("./tests/nist_vectors/{name}/internalProjection.json.gz");
+    let mut vectors = String::new();
+    GzDecoder::new(File::open(&path).unwrap_or_else(|e| panic!("open {path}: {e}")))
+        .read_to_string(&mut vectors)
+        .unwrap_or_else(|e| panic!("gunzip {path}: {e}"));
     serde_json::from_str(&vectors).unwrap()
 }
 
@@ -257,18 +264,29 @@ fn test_keygen() {
 }
 
 #[test]
-fn test_siggen() {
-    let v = load("ML-DSA-sigGen-FIPS204");
+fn test_siggen() { siggen("ML-DSA-sigGen-FIPS204", "sigGen"); }
+
+#[test]
+fn test_siggen_tr1() { siggen("ML-DSA-sigGen-FIPS204-tr1", "sigGen-tr1"); }
+
+fn siggen(name: &str, which: &str) {
+    let v = load(name);
     let mut tally = Tally::new(&v);
 
     for test_group in groups(&v) {
         check_group(test_group, &[
-            "cornerCase", "deterministic", "externalMu", "parameterSet", "preHash",
+            "cornerCase", "deterministic", "externalMu", "keyFormat", "parameterSet", "preHash",
             "signatureInterface", "testType", "tests", "tgId",
         ]);
         let set = test_group["parameterSet"].as_str().expect("parameterSet");
         let kind = kind_of(test_group);
         let tg_deterministic = test_group["deterministic"].as_bool().unwrap();
+        // Only the tr1 file has `keyFormat`; elsewhere the key is the expanded `sk`
+        let seed_format = match test_group.get("keyFormat").map(Value::as_str) {
+            None | Some(Some("expanded")) => false,
+            Some(Some("seed")) => true,
+            other => panic!("tgId {}: unknown keyFormat {other:?}", test_group["tgId"]),
+        };
         for test in cases(test_group) {
             if needs_hooks(kind) {
                 tally.hook_skipped += 1;
@@ -289,8 +307,15 @@ fn test_siggen() {
 
             macro_rules! runtest {
                 ($pc:ident) => {{
-                    let sk = $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
-                        .unwrap();
+                    let sk = if seed_format {
+                        let xi: [u8; 32] = hex(test, "seed", &loc).try_into().unwrap();
+                        let (_pk, sk) = $pc::KG::keygen_from_seed(&xi);
+                        assert_eq!(sk_bytes, sk.clone().into_bytes(), "{loc} seed expands to sk");
+                        sk
+                    } else {
+                        $pc::PrivateKey::try_from_bytes(sk_bytes.clone().try_into().unwrap())
+                            .unwrap()
+                    };
                     let pk2 = sk.get_public_key();
                     assert_eq!(pk_bytes, pk2.into_bytes(), "{loc}");
                     let pk1 = $pc::PublicKey::try_from_bytes(pk_bytes.clone().try_into().unwrap())
@@ -342,7 +367,7 @@ fn test_siggen() {
             tally.count(dispatch!(set, runtest));
         }
     }
-    tally.finish("sigGen");
+    tally.finish(which);
 }
 
 #[test]

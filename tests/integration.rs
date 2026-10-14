@@ -1,5 +1,3 @@
-mod nist_vectors;
-
 use fips204::traits::{KeyGen, Signer, Verifier};
 
 #[cfg(feature = "ml-dsa-44")]

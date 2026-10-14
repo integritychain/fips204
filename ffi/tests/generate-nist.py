@@ -2,6 +2,7 @@
 
 """Generate C source to test libfips204"""
 
+import gzip
 import json
 
 
@@ -45,7 +46,7 @@ def buf(h: str, name: str, x: int) -> tuple[str, str]:
 
 
 def keygen(f: str) -> str:
-    d = json.load(open(f))
+    d = json.load(gzip.open(f, "rt"))
     out = """
 results keygen() {
   results ret = { 0,0,0 };
@@ -130,7 +131,7 @@ class hasher:
 
 
 def sigver(f: str) -> str:
-    d = json.load(open(f))
+    d = json.load(gzip.open(f, "rt"))
     out = """
 results sigver() {
    results ret = { 0,0,0 };
@@ -204,7 +205,7 @@ results sigver() {
 
 
 def siggen(f: str) -> str:
-    d = json.load(open(f))
+    d = json.load(gzip.open(f, "rt"))
     out = """
 results siggen() {
   results ret = { 0,0,0 };
@@ -353,6 +354,6 @@ main (int argc, const char **argv) {
 
 
 print(prefix())
-print(keygen("../../tests/nist_vectors/ML-DSA-keyGen-FIPS204/internalProjection.json"))
-print(sigver("../../tests/nist_vectors/ML-DSA-sigVer-FIPS204/internalProjection.json"))
-print(siggen("../../tests/nist_vectors/ML-DSA-sigGen-FIPS204/internalProjection.json"))
+print(keygen("../../tests/nist_vectors/ML-DSA-keyGen-FIPS204/internalProjection.json.gz"))
+print(sigver("../../tests/nist_vectors/ML-DSA-sigVer-FIPS204/internalProjection.json.gz"))
+print(siggen("../../tests/nist_vectors/ML-DSA-sigGen-FIPS204/internalProjection.json.gz"))

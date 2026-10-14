@@ -13,6 +13,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/integritychain/fips204"
 # MSRV set at 1.85 for Debian stable (trixie), e.g. https://packages.debian.org/trixie/rustc
 rust-version = "1.85"
+# The NIST and Wycheproof vectors (22 MB gzipped) stay in the repository; the published crate omits them
+exclude = ["tests/nist_vectors/", "tests/wycheproof/"]
 
 
 [features]
@@ -47,6 +49,8 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 regex = "1.10.2"
 serde_json = {version = "1.0.127", features = []}
+# The vector files are gzipped
+flate2 = "1.0.27"
 
 
 [[bench]]
