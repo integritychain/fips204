@@ -86,7 +86,10 @@ This is a wrapper around libfips204, built from the Rust fips204-ffi crate.
 
 If that library is not installed in the expected path for libraries on
 your system, importing this module will fail.  For in-tree tests, set
-`FIPS204_PYTHON_TESTING_LIBRARY` to the built `libfips204.so`.
+`FIPS204_PYTHON_TESTING_LIBRARY` to the built `libfips204.so` (`libfips204.dylib` on macOS).
+On macOS, Python searches `DYLD_LIBRARY_PATH`, then `~/lib`, `/usr/local/lib`, `/lib` and
+`/usr/lib`, so a library installed elsewhere, such as MacPorts' `/opt/local/lib` or
+Homebrew's `/opt/homebrew/lib`, also needs `FIPS204_PYTHON_TESTING_LIBRARY`.
 
 This module should have reasonable type annotations and docstrings for
 the public interface.  If you discover a problem with type

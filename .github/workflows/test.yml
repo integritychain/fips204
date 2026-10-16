@@ -184,7 +184,13 @@ jobs:
 
 
   ffi:
-    runs-on: ubuntu-latest
+    # The macOS leg covers Apple clang and linker, BSD tools, GNU make 3.81, and a .dylib
+    # with an @rpath install name.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master 2026-10-01
@@ -196,6 +202,7 @@ jobs:
           make -C ffi/tests check
       - name: Python NIST vectors
         run: |
+          case "$RUNNER_OS" in macOS) ext=dylib ;; *) ext=so ;; esac
           cd ffi/python
-          FIPS204_PYTHON_TESTING_LIBRARY=../../target/debug/libfips204.so \
+          FIPS204_PYTHON_TESTING_LIBRARY=../../target/debug/libfips204.$ext \
             PYTHONPATH=. python3 test/nist.py

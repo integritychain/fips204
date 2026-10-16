@@ -544,9 +544,9 @@ class _ML_DSA:
         libname = ctypes.util.find_library("fips204")
         if libname is None:
             raise OSError(
-                "libfips204 shared library not found. Install it, or set "
-                "FIPS204_PYTHON_TESTING_LIBRARY to the path of libfips204.so "
-                "for in-tree tests."
+                "libfips204 shared library not found. Install it where the system "
+                "loader looks, or set FIPS204_PYTHON_TESTING_LIBRARY to its full "
+                "path (libfips204.so, or libfips204.dylib on macOS)."
             )
         lib = ctypes.CDLL(libname)
 

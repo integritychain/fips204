@@ -48,7 +48,7 @@ def buf(h: str, name: str, x: int) -> tuple[str, str]:
 def keygen(f: str) -> str:
     d = json.load(gzip.open(f, "rt"))
     out = """
-results keygen() {
+results keygen(void) {
   results ret = { 0,0,0 };
     """
     if d["mode"] != "keyGen":
@@ -133,7 +133,7 @@ class hasher:
 def sigver(f: str) -> str:
     d = json.load(gzip.open(f, "rt"))
     out = """
-results sigver() {
+results sigver(void) {
    results ret = { 0,0,0 };
     """
     if d["mode"] != "sigVer":
@@ -207,7 +207,7 @@ results sigver() {
 def siggen(f: str) -> str:
     d = json.load(gzip.open(f, "rt"))
     out = """
-results siggen() {
+results siggen(void) {
   results ret = { 0,0,0 };
     """
     if d["mode"] != "sigGen":
@@ -325,9 +325,9 @@ typedef struct {
         out += prefix + '#include "nist-tests-template.c"\n' + suffix
     out += """
 
-results keygen();
-results sigver();
-results siggen();
+results keygen(void);
+results sigver(void);
+results siggen(void);
 
 int
 main (int argc, const char **argv) {

@@ -142,13 +142,30 @@ class SigTest(Test):
         self.hashAlg = data["hashAlg"]
 
 
+# ACVP digest names, mapped to Python's own names so that no OpenSSL 3 alias is needed.
+_DIGESTS: Dict[str, tuple[str, Optional[int]]] = {
+    "SHA2-224": ("sha224", None),
+    "SHA2-256": ("sha256", None),
+    "SHA2-384": ("sha384", None),
+    "SHA2-512": ("sha512", None),
+    "SHA2-512/224": ("sha512_224", None),
+    "SHA2-512/256": ("sha512_256", None),
+    "SHA3-224": ("sha3_224", None),
+    "SHA3-256": ("sha3_256", None),
+    "SHA3-384": ("sha3_384", None),
+    "SHA3-512": ("sha3_512", None),
+    "SHAKE-128": ("shake_128", 32),
+    "SHAKE-256": ("shake_256", 64),
+}
+
+
 def digest_message(alg: str, msg: bytes) -> bytes:
-    if alg.startswith("SHAKE-"):
-        dlen = int(alg[6:]) // 4
-        return hashlib.new(alg, msg).digest(dlen)  # type: ignore[call-arg] # https://github.com/python/typeshed/issues/16480
+    name, dlen = _DIGESTS[alg]
+    if dlen is not None:
+        return hashlib.new(name, msg).digest(dlen)  # type: ignore[call-arg] # https://github.com/python/typeshed/issues/16480
 
     else:
-        return hashlib.new(alg, msg).digest()
+        return hashlib.new(name, msg).digest()
 
 
 class SigGenTest(SigTest):
