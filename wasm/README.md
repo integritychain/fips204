@@ -42,14 +42,6 @@ Then open http://localhost:8080/ .
 
 ## Optional: OS RNG in the browser
 
-This demo does not need OS entropy. If you change the code to use `getrandom` /
-`OsRng` on `wasm32-unknown-unknown`, enable getrandom’s JS backend **and** select it
-with a cfg (see the [getrandom WebAssembly docs](https://docs.rs/getrandom)):
-
-~~~
-# Cargo.toml already has: getrandom = { version = "0.3", features = ["wasm_js"] }
-$ RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build
-~~~
-
-Or set the same `rustflags` under `[target.wasm32-unknown-unknown]` in
-`.cargo/config.toml`.
+This demo does not need OS entropy. If you change the code to use `getrandom` on
+`wasm32-unknown-unknown`, this crate already depends on `getrandom` 0.2 with the
+`js` feature, which is the backend for that version.

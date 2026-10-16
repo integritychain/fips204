@@ -381,6 +381,7 @@ pub trait Signer {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     fn get_public_key(&self) -> Self::PublicKey;
 }
 

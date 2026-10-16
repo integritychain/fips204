@@ -159,7 +159,6 @@ macro_rules! functionality {
         use crate::traits::{KeyGen, SerDes, Signer, Verifier};
         use crate::types;
         use rand_core::CryptoRngCore;
-        use zeroize::{Zeroize, ZeroizeOnDrop};
 
         use crate::{D, Q};
         const BETA: i32 = TAU * ETA;
@@ -171,7 +170,6 @@ macro_rules! functionality {
         // ----- 'EXTERNAL' DATA TYPES -----
 
         /// Empty struct that implements the [`crate::traits::KeyGen`] trait, for keypair generation.
-        #[derive(Zeroize, ZeroizeOnDrop)]
         pub struct KG();
 
 
@@ -727,6 +725,7 @@ macro_rules! functionality {
         /// # Errors
         /// Returns an error when the random number generator fails; propagates internal errors.
         #[deprecated = "Function for constant-time testing; do not use elsewhere"]
+        #[doc(hidden)]
         #[cfg(feature = "dudect")]
         pub fn dudect_keygen_sign_with_rng(
             rng: &mut impl CryptoRngCore, message: &[u8],

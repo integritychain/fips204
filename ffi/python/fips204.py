@@ -538,7 +538,7 @@ class _ML_DSA:
         },
     }
     testlibpath = environ.get("FIPS204_PYTHON_TESTING_LIBRARY", None)
-    if testlibpath is not None:
+    if testlibpath:
         lib = ctypes.CDLL(testlibpath)
     else:
         libname = ctypes.util.find_library("fips204")

@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `libfips204` (crate `fips204-ffi`), a C library for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
 
 ### Changed
-- `Verifier::verify` and `Verifier::hash_verify` are `#[must_use]`.
+- `Verifier::verify`, `Verifier::hash_verify` and `Signer::get_public_key` are `#[must_use]`.
 - Key generation and signing zeroize their seeds, randomness and secret intermediate values.
 
 ### Removed

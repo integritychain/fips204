@@ -24,7 +24,9 @@ endif
 
 all: check
 
-# adjustments for testing the local debug or release build:
+# adjustments for testing the local debug or release build. target/release is used
+# when it has the library, else target/debug; to choose, pass e.g.
+# SO_LOCATION=../../target/debug/ (with the trailing slash).
 ifneq ($(AS_INSTALLED),true)
 SO_LOCATIONS = $(foreach w,.. ../..,$(foreach x,release debug,$w/target/$x $w/target/*/$x))
 SO_LOCATION = $(dir $(firstword $(foreach d,$(SO_LOCATIONS),$(wildcard $d/$(LINK_LIB)))))
@@ -37,8 +39,9 @@ else
 # cargo emits libfips204.so, but build.rs sets ELF SONAME to libfips204.so.0,
 # so the loader looks for the versioned name at runtime. Create a local symlink
 # for in-tree tests without changing the installed ABI layout.
-ADDITIONAL_RUN_DEPENDS = $(SO_LOCATION)libfips204.so.0
-$(SO_LOCATION)libfips204.so.0: $(SO_LOCATION)$(LINK_LIB)
+SONAME_LINK = $(SO_LOCATION)libfips204.so.0
+ADDITIONAL_RUN_DEPENDS = $(SONAME_LINK)
+$(SONAME_LINK): $(SO_LOCATION)$(LINK_LIB)
 	ln -sfn $(LINK_LIB) $@
 endif
 endif
@@ -91,7 +94,8 @@ link-two: two_a.c two_b.c ../fips204.h
 cplusplus: cplusplus.cc ../fips204.h
 	$(CXX) -o $@ -g -std=c++11 -Werror -Wall -Wextra -pedantic $< $(COMPILE_FLAGS) -lfips204
 
+# Remove only what this Makefile creates. Never the cargo-built library.
 clean:
-	rm -f $(BASELINES) $(ADDITIONAL_RUN_DEPENDS) nist-tests.c nist-tests link-two cplusplus
+	rm -f $(BASELINES) $(SONAME_LINK) nist-tests.c nist-tests link-two cplusplus
 
 .PHONY: clean check all

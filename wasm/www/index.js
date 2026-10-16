@@ -11,7 +11,7 @@ wasmForm.addEventListener("submit", (e) => {
     if (message.value) {
         result = wasm.sign(message.value);
         message.value = "";
-        document.getElementById("wasm-canvas").innerHTML = result;
+        document.getElementById("wasm-canvas").textContent = result;
     } else {
         alert("Please enter a non-empty message");
     }

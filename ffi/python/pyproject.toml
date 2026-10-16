@@ -20,6 +20,7 @@ keywords = [
 # README.md duplicates the module docstring.
 # I do not know how to keep them automatically in sync
 readme = "README.md"
+requires-python = ">=3.9"
 # only dependencies are having the libfips204 shared object available
 # everything else is from the stdlib
 dependencies = []
