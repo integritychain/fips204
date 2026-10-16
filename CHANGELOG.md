@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ph` is removed. `try_hash_sign` and `hash_verify` take the caller's digest and a DER-encoded OID (see `pre_hash`) in place of the message. For a `pre_hash` OID the digest must be that function's full output (SHAKE128: 32 bytes, SHAKE256: 64 bytes). A digest of the wrong length, a non-DER OID, or a digest over 1024 bytes is an error on sign and `false` on verify.
 
 ### Added
-- `libfips204`, a C library for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
+- `libfips204` (crate `fips204-ffi`), a C library for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
 
 ### Changed
 - `Verifier::verify` and `Verifier::hash_verify` are `#[must_use]`.

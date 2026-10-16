@@ -86,9 +86,9 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   keys given as seeds), the C2SP Wycheproof ML-DSA vectors and the CCTV accumulated tests run in
   the test suite, and the C and Python bindings apply the ACVP files through the C ABI. The vector
   files stay in the repository; the published crate omits them.
-* A C shared library (`libfips204`) for the external ML-DSA and HashML-DSA interfaces, with Python
-  bindings, and a WASM browser demo, are described in [`ffi/README.md`][ffi-readme] and
-  [`wasm/README.md`][wasm-readme].
+* A C shared library (`libfips204`, published as `fips204-ffi`) for the external ML-DSA and
+  HashML-DSA interfaces, with Python bindings, and a WASM browser demo, are described in
+  [`ffi/README.md`][ffi-readme] and [`wasm/README.md`][wasm-readme].
 * Requires Rust **1.85** or higher (Debian stable, trixie). The minimum supported Rust version may
   change in the future, but only with a minor version bump (once the major version is above 0).
 * All on-by-default features of this library are covered by `SemVer`.
