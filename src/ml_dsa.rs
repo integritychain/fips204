@@ -14,7 +14,14 @@ use crate::types::{PrivateKey, PublicKey, R, T};
 use crate::{D, Q};
 use rand_core::CryptoRngCore;
 use sha3::digest::XofReader;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
+
+
+/// The bound on signing attempts in `sign_internal()`, from FIPS 204 Appendix C, Table 3. A
+/// correct key reaches it with probability about 2^−256. A private key whose t0 does not match
+/// its other parts can be rejected on every attempt, and without the bound signing would never
+/// finish. The bound also keeps κ ≤ 813·ℓ, so its 16-bit counter cannot wrap.
+const MAX_SIGN_ATTEMPTS: u16 = 814;
 
 
 /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
@@ -161,6 +168,9 @@ pub(crate) fn mu(tr_and_mp: &[&[u8]]) -> [u8; 64] {
 ///             formatted message 𝑀′ ∈ {0, 1}∗, and
 ///             per message randomness or dummy variable rnd ∈ 𝔹^{32}. <br>
 /// **Output**: Signature 𝜎 ∈ 𝔹^{𝜆/4+ℓ⋅32⋅(1+bitlen(𝛾1−1))+𝜔+𝑘}.
+///
+/// # Errors
+/// Returns an error after `MAX_SIGN_ATTEMPTS` rejected attempts (FIPS 204 Appendix C).
 // Note the caller assembles M' and passes the message representative µ (step 6, see `mu()`),
 // so that pure, pre-hash, internal and external-µ signing all share this function.
 // Further, a deserialized private key struct has a variety of pre-computed
@@ -182,7 +192,7 @@ pub(crate) fn sign_internal<
 >(
     beta: i32, gamma1: i32, gamma2: i32, omega: i32, tau: i32, esk: &PrivateKey<K, L>,
     mu: &[u8; 64], rnd: &[u8; 32],
-) -> [u8; SIG_LEN] {
+) -> Result<[u8; SIG_LEN], &'static str> {
     //
     // 1: (ρ, K, tr, s_1, s_2, t_0) ← skDecode(sk)
     // --> calculated in `expand_private()` near the bottom of this file
@@ -217,9 +227,18 @@ pub(crate) fn sign_internal<
     let mut z: [R; L];
     let mut h: [R; K];
     let mut c_tilde = [0u8; LAMBDA_DIV4];
+    let mut attempts = 0u16;
 
     // 10: while (z, h) = ⊥ do    ▷ Rejection sampling loop (with continue for ⊥)
     loop {
+        // Appendix C: stop after MAX_SIGN_ATTEMPTS, and return the same error every time. The
+        // attempts' polynomials and ρ″ wipe themselves on drop; c̃ is wiped here.
+        if attempts == MAX_SIGN_ATTEMPTS {
+            c_tilde.zeroize();
+            return Err("ML-DSA.Sign: too many attempts");
+        }
+        attempts += 1;
+
         //
         // 11: y ← ExpandMask(ρ′', κ)
         let y: [R; L] = expand_mask(gamma1, &rho_prime, kappa_ctr);
@@ -343,7 +362,9 @@ pub(crate) fn sign_internal<
     // 34: return σ
     let zmodq: [R; L] =
         core::array::from_fn(|l| R(core::array::from_fn(|n| center_mod(z[l].0[n]))));
-    sig_encode::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN>(gamma1, omega, &c_tilde, &zmodq, &h)
+    Ok(sig_encode::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN>(
+        gamma1, omega, &c_tilde, &zmodq, &h,
+    ))
 }
 
 

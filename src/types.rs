@@ -6,6 +6,13 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 /// These are all within the OID space prefixed by 2.16.840.1.101.3.4.2, a.k.a.
 /// joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101) csor(3) nistalgorithm(4) hashalgs(2)
 /// See also <https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration#Hash>
+///
+/// The caller hashes the message. With one of these OIDs, `try_hash_sign` and `hash_verify` need
+/// the whole digest: 28 bytes for the -224 functions, 32 for the -256 functions and SHAKE128
+/// (256-bit output), 48 for the -384 functions, and 64 for the -512 functions and SHAKE256
+/// (512-bit output). Another OID must be DER-encoded and takes a digest of up to 1024 bytes.
+/// FIPS 204 §5.4 asks for a digest of at least 2λ bits to keep the parameter set's strength:
+/// 256 bits for ML-DSA-44, 384 for ML-DSA-65 and 512 for ML-DSA-87.
 pub mod pre_hash {
     #![allow(dead_code)]
 
@@ -45,6 +52,28 @@ pub mod pre_hash {
     /// DER-encoded OID for id-shake256
     pub const SHAKE_256: [u8; 11] =
         [0x06u8, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C];
+
+    /// The digest length in bytes for each OID above. SHAKE128 and SHAKE256 output 256 and 512
+    /// bits, as in FIPS 204 Algorithm 4.
+    const DIGEST_LENS: [(&[u8], usize); 12] = [
+        (&SHA2_224, 28),
+        (&SHA2_256, 32),
+        (&SHA2_384, 48),
+        (&SHA2_512, 64),
+        (&SHA2_512_224, 28),
+        (&SHA2_512_256, 32),
+        (&SHA3_224, 28),
+        (&SHA3_256, 32),
+        (&SHA3_384, 48),
+        (&SHA3_512, 64),
+        (&SHAKE_128, 32),
+        (&SHAKE_256, 64),
+    ];
+
+    /// The digest length in bytes for an OID in this module, or `None` for any other OID.
+    pub(crate) fn digest_len(oid: &[u8]) -> Option<usize> {
+        DIGEST_LENS.iter().find(|(known, _)| *known == oid).map(|(_, len)| *len)
+    }
 }
 
 

@@ -128,7 +128,9 @@ pub trait Signer {
     /// not treated as secret.
     ///
     /// # Errors
-    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
+    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes,
+    /// or when signing exceeds the FIPS 204 Appendix C limit of 814 attempts, which only a malformed
+    /// private key reaches; propagates internal errors.
     ///
     /// # Examples
     /// ```rust
@@ -162,7 +164,9 @@ pub trait Signer {
     /// are not treated as secret.
     ///
     /// # Errors
-    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes; propagates internal errors.
+    /// Returns an error when the random number generator fails or the `ctx` is longer than 255 bytes,
+    /// or when signing exceeds the FIPS 204 Appendix C limit of 814 attempts, which only a malformed
+    /// private key reaches; propagates internal errors.
     ///
     /// # Examples
     /// ```rust
@@ -196,7 +200,9 @@ pub trait Signer {
     /// number of attempts is not constant. `rho`, stored in the public key, is not treated as secret.
     ///
     /// # Errors
-    /// Returns an error when the `ctx` is longer than 255 bytes; propagates internal errors.
+    /// Returns an error when the `ctx` is longer than 255 bytes, or when signing exceeds the
+    /// FIPS 204 Appendix C limit of 814 attempts, which only a malformed private key reaches;
+    /// propagates internal errors.
     ///
     /// # Examples
     /// ```rust
@@ -227,8 +233,8 @@ pub trait Signer {
 
     /// Attempt to sign a precomputed digest, returning a HashML-DSA signature on success, or an
     /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
-    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
-    /// This function does not hash `hash` again. It utilizes the **default OS** random number
+    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings,
+    /// and for those `hash` must be the whole digest. This function does not hash `hash` again. It utilizes the **default OS** random number
     /// generator. Within one attempt, signing avoids branches on secret data. The rejection loop
     /// in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the number of attempts is
     /// not constant. The OS random number generator and `rho` (stored in the public key) are
@@ -236,7 +242,9 @@ pub trait Signer {
     ///
     /// # Errors
     /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
-    /// `hash_oid` is empty, or `hash` is longer than 1024 bytes; propagates internal errors.
+    /// `hash_oid` is not a DER-encoded OID, `hash` is not the output length of a [`crate::pre_hash`]
+    /// OID or is longer than 1024 bytes, or signing exceeds its attempt limit; propagates internal
+    /// errors.
     ///
     /// # Examples
     /// ```rust
@@ -246,15 +254,15 @@ pub trait Signer {
     /// use fips204::pre_hash;
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
     /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-    /// use sha2::{Digest, Sha256};
+    /// use sha2::{Digest, Sha512};
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
-    /// let digest = Sha256::digest(message); // The caller hashes the message
+    /// let digest = Sha512::digest(message); // The caller hashes the message
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
-    /// let sig = sk.try_hash_sign(&digest, &[0], &pre_hash::SHA2_256)?; // Use the secret key to sign the digest
-    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_256); // Use the public key to verify the digest signature
+    /// let sig = sk.try_hash_sign(&digest, &[0], &pre_hash::SHA2_512)?; // Use the secret key to sign the digest
+    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_512); // Use the public key to verify the digest signature
     /// assert!(v);
     /// # }
     /// # Ok(())}
@@ -269,8 +277,8 @@ pub trait Signer {
 
     /// Attempt to sign a precomputed digest, returning a HashML-DSA signature on success, or an
     /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
-    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
-    /// This function does not hash `hash` again. It utilizes the **provided** random number
+    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings,
+    /// and for those `hash` must be the whole digest. This function does not hash `hash` again. It utilizes the **provided** random number
     /// generator. Within one attempt, signing avoids branches on secret data. The rejection loop
     /// in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so the number of attempts is
     /// not constant. The provided random number generator and `rho` (stored in the public key)
@@ -278,7 +286,9 @@ pub trait Signer {
     ///
     /// # Errors
     /// Returns an error when the random number generator fails, the `ctx` is longer than 255 bytes,
-    /// `hash_oid` is empty, or `hash` is longer than 1024 bytes; propagates internal errors.
+    /// `hash_oid` is not a DER-encoded OID, `hash` is not the output length of a [`crate::pre_hash`]
+    /// OID or is longer than 1024 bytes, or signing exceeds its attempt limit; propagates internal
+    /// errors.
     ///
     /// # Examples
     /// ```rust
@@ -310,16 +320,17 @@ pub trait Signer {
 
     /// Attempt to sign a precomputed digest, returning a HashML-DSA signature on success, or an
     /// error if something went wrong. `hash` is `PH(M)` and `hash_oid` is the DER encoding of that
-    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings.
-    /// This function does not hash `hash` again. It utilizes the **provided seed to support (less
+    /// pre-hash, including the tag and length. [`crate::pre_hash`] provides the NIST CSOR encodings,
+    /// and for those `hash` must be the whole digest. This function does not hash `hash` again. It utilizes the **provided seed to support (less
     /// common) deterministic signatures**. Within one attempt, signing avoids branches on secret
     /// data. The rejection loop in FIPS 204 Algorithm 7, `ML-DSA.Sign_internal`, may repeat, so
     /// the number of attempts is not constant. `rho`, stored in the public key, is not treated
     /// as secret.
     ///
     /// # Errors
-    /// Returns an error when the `ctx` is longer than 255 bytes, `hash_oid` is empty, or `hash` is
-    /// longer than 1024 bytes; propagates internal errors.
+    /// Returns an error when the `ctx` is longer than 255 bytes, `hash_oid` is not a DER-encoded OID,
+    /// `hash` is not the output length of a [`crate::pre_hash`] OID or is longer than 1024 bytes, or
+    /// signing exceeds its attempt limit; propagates internal errors.
     ///
     /// # Examples
     /// ```rust
@@ -431,8 +442,8 @@ pub trait Verifier {
     /// is the DER encoding of that pre-hash, including the tag and length; see [`crate::pre_hash`].
     /// The caller must supply the same digest and OID that were signed. As this function operates on
     /// purely public data, it does not provide constant-time assurances. Returns `false` when `ctx`
-    /// is longer than 255 bytes, `hash_oid` is empty, `hash` is longer than 1024 bytes, or the
-    /// signature does not verify.
+    /// is longer than 255 bytes, `hash_oid` is not a DER-encoded OID, `hash` is not the output length
+    /// of a [`crate::pre_hash`] OID or is longer than 1024 bytes, or the signature does not verify.
     ///
     /// # Examples
     /// ```rust
@@ -442,15 +453,15 @@ pub trait Verifier {
     /// use fips204::pre_hash;
     /// use fips204::ml_dsa_65; // Could also be ml_dsa_44 or ml_dsa_87.
     /// use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
-    /// use sha2::{Digest, Sha256};
+    /// use sha2::{Digest, Sha512};
     ///
     /// let message = [0u8, 1, 2, 3, 4, 5, 6, 7];
-    /// let digest = Sha256::digest(message); // The caller hashes the message
+    /// let digest = Sha512::digest(message); // The caller hashes the message
     ///
     /// // Generate key pair and signature
     /// let (pk, sk) = ml_dsa_65::KG::try_keygen()?; // Generate both public and secret keys
-    /// let sig = sk.try_hash_sign(&digest, &[0], &pre_hash::SHA2_256)?; // Use the secret key to sign the digest
-    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_256); // Use the public key to verify the digest signature
+    /// let sig = sk.try_hash_sign(&digest, &[0], &pre_hash::SHA2_512)?; // Use the secret key to sign the digest
+    /// let v = pk.hash_verify(&digest, &sig, &[0], &pre_hash::SHA2_512); // Use the public key to verify the digest signature
     /// assert!(v);
     /// # }
     /// # Ok(())}

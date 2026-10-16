@@ -115,6 +115,33 @@ pub use crate::types::pre_hash;
 /// rather than absorbed into the internal message representative.
 const MAX_PREHASH_LEN: usize = 1024;
 
+/// Checks the pre-hash inputs of HashML-DSA sign and verify (Algorithms 4 and 5). `hash_oid`
+/// must be a DER-encoded OID (tag 0x06, short-form length, content), so that 𝑀′ fixes where the
+/// OID ends and the digest begins. For an OID in [`pre_hash`], `hash` must be exactly as long as
+/// that function's output: the library does not hash, so this catches a message passed where its
+/// digest belongs. Any other OID takes a digest of up to 1024 bytes.
+fn check_pre_hash(hash: &[u8], hash_oid: &[u8]) -> Result<(), &'static str> {
+    helpers::ensure!(!hash_oid.is_empty(), "HashML-DSA.Sign: OID is empty");
+    helpers::ensure!(
+        hash_oid.len() >= 3
+            && hash_oid[0] == 0x06
+            && hash_oid[1] < 0x80
+            && usize::from(hash_oid[1]) == hash_oid.len() - 2,
+        "HashML-DSA.Sign: OID is not DER encoded"
+    );
+    helpers::ensure!(
+        hash.len() <= MAX_PREHASH_LEN,
+        "Hash of message is too long, should not be more than 1KiB"
+    );
+    if let Some(len) = pre_hash::digest_len(hash_oid) {
+        helpers::ensure!(
+            hash.len() == len,
+            "HashML-DSA.Sign: digest length does not match the OID"
+        );
+    }
+    Ok(())
+}
+
 // Applies across all security parameter sets
 const Q: i32 = 8_380_417; // 2^23 - 2^13 + 1 = 0x7FE001; page 15 table 1 first row
 const ZETA: i32 = 1753; // See section 2.5 of FIPS 204; page 15 table 1 second row
@@ -271,7 +298,8 @@ macro_rules! functionality {
             /// **Output**: Signature `𝜎 ∈ 𝔹𝜆/4+ℓ⋅32⋅(1+bitlen (𝛾1−1))+𝜔+𝑘`.
             ///
             /// # Errors
-            /// Returns an error when the random number generator fails or context too long.
+            /// Returns an error when the random number generator fails, the context is too long,
+            /// or signing exceeds its attempt limit.
             fn try_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, message: &[u8], ctx: &[u8],
             ) -> Result<Self::Signature, &'static str> {
@@ -299,7 +327,7 @@ macro_rules! functionality {
                 // 11: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, &rnd
-                );
+                )?;
 
                 // 12: return 𝜎
                 Ok(sig)
@@ -317,7 +345,8 @@ macro_rules! functionality {
             ///
             /// # Errors
             /// Returns an error when the random number generator fails, the context is too long,
-            /// the OID is empty, or the digest is longer than 1024 bytes.
+            /// the OID is not DER encoded, the digest length does not match a [`pre_hash`] OID
+            /// or exceeds 1024 bytes, or signing exceeds its attempt limit.
             fn try_hash_sign_with_rng(
                 &self, rng: &mut impl CryptoRngCore, hash: &[u8], ctx: &[u8], hash_oid: &[u8],
             ) -> Result<Self::Signature, &'static str> {
@@ -325,13 +354,8 @@ macro_rules! functionality {
                 // 2:   return ⊥    ▷ return an error indication if the context string is too long
                 // 3: end if
                 helpers::ensure!(ctx.len() < 256, "HashML-DSA.Sign: ctx too long");
-                // An empty OID names no pre-hash function.
-                helpers::ensure!(!hash_oid.is_empty(), "HashML-DSA.Sign: OID is empty");
-                // Reject an oversized digest before drawing randomness.
-                helpers::ensure!(
-                    hash.len() <= crate::MAX_PREHASH_LEN,
-                    "Hash of message is too long, should not be more than 1KiB"
-                );
+                // The OID must be DER, and the digest must fit it. Checked before drawing randomness.
+                crate::check_pre_hash(hash, hash_oid)?;
 
                 // 4:  (blank line in spec)
 
@@ -353,7 +377,7 @@ macro_rules! functionality {
                 // 24: 𝜎 ← ML-DSA.Sign_internal(𝑠𝑘, 𝑀 ′ , 𝑟𝑛𝑑)
                 let sig = ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, &mu, &rnd
-                );
+                )?;
 
                 // 25: return 𝜎
                 Ok(sig)
@@ -415,12 +439,8 @@ macro_rules! functionality {
                 if ctx.len() > 255 {
                     return false;
                 };
-                // An empty OID names no pre-hash function.
-                if hash_oid.is_empty() {
-                    return false;
-                }
-                // Same ceiling as HashML-DSA.Sign: do not absorb an oversized digest.
-                if hash.len() > crate::MAX_PREHASH_LEN {
+                // Same checks as HashML-DSA.Sign: a DER OID, and a digest that fits it.
+                if crate::check_pre_hash(hash, hash_oid).is_err() {
                     return false;
                 }
 
@@ -480,9 +500,9 @@ macro_rules! functionality {
                     rng.try_fill_bytes(&mut rnd[..])
                         .map_err(|_| "ML-DSA.Sign_internal: random number generator failed")?;
                 }
-                Ok(ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+                ml_dsa::sign_internal::<CTEST, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                     BETA, GAMMA1, GAMMA2, OMEGA, TAU, &self, mu, &rnd
-                ))
+                )
             }
         }
 
@@ -718,10 +738,9 @@ macro_rules! functionality {
             rng.try_fill_bytes(&mut rnd[..]).map_err(|_| "Random number generator failed")?;
             // Pure ML-DSA framing of `message` with an empty context
             let mu = ml_dsa::mu(&[&sk.tr, &[0u8], &[0u8], message]);
-            let sig = ml_dsa::sign_internal::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
+            ml_dsa::sign_internal::<true, K, L, LAMBDA_DIV4, SIG_LEN, SK_LEN, W1_LEN>(
                 BETA, GAMMA1, GAMMA2, OMEGA, TAU, &sk, &mu, &rnd
-            );
-            Ok(sig)
+            )
         }
     };
 }

@@ -5,33 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.5.0 (in progress)
+## 0.5.0 (unreleased)
 
 ### Migration from 0.4.x
-- Not API-compatible with 0.4.6. Depend on `fips204 = "0.5"`.
-- MSRV is **1.85**.
-- `Ph` is gone. `hash_sign` and `hash_verify` take a precomputed digest and a DER-encoded OID (`pre_hash`). This crate does not hash the message. An empty OID or a digest longer than 1024 bytes is an error on sign and a failed verify.
-- RNG stays `rand_core` 0.6. `CryptoRng`, `RngCore`, and `RngError` are re-exported. There is no `TryCryptoRng`.
-- Default features enable the OS RNG and all three parameter sets. That does not build on bare metal. Use `default-features = false`, one `ml-dsa-*` feature, and seeds or `*_with_rng`.
+- MSRV is 1.85 (was 1.70).
+- `Ph` is removed. `try_hash_sign` and `hash_verify` take the caller's digest and a DER-encoded OID (see `pre_hash`) in place of the message. For a `pre_hash` OID the digest must be that function's full output (SHAKE128: 32 bytes, SHAKE256: 64 bytes). A digest of the wrong length, a non-DER OID, or a digest over 1024 bytes is an error on sign and `false` on verify.
 
 ### Added
-- `libfips204` for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
+- `libfips204`, a C library for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
 
 ### Changed
-- `Verifier::verify` and `Verifier::hash_verify` are `#[must_use]`, as in `fips205`. Ignoring the result is now a compiler warning.
-- Release builds use opt-level 3.
-- The constant-time claim covers one attempt. Rejection sampling may repeat. Within an attempt, key generation and signing do not branch on secret data.
-- Key generation and signing wipe their seeds and random values on drop: ξ, ρ′, K, ρ″ and `rnd`, including the copy of `rnd` that `try_sign_with_seed` and `try_hash_sign_with_seed` hold. The hashes that derive ρ′, K and ρ″, and the ExpandS and ExpandMask streams that give s1, s2 and y, also wipe their buffers and the stack they used, and the SHAKE (Keccak) state is wiped on drop (FIPS 204 §3.6.3). This needs `sha3` 0.10.9 or later.
+- `Verifier::verify` and `Verifier::hash_verify` are `#[must_use]`.
+- Key generation and signing zeroize their seeds, randomness and secret intermediate values.
 
 ### Removed
-- Temporary `_internal_sign` and `_internal_verify`.
+- Deprecated `_internal_sign` and `_internal_verify`. Test hooks are now behind the `acvp-internal` feature, which is not for use in applications.
 
 ### Fixed
-- `PrivateKey::try_from_bytes` rejects a key whose s1 or s2 has a coefficient outside [−η, η], as its docs said. Such a key used to deserialize and sign.
-- The `ml-dsa-65` and `ml-dsa-87` features now gate their modules. Before, `ml_dsa_65` and `ml_dsa_87` were always compiled. A build that uses either module must enable its feature.
-- `ffi/fips204.h` compiles as C++ (C++11 and later). The header has an `extern "C"` block for C++ callers, but parameters named `private` and `public` are C++ keywords, so every C++ build failed. They are now `private_key` and `public_key`, as in `fips205.h`. The inline `*_deterministic` wrappers zero their seed with `{ { 0 } }`. The designated initializer they used before is C++20 only, and a `-pedantic -Werror` build rejected it. Parameter names are not part of the C ABI, so C callers and the shared library are unchanged.
-- In the Rust FFI, `ml_dsa_*_get_public_key` borrows the private key as `&`, matching the `const` pointer in `fips204.h`. It never writes the key. The old `&mut` claimed exclusive write access that a caller passing a `const` key does not grant.
-- The seed parameter of `ml_dsa_*_keygen_from_seed` in `fips204.h` is `seed`, not `d_z`. `d_z` named the ML-KEM seed (`d || z`), but ML-DSA key generation takes a single 32-byte seed, ξ.
+- Signing gives up after 814 attempts (FIPS 204 Appendix C) and returns an error. Before, a malformed private key that `try_from_bytes` accepted could hang release builds and panic debug builds.
+- `PrivateKey::try_from_bytes` rejects a key whose s1 or s2 has a coefficient outside [−η, η].
+- `ffi/fips204.h` compiles as C++.
 
 ## 0.4.6 (2024-12-21)
 

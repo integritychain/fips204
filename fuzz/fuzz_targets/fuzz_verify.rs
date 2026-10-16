@@ -31,9 +31,16 @@ where
         assert!(!pk.verify(data, &sig, &modified_ctx));
     }
 
-    // Test HashML-DSA over a caller-supplied digest and DER OID.
-    let digest = &data[..data.len().min(64)];
-    for oid in [&pre_hash::SHA2_256[..], &pre_hash::SHA2_512[..], &pre_hash::SHAKE_128[..]] {
+    // Test HashML-DSA over a caller-supplied digest and DER OID. The digest has the length of
+    // the OID's hash function, taken from the input and zero-padded.
+    let mut buf = [0u8; 64];
+    buf[..data.len().min(64)].copy_from_slice(&data[..data.len().min(64)]);
+    for (oid, len) in [
+        (&pre_hash::SHA2_256[..], 32),
+        (&pre_hash::SHA2_512[..], 64),
+        (&pre_hash::SHAKE_128[..], 32),
+    ] {
+        let digest = &buf[..len];
         if let Ok(sig) = sk.try_hash_sign(digest, ctx, oid) {
             assert!(pk.hash_verify(digest, &sig, ctx, oid));
 
@@ -47,8 +54,11 @@ where
             modified_ctx.push(1);
             assert!(!pk.hash_verify(digest, &sig, &modified_ctx, oid));
 
+            // A different OID of the same digest length
             let different_oid = if oid == pre_hash::SHA2_256.as_slice() {
-                &pre_hash::SHA2_512[..]
+                &pre_hash::SHAKE_128[..]
+            } else if oid == pre_hash::SHA2_512.as_slice() {
+                &pre_hash::SHA3_512[..]
             } else {
                 &pre_hash::SHA2_256[..]
             };

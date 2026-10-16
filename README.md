@@ -61,6 +61,8 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 * Constant-time: within one attempt, key generation and signing do not branch on secret data. Two
   steps use rejection sampling, so their number of iterations varies: sampling the secret vectors
   (`ExpandS`), and the signing loop, which FIPS 204 restarts until a signature meets its bounds.
+  Signing gives up with an error after 814 attempts (FIPS 204 Appendix C), which a valid key
+  reaches with probability about 2^−256 but a malformed private key can reach every time.
   Expanding the matrix Â from the seed ρ varies too, but ρ is public, carried in the public key.
   Checked by source review and by the [`dudect`](dudect/README.md) measurements. The claim is at
   the source level: the compiler and CPU are trusted not to add secret-dependent timing, and the
@@ -75,9 +77,11 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   the parameter-set feature they need, and the seed-based functions or `*_with_rng`, as in
   [`ct_cm4/`](ct_cm4/):
   `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`.
-* `hash_sign` and `hash_verify` (HashML-DSA) take a precomputed digest and a DER-encoded OID
-  (`pre_hash` lists the NIST CSOR encodings). The library does not hash the message. An empty
-  OID or a digest longer than 1024 bytes is rejected.
+* `try_hash_sign` and `hash_verify` (HashML-DSA) take a precomputed digest and a DER-encoded OID
+  (`pre_hash` lists the NIST CSOR encodings). The library does not hash the message. For a
+  `pre_hash` OID the digest must have that function's output length (32 bytes for SHAKE128, 64
+  for SHAKE256), so passing the message by mistake is an error. Any other OID must be
+  DER-encoded and takes a digest of up to 1024 bytes.
 * Test vectors: the NIST ACVP keyGen, sigGen and sigVer vectors (including HashML-DSA and private
   keys given as seeds), the C2SP Wycheproof ML-DSA vectors and the CCTV accumulated tests run in
   the test suite, and the C and Python bindings apply the ACVP files through the C ABI. The vector

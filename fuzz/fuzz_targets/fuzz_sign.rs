@@ -52,10 +52,16 @@ fn fuzz_signer_for_params<S, V>(
         assert!(derived_pk.verify(data, &sig1, ctx));
     }
 
-    // Test HashML-DSA over a caller-supplied digest and DER OID.
-    // Cap the digest so inputs longer than the API ceiling still reach signing.
-    let digest = &data[..data.len().min(64)];
-    for oid in [&pre_hash::SHA2_256[..], &pre_hash::SHA2_512[..], &pre_hash::SHAKE_128[..]] {
+    // Test HashML-DSA over a caller-supplied digest and DER OID. The digest has the length of
+    // the OID's hash function, taken from the input and zero-padded.
+    let mut buf = [0u8; 64];
+    buf[..data.len().min(64)].copy_from_slice(&data[..data.len().min(64)]);
+    for (oid, len) in [
+        (&pre_hash::SHA2_256[..], 32),
+        (&pre_hash::SHA2_512[..], 64),
+        (&pre_hash::SHAKE_128[..], 32),
+    ] {
+        let digest = &buf[..len];
         if let Ok(sig) = sk.try_hash_sign_with_rng(rng, digest, ctx, oid) {
             assert!(pk.hash_verify(digest, &sig, ctx, oid));
 
@@ -64,8 +70,11 @@ fn fuzz_signer_for_params<S, V>(
                 assert!(pk.hash_verify(digest, &sig2, ctx, oid));
             }
 
+            // SHAKE128 has the same digest length as SHA2-256
             let wrong_oid = if oid == pre_hash::SHA2_256.as_slice() {
-                &pre_hash::SHA2_512[..]
+                &pre_hash::SHAKE_128[..]
+            } else if oid == pre_hash::SHA2_512.as_slice() {
+                &pre_hash::SHA3_512[..]
             } else {
                 &pre_hash::SHA2_256[..]
             };

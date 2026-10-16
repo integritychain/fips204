@@ -40,15 +40,21 @@ fuzz_target!(|data: [u8; 2560 + 2420 + 1312]| {
 
     // Try to use 'fuzzy' sk and 'fuzzy' pk
     if let (Ok(sk), Ok(pk)) = (sk_fuzz.clone(), pk_fuzz.clone()) {
-        let _sig = sk.try_sign(&[0u8, 1, 2, 3], &[]).unwrap();
+        // A fuzzed key can exhaust the signing attempt limit, which is an error
+        let _sig = sk.try_sign(&[0u8, 1, 2, 3], &[]);
         let _res = pk.verify(&[0u8, 1, 2, 3], &sig_fuzz, &[]);
     }
 
     if let (Ok(sk), Ok(pk)) = (sk_fuzz, pk_fuzz) {
-        let oid = [&pre_hash::SHA2_256[..], &pre_hash::SHA2_512[..], &pre_hash::SHAKE_128[..]]
-            [usize::from(data[0]) % 3];
-        let digest = [0u8, 1, 2, 3];
-        let sig = sk.try_hash_sign_with_rng(&mut OsRng, &digest, &[], oid).unwrap();
-        let _res = pk.hash_verify(&digest, &sig, &[], oid);
+        // The digest has the length of the OID's hash function
+        let (oid, len) = [
+            (&pre_hash::SHA2_256[..], 32),
+            (&pre_hash::SHA2_512[..], 64),
+            (&pre_hash::SHAKE_128[..], 32),
+        ][usize::from(data[0]) % 3];
+        let digest = [0u8; 64];
+        if let Ok(sig) = sk.try_hash_sign_with_rng(&mut OsRng, &digest[..len], &[], oid) {
+            let _res = pk.hash_verify(&digest[..len], &sig, &[], oid);
+        }
     }
 });
