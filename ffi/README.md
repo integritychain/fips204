@@ -89,8 +89,11 @@ If you link your own binary against a raw `target/*/libfips204.so` on Linux, eit
 - set an appropriate rpath / use `LD_LIBRARY_PATH` **and** ensure `libfips204.so.0`
   resolves (a bare `libfips204.so` alone is not enough when SONAME is `.so.0`).
 
-On **macOS**, `build.rs` sets the install name to `@rpath/libfips204.dylib` instead of
-an ELF-style SONAME; the Makefile does not need a `.so.0` symlink there.
+On **macOS** and iOS, `build.rs` sets the install name to `@rpath/libfips204.dylib` instead of
+an ELF-style SONAME; the Makefile does not need a `.so.0` symlink there. On **Android** the
+SONAME is unversioned, `libfips204.so`, because an APK holds only `lib*.so` files. Windows and
+WebAssembly builds get no extra linker flags. `build.rs` picks these by the target, not the
+build machine, so cross builds get the right ones.
 
 
 # Linking a C program (local build)
