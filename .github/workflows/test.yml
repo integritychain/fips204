@@ -181,6 +181,13 @@ jobs:
       - run: ${{ matrix.deps }}
       - run: cargo check --target ${{ matrix.target }} --all-features
       - run: cargo test --release --target ${{ matrix.target }}
+      # Debian's 32-bit autopkgtest compiles every target in the dev profile with -C debuginfo=2, and a
+      # 32-bit rustc gets only about 3-4 GB. Cap memory the same way (Debian bug #1148395).
+      - name: 32-bit compile memory (Debian autopkgtest settings)
+        if: matrix.target == 'i686-unknown-linux-gnu' && matrix.rust == 'stable'
+        run: (ulimit -v 3500000; cargo test --no-run --all-targets --all-features --target ${{ matrix.target }})
+        env:
+          RUSTFLAGS: "-C debuginfo=2"
 
 
   ffi:
@@ -206,3 +213,81 @@ jobs:
           cd ffi/python
           FIPS204_PYTHON_TESTING_LIBRARY=../../target/debug/libfips204.$ext \
             PYTHONPATH=. python3 test/nist.py
+
+
+  # Breadth over depth: the default-feature tests, then the C library and the Python NIST vectors
+  # through it, on each GitHub-hosted OS and CPU. `test` covers x86_64 and i686 Linux, and `ffi`
+  # adds the C tests on Linux and macOS.
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm     # Linux, arm64
+          - os: macos-latest         # macOS, Apple silicon
+          - os: macos-15-intel       # macOS, x86_64
+          - os: windows-latest       # Windows, x86_64 (MSVC)
+          - os: windows-11-arm       # Windows, arm64 (MSVC)
+          - os: windows-latest       # Windows, 32-bit x86: Rust tests only
+            target: i686-pc-windows-msvc
+          - os: ubuntu-latest        # static musl, as on Alpine: Rust tests only
+            target: x86_64-unknown-linux-musl
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master 2026-10-01
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: Rust tests
+        run: cargo test --release ${TARGET:+--target $TARGET}
+        env:
+          TARGET: ${{ matrix.target }}
+      - name: C library and Python NIST vectors
+        if: ${{ !matrix.target }}
+        run: |
+          cargo build --release -p fips204-ffi
+          case "$RUNNER_OS" in
+            Windows) lib=fips204.dll; py=python ;;
+            macOS) lib=libfips204.dylib; py=python3 ;;
+            *) lib=libfips204.so; py=python3 ;;
+          esac
+          if ! command -v "$py" > /dev/null; then
+            echo "::warning::no $py on this runner; the Python NIST test is skipped"
+            exit 0
+          fi
+          cd ffi/python
+          export FIPS204_PYTHON_TESTING_LIBRARY=../../target/release/$lib PYTHONPATH=.
+          "$py" test/nist.py
+
+
+  # Breadth: type-check the default features (including the OS random number source) and the C
+  # library crate for more operating systems and CPUs. Nothing is linked.
+  targets:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-apple-ios
+          - aarch64-linux-android
+          - armv7-linux-androideabi
+          - x86_64-unknown-freebsd
+          - x86_64-unknown-netbsd
+          - x86_64-unknown-illumos
+          - riscv64gc-unknown-linux-gnu
+          - loongarch64-unknown-linux-gnu
+          - powerpc64le-unknown-linux-gnu
+          - wasm32-wasip1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master 2026-10-01
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - run: cargo check --target ${{ matrix.target }}
+      - if: matrix.target != 'wasm32-wasip1'
+        run: cargo check -p fips204-ffi --target ${{ matrix.target }}

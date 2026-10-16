@@ -59,10 +59,9 @@ required-features = ["ml-dsa-44", "ml-dsa-65", "ml-dsa-87", "default-rng"]
 
 
 [profile.dev]
-debug = true
-#lto = true
-opt-level = 1
-#codegen-units = 1
+# Not 1: at opt-level 1, compiling fips204's benchmark for i686 takes about 6.7 GB, which 32-bit
+# builders (Debian i386 autopkgtest, bug #1148395) cannot allocate. At 3 it takes about 410 MB.
+opt-level = 3
 
 
 [profile.release]
