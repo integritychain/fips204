@@ -6,7 +6,7 @@ use rand_core::{CryptoRng, CryptoRngCore, RngCore};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 
-/// The `KeyGen` trait is defined to allow trait objects for keygen.
+/// The `KeyGen` trait defines methods for generating public and private key pairs.
 pub trait KeyGen {
     /// The public key type for this security parameter set (used for verification).
     type PublicKey;

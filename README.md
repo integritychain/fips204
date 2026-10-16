@@ -64,7 +64,7 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   Signing gives up with an error after 814 attempts (FIPS 204 Appendix C), which a valid key
   reaches with probability about 2^−256 but a malformed private key can reach every time.
   Expanding the matrix Â from the seed ρ varies too, but ρ is public, carried in the public key.
-  Checked by source review and by the [`dudect`](dudect/README.md) measurements. The claim is at
+  Checked by source review and by the [`dudect`][dudect-readme] measurements. The claim is at
   the source level: the compiler and CPU are trusted not to add secret-dependent timing, and the
   caller's RNG is outside it. Verify uses only public data and makes no constant-time claim.
 * FIPS 204 places specific requirements on randomness (section 3.6.1), hence the exposed `RNG`. RNG
@@ -75,7 +75,7 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   hosted environments; it will **not** compile on bare-metal targets that lack a `getrandom`
   backend (for example `thumbv7em-none-eabi`). Embedded builds use `default-features = false`,
   the parameter-set feature they need, and the seed-based functions or `*_with_rng`, as in
-  [`ct_cm4/`](ct_cm4/):
+  [`ct_cm4/`][ct_cm4-dir]:
   `fips204 = { version = "0.5", default-features = false, features = ["ml-dsa-44"] }`.
 * `try_hash_sign` and `hash_verify` (HashML-DSA) take a precomputed digest and a DER-encoded OID
   (`pre_hash` lists the NIST CSOR encodings). The library does not hash the message. For a
@@ -87,8 +87,8 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
   the test suite, and the C and Python bindings apply the ACVP files through the C ABI. The vector
   files stay in the repository; the published crate omits them.
 * A C shared library (`libfips204`) for the external ML-DSA and HashML-DSA interfaces, with Python
-  bindings, and a WASM browser demo, are described in [`ffi/README.md`](ffi/README.md) and
-  [`wasm/README.md`](wasm/README.md).
+  bindings, and a WASM browser demo, are described in [`ffi/README.md`][ffi-readme] and
+  [`wasm/README.md`][wasm-readme].
 * Requires Rust **1.85** or higher (Debian stable, trixie). The minimum supported Rust version may
   change in the future, but only with a minor version bump (once the major version is above 0).
 * All on-by-default features of this library are covered by `SemVer`.
@@ -117,5 +117,9 @@ defined in the Apache-2.0 license, shall be dual licensed as above, without any 
 
 [//]: # (general links)
 
+[ct_cm4-dir]: https://github.com/integritychain/fips204/tree/main/ct_cm4
+[dudect-readme]: https://github.com/integritychain/fips204/blob/main/dudect/README.md
+[ffi-readme]: https://github.com/integritychain/fips204/blob/main/ffi/README.md
+[wasm-readme]: https://github.com/integritychain/fips204/blob/main/wasm/README.md
 [IntegrityChain]: https://github.com/integritychain/
 [FIPS 204]: https://csrc.nist.gov/pubs/fips/204/final

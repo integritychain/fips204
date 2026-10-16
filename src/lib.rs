@@ -107,7 +107,7 @@ mod ml_dsa;
 mod ntt;
 mod types;
 
-/// All functionality is covered by traits, such that consumers can utilize trait objects as desired.
+/// All functionality is covered by traits.
 pub mod traits;
 pub use crate::types::pre_hash;
 
@@ -170,8 +170,7 @@ macro_rules! functionality {
 
         // ----- 'EXTERNAL' DATA TYPES -----
 
-        /// Empty struct to enable `KeyGen` trait objects across security parameter
-        /// sets. Implements the [`crate::traits::KeyGen`] trait.
+        /// Empty struct that implements the [`crate::traits::KeyGen`] trait, for keypair generation.
         #[derive(Zeroize, ZeroizeOnDrop)]
         pub struct KG();
 
