@@ -13,8 +13,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/integritychain/fips204"
 # MSRV set at 1.85 for Debian stable (trixie), e.g. https://packages.debian.org/trixie/rustc
 rust-version = "1.85"
-# The NIST and Wycheproof vectors (22 MB gzipped) stay in the repository; the published crate omits them
-exclude = ["tests/nist_vectors/", "tests/wycheproof/"]
+# The NIST and Wycheproof vectors (22 MB gzipped) stay in the repository; the published crate omits
+# them, except the NIST keyGen vectors (480 kB), which distribution packages use to test the FFI
+exclude = ["tests/nist_vectors/*", "!tests/nist_vectors/ML-DSA-keyGen-FIPS204/", "tests/wycheproof/"]
 
 
 [features]
@@ -42,8 +43,6 @@ fips204 = { path = ".", default-features = false, features = ["acvp-internal"] }
 criterion = "0.5"
 # Tests hash the message outside the library. Not used by the crate itself.
 sha2 = { version = "0.10.8", default-features = false }
-# Direct pin: Cargo.lock is gitignored; textwrap>=0.16.3 raises MSRV above 1.85
-textwrap = "=0.16.2"
 hex = "0.4.3"
 rand = "0.8.5"
 rand_chacha = "0.3.1"

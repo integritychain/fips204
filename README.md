@@ -85,7 +85,8 @@ The Rust [Documentation][docs-link] lives under each **Module** corresponding to
 * Test vectors: the NIST ACVP keyGen, sigGen and sigVer vectors (including HashML-DSA and private
   keys given as seeds), the C2SP Wycheproof ML-DSA vectors and the CCTV accumulated tests run in
   the test suite, and the C and Python bindings apply the ACVP files through the C ABI. The vector
-  files stay in the repository; the published crate omits them.
+  files stay in the repository; the published crate has only the keyGen file, which the bindings'
+  tests can use through `FIPS204_NIST_VECTORS`.
 * A C shared library (`libfips204`, published as `fips204-ffi`) for the external ML-DSA and
   HashML-DSA interfaces, with Python bindings, and a WASM browser demo, are described in
   [`ffi/README.md`][ffi-readme] and [`wasm/README.md`][wasm-readme].

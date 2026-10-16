@@ -4,6 +4,7 @@
 
 import gzip
 import json
+import sys
 
 
 class NISTTestException(Exception):
@@ -353,7 +354,9 @@ main (int argc, const char **argv) {
     return out
 
 
+# The vector directory is the first argument (the Makefile passes FIPS204_NIST_VECTORS).
+vectors = sys.argv[1] if len(sys.argv) > 1 else "../../tests/nist_vectors"
 print(prefix())
-print(keygen("../../tests/nist_vectors/ML-DSA-keyGen-FIPS204/internalProjection.json.gz"))
-print(sigver("../../tests/nist_vectors/ML-DSA-sigVer-FIPS204/internalProjection.json.gz"))
-print(siggen("../../tests/nist_vectors/ML-DSA-sigGen-FIPS204/internalProjection.json.gz"))
+print(keygen(f"{vectors}/ML-DSA-keyGen-FIPS204/internalProjection.json.gz"))
+print(sigver(f"{vectors}/ML-DSA-sigVer-FIPS204/internalProjection.json.gz"))
+print(siggen(f"{vectors}/ML-DSA-sigGen-FIPS204/internalProjection.json.gz"))

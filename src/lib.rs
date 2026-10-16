@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(clippy::pedantic, warnings, missing_docs, unsafe_code)]
+#![deny(clippy::pedantic, missing_docs, unsafe_code)]
 // Almost all of the 'allow' category...
 #![deny(absolute_paths_not_starting_with_crate, dead_code)]
 #![deny(elided_lifetimes_in_paths, explicit_outlives_requirements, keyword_idents)]
@@ -10,6 +10,13 @@
 #![deny(trivial_numeric_casts, unreachable_pub, unsafe_op_in_unsafe_fn, unstable_features)]
 #![deny(unused_extern_crates, unused_import_braces, unused_lifetimes, unused_macro_rules)]
 #![deny(unused_qualifications, unused_results, variant_size_differences)]
+// Warnings are errors in CI (RUSTFLAGS=-Dwarnings), not here, so that a newer compiler
+// does not break downstream builds. A build without a parameter set has nothing to export;
+// keep it error-free for feature-matrix tests such as Debian's.
+#![cfg_attr(
+    not(any(feature = "ml-dsa-44", feature = "ml-dsa-65", feature = "ml-dsa-87")),
+    allow(dead_code, unreachable_pub, unused_macros)
+)]
 //
 #![doc = include_str!("../README.md")]
 

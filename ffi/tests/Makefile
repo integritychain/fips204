@@ -65,13 +65,25 @@ endif
 endif
 
 
+# The NIST vectors are in the git repository; the published fips204 crate has the keyGen ones
+# only. FIPS204_NIST_VECTORS names the directory. Without all three files (for example when the
+# fips204-ffi crate is built on its own, as Debian does), skip the C NIST test.
+FIPS204_NIST_VECTORS ?= ../../tests/nist_vectors
+NIST_VECTORS = $(wildcard $(foreach m,keyGen sigVer sigGen,$(FIPS204_NIST_VECTORS)/ML-DSA-$(m)-FIPS204/internalProjection.json.gz))
+ifeq ($(words $(NIST_VECTORS)),3)
+NIST_CHECK = run-nist-tests
+HAS_NIST = Yes
+else
+HAS_NIST = No
+endif
+
 BASELINES=$(foreach sz, $(SIZES), baseline-$(sz))
-CHECKS=$(foreach sz, $(SIZES), run-baseline-$(sz)) run-nist-tests run-link-two run-cplusplus
+CHECKS=$(foreach sz, $(SIZES), run-baseline-$(sz)) $(NIST_CHECK) run-link-two run-cplusplus
 
 check: status $(CHECKS)
 
 status:
-	printf "With libmd: %s\n" "$(HAS_LIBMD)"
+	printf "With libmd: %s\nWith NIST vectors: %s\n" "$(HAS_LIBMD)" "$(HAS_NIST)"
 
 run-%: % $(ADDITIONAL_RUN_DEPENDS)
 	$(RUN_PREFIX) ./$<
@@ -80,7 +92,7 @@ baseline-%: baseline.c ../fips204.h
 	$(CC) -o $@ -g -D MLDSA_size=$* $(foreach v, $(FRAMES),-D MLDSA_$(v)=ml_dsa_$*_$(v)) -Werror -Wall -pedantic $< -Wall $(COMPILE_FLAGS) -lfips204
 
 nist-tests.c:  nist-tests-template.c generate-nist.py
-	./generate-nist.py > $@.tmp
+	./generate-nist.py $(FIPS204_NIST_VECTORS) > $@.tmp
 	mv $@.tmp $@
 
 nist-tests: nist-tests.c ../fips204.h

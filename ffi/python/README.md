@@ -91,6 +91,10 @@ On macOS, Python searches `DYLD_LIBRARY_PATH`, then `~/lib`, `/usr/local/lib`, `
 `/usr/lib`, so a library installed elsewhere, such as MacPorts' `/opt/local/lib` or
 Homebrew's `/opt/homebrew/lib`, also needs `FIPS204_PYTHON_TESTING_LIBRARY`.
 
+The NIST tests under `test/` read vectors from `../../tests/nist_vectors` in a source checkout,
+or from the directory named by `FIPS204_NIST_VECTORS`. The published `fips204` crate includes
+the keyGen vectors, under `tests/nist_vectors/`.
+
 This module should have reasonable type annotations and docstrings for
 the public interface.  If you discover a problem with type
 annotations, or see a way that this kind of documentation could be

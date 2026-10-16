@@ -270,11 +270,19 @@ class SigVerTestGroup(TestGroup):
             )
 
 
-def process(testtype: str) -> None:
-    with gzip.open(
-        f"../../tests/nist_vectors/ML-DSA-{testtype}-FIPS204/internalProjection.json.gz",
-        "rt",
-    ) as f:
+# The published fips204 crate ships the keyGen vectors only; FIPS204_NIST_VECTORS can point at
+# its copy, and a mode without a vector file is skipped.
+VECTORS = os.environ.get("FIPS204_NIST_VECTORS") or "../../tests/nist_vectors"
+
+
+def process(testtype: str) -> bool:
+    path = os.path.join(
+        VECTORS, f"ML-DSA-{testtype}-FIPS204", "internalProjection.json.gz"
+    )
+    if not os.path.exists(path):
+        print(f"{testtype}: {path} not found, skipped")
+        return False
+    with gzip.open(path, "rt") as f:
         t = json.load(f)
         assert t["vsId"] == 42
         assert t["algorithm"] == "ML-DSA"
@@ -310,10 +318,11 @@ def process(testtype: str) -> None:
             tests + skipped == total
         ), f"{testtype}: {tests} ran and {skipped} skipped, of {total}"
         assert tests > 0, f"{testtype}: no tests ran"
+    return True
 
 
 if os.environ.get("VERBOSE", None) is not None:
     logging.basicConfig(level=logging.DEBUG)
 
-for t in ["keyGen", "sigVer", "sigGen"]:
-    process(t)
+ran = [process(t) for t in ["keyGen", "sigVer", "sigGen"]]
+assert any(ran), f"no NIST vector files under {VECTORS}"
