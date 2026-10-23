@@ -37,7 +37,7 @@ Then open http://localhost:8080/ .
 |---|---|
 | `src/` | Rust crate (`fips204-wasm`) with a `sign` export |
 | `pkg/` | Produced by `wasm-pack build` (gitignored); consumed by `www/` as `file:../pkg` |
-| `www/` | Webpack + `webpack-dev-server` front end (`package-lock.json` is tracked for reproducible installs) |
+| `www/` | Webpack + `webpack-dev-server` front end |
 
 
 ## Optional: OS RNG in the browser

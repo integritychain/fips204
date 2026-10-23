@@ -8,7 +8,7 @@ npm package name is `fips204-wasm-www` (private demo front end; not published).
 
 ## Scripts
 
-- `npm install` — install devDependencies (see `package-lock.json`)
+- `npm install` — install devDependencies
 - `npm run start` — `webpack-dev-server` at http://localhost:8080/
 - `npm run build` — production webpack bundle into `dist/`
 
@@ -16,5 +16,4 @@ npm package name is `fips204-wasm-www` (private demo front end; not published).
 
 - `index.html` / `index.js` / `bootstrap.js` — page UI and wasm glue
 - `webpack.config.js` — bundles JS and copies `index.html`
-- `package.json` / `package-lock.json` — pinned toolchain (kept under version control
-  for reproducible, audit-clean installs)
+- `package.json` — npm scripts and devDependencies
