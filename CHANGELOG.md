@@ -9,23 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration from 0.4.x
 - MSRV is 1.85 (was 1.70).
-- `Ph` is removed. `try_hash_sign` and `hash_verify` take the caller's digest and a DER-encoded OID (see `pre_hash`) in place of the message. For a `pre_hash` OID the digest must be that function's full output (SHAKE128: 32 bytes, SHAKE256: 64 bytes). A digest of the wrong length, a non-DER OID, or a digest over 1024 bytes is an error on sign and `false` on verify.
+- `Ph` is removed. `try_hash_sign`, `try_hash_sign_with_rng`, `try_hash_sign_with_seed` and `hash_verify` take a digest and a DER-encoded OID (see `pre_hash`) instead of the message. A digest of the wrong length for a `pre_hash` OID (SHAKE128: 32 bytes, SHAKE256: 64), a digest over 1024 bytes, or a malformed OID is an error on sign and `false` on verify.
+- `KG` no longer implements `Zeroize` or `ZeroizeOnDrop`.
 
 ### Added
-- `libfips204` (crate `fips204-ffi`), a C library for ML-DSA and HashML-DSA (44/65/87), and Python bindings in `ffi/python`. Thanks to @dkg.
+- `libfips204` (crate `fips204-ffi`): a C library and Python bindings for ML-DSA and HashML-DSA. Thanks to @dkg.
+- `pre_hash`: DER-encoded OIDs of the pre-hash functions, for `try_hash_sign` and `hash_verify`.
 
 ### Changed
 - `Verifier::verify`, `Verifier::hash_verify` and `Signer::get_public_key` are `#[must_use]`.
-- Key generation and signing zeroize their seeds, randomness and secret intermediate values.
-- New compiler warnings no longer fail the build (CI still treats warnings as errors), and a build without any parameter-set feature, such as `--no-default-features`, compiles cleanly.
+- Key generation and signing zeroize their randomness and secret intermediate values, best effort: copies of keys that are moved or passed by value can remain on the stack.
+- Building the crate itself, as distributions do, no longer fails on new compiler warnings or with no parameter-set feature.
 
 ### Removed
-- Deprecated `_internal_sign` and `_internal_verify`. Test hooks are now behind the `acvp-internal` feature, which is not for use in applications.
+- Deprecated `_internal_sign` and `_internal_verify`. Test hooks are behind the `acvp-internal` feature, which is not for applications.
 
 ### Fixed
-- Signing gives up after 814 attempts (FIPS 204 Appendix C) and returns an error. Before, a malformed private key that `try_from_bytes` accepted could hang release builds and panic debug builds.
+- Signing returns an error after 814 attempts (FIPS 204 Appendix C) instead of looping forever on a malformed private key.
 - `PrivateKey::try_from_bytes` rejects a key whose s1 or s2 has a coefficient outside [−η, η].
-- `ffi/fips204.h` compiles as C++.
 
 ## 0.4.6 (2024-12-21)
 

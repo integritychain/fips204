@@ -15,7 +15,7 @@ The goals of this implementation are:
 security-related goals:
 
 - constant-time operations
-- clean library RAM (objects should be zeroed out of any library-allocated memory before function exit)
+- clean library RAM, best effort (the library wipes the secret buffers it uses before returning, but copies made when a key is moved or passed by value can remain on the stack)
 
 non-goals are:
 
