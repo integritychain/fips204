@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fips204"
+license = "MIT OR Apache-2.0"
 dynamic = ["version"]
 description = "ML-DSA (FIPS204) -- asymmetric, quantum-secure digital signatures"
 authors = [{name = "Daniel Kahn Gillmor", email = "dkg@fifthhorseman.net"}]
@@ -30,11 +31,6 @@ classifiers = [
   "Intended Audience :: Telecommunications Industry",
   "Intended Audience :: Information Technology",
   "Topic :: Security :: Cryptography",
-  "License :: OSI Approved :: MIT License",
-  # Apache 2.0 license is not in the list of known classifiers
-  # So the dual licensing of this module is not adequately represented
-  #  "License :: OSI Approved :: Apache 2.0 License",
-  "License :: DFSG approved",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
