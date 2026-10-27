@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "fips204"
 dynamic = ["version"]
 description = "ML-DSA (FIPS204) -- asymmetric, quantum-secure digital signatures"
-authors = [{name = "Daniel Kahn Gillmor", email = "dkg@fifthhorseman.net"}]
+authors = [
+ {name = "Daniel Kahn Gillmor", email = "dkg@fifthhorseman.net"},
+ {name = "Eric Schorn", email = "eschorn@integritychain.com"},
+]
 keywords = [
  "cryptography",
  "signing",
