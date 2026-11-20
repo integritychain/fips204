@@ -24,6 +24,22 @@ use zeroize::{Zeroize, Zeroizing};
 const MAX_SIGN_ATTEMPTS: u16 = 814;
 
 
+/// Bring each coefficient of an unreduced `mat_vec_mul` result into `(-q, q)`.
+///
+/// `inv_ntt` adds all 256 coefficients with no reduction on the low butterfly
+/// leg, so the sum of those inputs has to fit in `i32`. One `partial_reduce32`
+/// per coefficient gives `|x| < q`, and then every add and subtract in
+/// `inv_ntt` stays at or below `256·(q−1)`. The helper is congruent modulo `q`
+/// and `inv_ntt` ends in `full_reduce32`, so results that already fit are unchanged.
+fn partial_reduce_vec<const N: usize>(v: &mut [T; N]) {
+    for poly in v {
+        for coeff in &mut poly.0 {
+            *coeff = partial_reduce32(*coeff);
+        }
+    }
+}
+
+
 /// # Algorithm 1: `ML-DSA.KeyGen()` on page 17.
 /// Generates a public-private key pair.
 ///
@@ -93,7 +109,8 @@ pub(crate) fn key_gen_internal<
     let (t_1, t_0): ([R; K], [R; K]) = {
         let cap_a_hat: [[T; L]; K] = expand_a::<CTEST, K, L>(&rho);
         let s_1_hat: [T; L] = ntt(&s_1);
-        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        let mut as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        partial_reduce_vec(&mut as1_hat);
         let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
         let t: [R; K] = core::array::from_fn(|k| {
             R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n])))
@@ -246,7 +263,8 @@ pub(crate) fn sign_internal<
         // 12: w ← NTT−1(cap_a_hat ◦ NTT(y))
         let w: [R; K] = {
             let y_hat: [T; L] = ntt(&y);
-            let ay_hat: [T; K] = mat_vec_mul(&cap_a_hat, &y_hat);
+            let mut ay_hat: [T; K] = mat_vec_mul(&cap_a_hat, &y_hat);
+            partial_reduce_vec(&mut ay_hat);
             inv_ntt(&ay_hat)
         };
 
@@ -430,8 +448,10 @@ pub(crate) fn verify_internal<
         let c_hat: &T = &ntt(&[c])[0];
         inv_ntt(&core::array::from_fn(|k| {
             T(core::array::from_fn(|n| {
-                az_hat[k].0[n]
-                    - mont_reduce(i64::from(c_hat.0[n]) * i64::from(t1_d2_hat_mont[k].0[n]))
+                partial_reduce32(
+                    az_hat[k].0[n]
+                        - mont_reduce(i64::from(c_hat.0[n]) * i64::from(t1_d2_hat_mont[k].0[n])),
+                )
             }))
         }))
     };
@@ -562,7 +582,8 @@ pub(crate) fn private_to_public_key<const K: usize, const L: usize>(
 
     // 5: t ← NTT−1(cap_a_hat ◦ NTT(s_1)) + s_2    ▷ Compute t = As1 + s2
     let t: [R; K] = {
-        let as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        let mut as1_hat: [T; K] = mat_vec_mul(&cap_a_hat, &s_1_hat);
+        partial_reduce_vec(&mut as1_hat);
         let t_not_reduced: [R; K] = add_vector_ntt(&inv_ntt(&as1_hat), &s_2);
         core::array::from_fn(|k| R(core::array::from_fn(|n| full_reduce32(t_not_reduced[k].0[n]))))
     };
