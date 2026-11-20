@@ -296,7 +296,7 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
     for i in 0..K {
         //
         // 4: for j from 0 to 255 do
-        for j in 0..256 {
+        for (j, &coeff) in h[i].0.iter().enumerate() {
             //
             // 5: if h[i]_j != 0 then
             // CT patch path
@@ -304,7 +304,7 @@ pub(crate) fn hint_bit_pack<const CTEST: bool, const K: usize>(
                 continue;
             }
             // CT patch path
-            if CTEST || (h[i].0[j] != 0) {
+            if CTEST || (coeff != 0) {
                 //
                 // 6: y[Index] ← j      ▷ Store the locations of the nonzero coefficients in h[i]
                 y_bytes[index] = j.to_le_bytes()[0]; // ...bytes()[0] for clippy benefit
